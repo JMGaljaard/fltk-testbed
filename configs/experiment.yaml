@@ -1,0 +1,16 @@
+---
+# Experiment configuration
+total_epochs: 10
+epochs_per_cycle: 1
+wait_for_clients: true
+net: Cifar10CNN
+dataset: cifar10
+experiment_prefix: 'experiment_multi_machine'
+output_location: 'output'
+tensor_board_active: true
+clients_per_round: 2
+system:
+  federator:
+    hostname: '192.168.0.129'
+  clients:
+    amount: 2

@@ -127,3 +127,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+venv
+venv-*
+default_models
+data
+data_loaders
+simple_example
+output
+docker_data
+.idea
+*.tmp.txt
