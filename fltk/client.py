@@ -72,7 +72,7 @@ class Client:
                                           self.args.get_min_lr())
 
     def init_device(self):
-        if torch.cuda.is_available():
+        if self.args.cuda and torch.cuda.is_available():
             return torch.device("cuda:0")
         else:
             return torch.device("cpu")
@@ -169,12 +169,6 @@ class Client:
         """
         return self.client_idx
 
-    def get_nn_parameters(self):
-        """
-        Return the NN's parameters.
-        """
-        return self.net.state_dict()
-
     def update_nn_parameters(self, new_params):
         """
         Update the NN's parameters.
@@ -212,7 +206,7 @@ class Client:
         if self.args.distributed:
             self.dataset.train_sampler.set_epoch(epoch)
 
-        max_cycles = 50
+        # max_cycles = 50
         for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
@@ -232,8 +226,8 @@ class Client:
                 final_running_loss = running_loss / self.args.get_log_interval()
                 running_loss = 0.0
             # self.args.get_logger().info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / self.args.get_log_interval()))
-            if i >= max_cycles:
-                break
+            # if i >= max_cycles:
+            #     break
 
         self.scheduler.step()
 
@@ -298,6 +292,10 @@ class Client:
 
         data = EpochData(self.epoch_counter, train_time_ms, test_time_ms, loss, accuracy, test_loss, class_precision, class_recall, client_id=self.id)
         self.epoch_results.append(data)
+
+        # Copy GPU tensors to CPU
+        for k, v in weights.items():
+            weights[k] = v.cpu()
         return data, weights
 
     def save_model(self, epoch, suffix):
