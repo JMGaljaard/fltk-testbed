@@ -31,7 +31,8 @@ def main():
                 exit(1)
             world_size = yaml_data['system']['clients']['amount'] + 1
             master_address = yaml_data['system']['federator']['hostname']
-            run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg)
+            nic = yaml_data['system']['federator']['nic']
+            run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
         else:
             run_spawn(cfg)
 

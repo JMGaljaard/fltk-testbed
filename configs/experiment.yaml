@@ -14,5 +14,6 @@ clients_per_round: 1
 system:
   federator:
     hostname: '131.180.40.72'
+    nic: 'wlo1'
   clients:
     amount: 1

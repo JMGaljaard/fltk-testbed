@@ -18,15 +18,19 @@ def run_ps(rpc_ids_triple, args):
     fed = Federator(rpc_ids_triple, config=args)
     fed.run()
 
-def run_single(rank, world_size, host = None, args = None):
+def run_single(rank, world_size, host = None, args = None, nic = None):
     logging.info(f'Starting with rank={rank} and world size={world_size}')
     if host:
         os.environ['MASTER_ADDR'] = host
     else:
         os.environ['MASTER_ADDR'] = '0.0.0.0'
     os.environ['MASTER_PORT'] = '5000'
-    os.environ['GLOO_SOCKET_IFNAME'] = 'enp3s0'
-    os.environ['TP_SOCKET_IFNAME'] = 'enp3s0'
+    if nic:
+        os.environ['GLOO_SOCKET_IFNAME'] = nic
+        os.environ['TP_SOCKET_IFNAME'] = nic
+    else:
+        os.environ['GLOO_SOCKET_IFNAME'] = 'wlo1'
+        os.environ['TP_SOCKET_IFNAME'] = 'wlo1'
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
     options = rpc.TensorPipeRpcBackendOptions(
         num_worker_threads=16,
