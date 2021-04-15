@@ -6,8 +6,32 @@ Pytorch Distributed ([docs](https://pytorch.org/tutorials/beginner/dist_overview
 The goal if this project is to launch Federated Learning nodes in truly distribution fashion.
 
 ## Project structure
+Structure with important folders and files explained:
+```
+project
+├── configs
+│         └── experiment.yaml                 # Example of an experiment configuration
+├── deploy                                    # Templates for automatic deployment  
+│         └── templates
+│             ├── client_stub_default.yml
+│             ├── client_stub_medium.yml
+│             ├── client_stub_slow.yml
+│             └── system_stub.yml
+├── fltk                                      # Source code
+│         ├── datasets                        # Different dataset definitions
+│         │         ├── data_distribution     # Datasets with distributed sampler
+│         │         └── distributed           # "regular" datasets for centralized use
+│         ├── nets                            # Available networks
+│         ├── schedulers                      # Learning Rate Schedulers
+│         ├── strategy                        # Client selection and model aggregation algorithms
+│         └── util
+│            └── generate_docker_compose.py   # Generates a docker-compose.yml for a containerized run
+├── Dockerfile                                # Dockerfile to run in containers
+├── LICENSE
+├── README.md
+└── setup.py
 
-TBD
+```
 
 ## Models
 
@@ -62,7 +86,7 @@ python3 -m fltk single configs/experiment.yaml --rank=1
 
 #### Spawn FL system
 ```bash
-python3 -m fedsim spawn configs/experiment.yaml
+python3 -m fltk spawn configs/experiment.yaml
 ```
 
 ### Two machines (Native)
@@ -75,13 +99,15 @@ os.environ['TP_SOCKET_IFNAME'] = 'wlo1'
 Use `ifconfig` to find the name of the interface name on your machine.
 
 ### Docker Compose
-
-```bash
-docker-compose up
-```
-
-TBD
-
+1. Make sure docker and docker-compose are installed.
+2. Generate a `docker-compose.yml` file for your experiment. You can use the script `generate_docker_compose.py` for this.
+   From the root folder: ```python3 fltk/util/generate_docker_compose.py 4``` to generate a system with 4 clients.
+   Feel free to change/extend `generate_docker_compose.py` for your own need.
+   A `docker-compose.yml` file is created in the root folder.
+3. Run docker-compose to start the system:
+    ```bash
+    docker-compose up
+    ```
 ### Google Cloud Platform
 TBD
 
@@ -90,5 +116,5 @@ TBD
 
 ## Known issues
 
-* Currently, there is no GPU support. Not for native nor for docker compose
+* Currently, there is no GPU support docker containers (or docker compose)
 * First epoch only can be slow (6x - 8x slower)
