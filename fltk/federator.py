@@ -149,6 +149,10 @@ class Federator:
                                         epoch_data.loss_train,  # for every 1000 minibatches
                                         self.epoch_counter * res[0].data_size)
 
+            res[0].tb_writer.add_scalar('accuracy',
+                                        epoch_data.accuracy,  # for every 1000 minibatches
+                                        self.epoch_counter * res[0].data_size)
+
             client_weights.append(weights)
         updated_model = average_nn_parameters(client_weights)
 
