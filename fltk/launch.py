@@ -25,8 +25,8 @@ def run_single(rank, world_size, host = None, args = None):
     else:
         os.environ['MASTER_ADDR'] = '0.0.0.0'
     os.environ['MASTER_PORT'] = '5000'
-    os.environ['GLOO_SOCKET_IFNAME'] = 'wlo1'
-    os.environ['TP_SOCKET_IFNAME'] = 'wlo1'
+    os.environ['GLOO_SOCKET_IFNAME'] = 'enp3s0'
+    os.environ['TP_SOCKET_IFNAME'] = 'enp3s0'
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
     options = rpc.TensorPipeRpcBackendOptions(
         num_worker_threads=16,

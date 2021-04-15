@@ -117,6 +117,11 @@ class BareConfig:
             if 'federator' in cfg['system']:
                 if 'hostname' in cfg['system']['federator']:
                     self.federator_host = cfg['system']['federator']['hostname']
+        if 'cuda' in cfg:
+            if cfg['cuda']:
+                self.cuda = True
+            else:
+                self.cuda = False
 
 
     def init_logger(self, logger):
