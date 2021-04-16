@@ -1,5 +1,7 @@
 # FLTK - Federation Learning Toolkit
 [![License](https://img.shields.io/badge/license-BSD-blue.svg)](LICENSE)
+[![Python 3.6](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
+[![Python 3.6](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
 
 This toolkit is can be used to run Federated Learning experiments.
 Pytorch Distributed ([docs](https://pytorch.org/tutorials/beginner/dist_overview.html)) is used in this project.
@@ -10,27 +12,26 @@ Structure with important folders and files explained:
 ```
 project
 ├── configs
-│         └── experiment.yaml                 # Example of an experiment configuration
+│     └── experiment.yaml                     # Example of an experiment configuration
 ├── deploy                                    # Templates for automatic deployment  
-│         └── templates
-│             ├── client_stub_default.yml
-│             ├── client_stub_medium.yml
-│             ├── client_stub_slow.yml
-│             └── system_stub.yml
+│     └── templates
+│          ├── client_stub_default.yml
+│          ├── client_stub_medium.yml
+│          ├── client_stub_slow.yml
+│          └── system_stub.yml                # Describes the federator and the network
 ├── fltk                                      # Source code
-│         ├── datasets                        # Different dataset definitions
-│         │         ├── data_distribution     # Datasets with distributed sampler
-│         │         └── distributed           # "regular" datasets for centralized use
-│         ├── nets                            # Available networks
-│         ├── schedulers                      # Learning Rate Schedulers
-│         ├── strategy                        # Client selection and model aggregation algorithms
-│         └── util
-│            └── generate_docker_compose.py   # Generates a docker-compose.yml for a containerized run
+│     ├── datasets                            # Different dataset definitions
+│     │    ├── data_distribution              # Datasets with distributed sampler
+│     │    └── distributed                    # "regular" datasets for centralized use
+│     ├── nets                                # Available networks
+│     ├── schedulers                          # Learning Rate Schedulers
+│     ├── strategy                            # Client selection and model aggregation algorithms
+│     └── util
+│          └── generate_docker_compose.py     # Generates a docker-compose.yml for a containerized run
 ├── Dockerfile                                # Dockerfile to run in containers
 ├── LICENSE
 ├── README.md
 └── setup.py
-
 ```
 
 ## Models
@@ -60,12 +61,6 @@ When running in docker containers the following dependencies need to be installe
 ```bash
 python3 setup.py install
 ```
-
-[comment]: <> (```bash)
-
-[comment]: <> (pip3 install -r ./requirements.txt)
-
-[comment]: <> (```)
 
 ## Examples
 <details><summary>Show Examples</summary>
