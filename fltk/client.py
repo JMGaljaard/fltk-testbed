@@ -95,9 +95,6 @@ class Client:
     def local_log(self, message):
         logging.info(f'[{self.id}: {time.time()}]: {message}')
 
-    # def init_device(self, device: str):
-    #     return torch.device(device)
-
     def set_configuration(self, config: str):
         yaml_config = yaml.safe_load(config)
 
@@ -206,7 +203,6 @@ class Client:
         if self.args.distributed:
             self.dataset.train_sampler.set_epoch(epoch)
 
-        # max_cycles = 50
         for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
@@ -225,9 +221,6 @@ class Client:
                 self.args.get_logger().info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / self.args.get_log_interval()))
                 final_running_loss = running_loss / self.args.get_log_interval()
                 running_loss = 0.0
-            # self.args.get_logger().info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / self.args.get_log_interval()))
-            # if i >= max_cycles:
-            #     break
 
         self.scheduler.step()
 
@@ -260,8 +253,6 @@ class Client:
                 loss += self.loss_function(outputs, labels).item()
 
         accuracy = 100 * correct / total
-        # print(targets_)
-        # print(pred_)
         confusion_mat = confusion_matrix(targets_, pred_)
 
         class_precision = self.calculate_class_precision(confusion_mat)

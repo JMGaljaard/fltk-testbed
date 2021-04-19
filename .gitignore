@@ -139,3 +139,4 @@ output
 docker_data
 .idea
 *.tmp.txt
+docker-compose.yml

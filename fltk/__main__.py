@@ -18,6 +18,9 @@ def main():
     parser.add_argument('mode', choices=['single', 'spawn'])
     parser.add_argument('config', type=str)
     parser.add_argument('--rank', type=int)
+    parser.add_argument('--nic', type=str, default=None)
+    parser.add_argument('--host', type=str, default=None)
+    parser.add_argument('--world_size', type=str, default=None, help='Number of entities in the world. This is the number of clients + 1')
 
     args = parser.parse_args()
     with open(args.config) as file:
@@ -29,9 +32,18 @@ def main():
                 print('Missing rank argument when in \'single\' mode!')
                 parser.print_help()
                 exit(1)
-            world_size = yaml_data['system']['clients']['amount'] + 1
-            master_address = yaml_data['system']['federator']['hostname']
-            run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg)
+            world_size = args.world_size
+            master_address = args.host
+            nic = args.nic
+
+            if not world_size:
+                world_size = yaml_data['system']['clients']['amount'] + 1
+            if not master_address:
+                master_address = yaml_data['system']['federator']['hostname']
+            if not nic:
+                nic = yaml_data['system']['federator']['nic']
+            print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
+            run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
         else:
             run_spawn(cfg)
 
