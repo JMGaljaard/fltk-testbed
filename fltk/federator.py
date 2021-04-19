@@ -79,7 +79,6 @@ class Federator:
         self.config.init_logger(logging)
 
     def create_clients(self, client_id_triple):
-        # bare_config = BareConfig(self.config.logger)
         for id, rank, world_size in client_id_triple:
             client = rpc.remote(id, Client, kwargs=dict(id=id, log_rref=self.log_rref, rank=rank, world_size=world_size, config=self.config))
             writer = SummaryWriter(f'{self.tb_path}/{self.config.experiment_prefix}_client_{id}')
@@ -141,9 +140,6 @@ class Federator:
             self.client_data[epoch_data.client_id].append(epoch_data)
             logging.info(f'{res[0]} had a loss of {epoch_data.loss}')
             logging.info(f'{res[0]} had a epoch data of {epoch_data}')
-            # res[0].tb_writer.add_scalar('training loss',
-            #                   epoch_data.loss_train / 1000, # for every 1000 minibatches
-            #                   epoch * len(trainloader) + i)
 
             res[0].tb_writer.add_scalar('training loss',
                                         epoch_data.loss_train,  # for every 1000 minibatches
@@ -165,64 +161,22 @@ class Federator:
             res[1].wait()
         logging.info('Weights are updated')
 
-    # def remote_train_sync(self, epoch):
-    #     # logging.info('Starting epoch training')
-    #     responses = []
-    #     # for client in self.clients:
-    #     #     _remote_method(Client.train, client.ref, epoch=epoch)
-    #
-    #     client_weights = []
-    #     selected_clients = self.select_clients()
-    #     for client in selected_clients:
-    #         responses.append((client, _remote_method_async(Client.train, client.ref, epoch=epoch)))
-    #
-    #     for res in responses:
-    #         # logging.info(f'Waiting for {res[0]}')
-    #         loss, weights = res[1].wait()
-    #         logging.info(f'{res[0]} had a loss of {loss}')
-    #         client_weights.append(weights)
-    #     # logging.info('Done with one epoch')
-    #     updated_model = average_nn_parameters(client_weights)
-    #
-    #     responses = []
-    #     for client in self.clients:
-    #         responses.append((client, _remote_method_async(Client.update_nn_parameters, client.ref, new_params=updated_model)))
-    #
-    #     for res in responses:
-    #         res[1].wait()
-    #     logging.info('Weights are updated')
-
     def update_client_data_sizes(self):
-        # logging.info('Starting epoch testing')
         responses = []
-        # for client in self.clients:
-        #     _remote_method(Client.train, client.ref, epoch=epoch)
-
         for client in self.clients:
             responses.append((client, _remote_method_async(Client.get_client_datasize, client.ref)))
-
         for res in responses:
-            # logging.info(f'Waiting for {res[0]}')
             res[0].data_size = res[1].wait()
-            # logging.info(f'{res[0]} had a result of accuracy={accuracy}, loss={loss}, class_precision={class_precision}, class_recall={class_recall}')
             logging.info(f'{res[0]} had a result of datasize={res[0].data_size}')
-        # logging.info('Done with one epoch')
 
     def remote_test_sync(self):
-        # logging.info('Starting epoch testing')
         responses = []
-        # for client in self.clients:
-        #     _remote_method(Client.train, client.ref, epoch=epoch)
-
         for client in self.clients:
             responses.append((client, _remote_method_async(Client.test, client.ref)))
 
         for res in responses:
-            # logging.info(f'Waiting for {res[0]}')
             accuracy, loss, class_precision, class_recall = res[1].wait()
-            # logging.info(f'{res[0]} had a result of accuracy={accuracy}, loss={loss}, class_precision={class_precision}, class_recall={class_recall}')
             logging.info(f'{res[0]} had a result of accuracy={accuracy}')
-        # logging.info('Done with one epoch')
 
     def save_epoch_data(self):
         file_output = f'./{self.config.output_location}'
@@ -242,8 +196,6 @@ class Federator:
         Main loop of the Federator
         :return:
         """
-
-        # Init clients
         # # Make sure the clients have loaded all the data
         self.client_load_data()
         self.ping_all()
@@ -255,16 +207,9 @@ class Federator:
         epoch_to_run = self.config.epochs
         epoch_size = self.config.epochs_per_cycle
         for epoch in range(epoch_to_run):
-            # print(f'Running epoch {epoch}')
-        # # Run all epoch
-        # for epoch in range(1, 20):
             print(f'Running epoch {epoch}')
             self.remote_run_epoch(epoch_size)
             addition += 1
-
-            # self.remote_train_sync(epoch)
-            # self.remote_test_sync()
-        # rpc.shutdown()
         logging.info('Printing client data')
         print(self.client_data)
 

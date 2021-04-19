@@ -16,21 +16,15 @@ def average_nn_parameters(parameters):
 def fed_average_nn_parameters(parameters, sizes):
     new_params = {}
     sum_size = 0
-
-    # print('size'+ str(sizes))
-
     for client in parameters:
         for name in parameters[client].keys():
             try:
                 new_params[name].data += (parameters[client][name].data * sizes[client])
             except:
                 new_params[name] = (parameters[client][name].data * sizes[client])
-                # print('first agg')
         sum_size += sizes[client]
 
     for name in new_params:
         new_params[name].data /= sum_size
-
-    # new_params = [new_params[name].data / sum_size for name in new_params.keys()]
 
     return new_params
