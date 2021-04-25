@@ -12,8 +12,6 @@ import logging
 import numpy as np
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
-
-from fltk.datasets.distributed import DistCIFAR10Dataset
 from fltk.schedulers import MinCapableStepLR
 from fltk.util.arguments import Arguments
 from fltk.util.log import FLLogger
@@ -60,7 +58,10 @@ class Client:
         # self.args = Arguments(logging)
         self.args = config
         self.args.init_logger(logging)
+        print('Pre device')
         self.device = self.init_device()
+        print('Pre set_net')
+
         self.set_net(self.load_default_model())
         self.loss_function = self.args.get_loss_function()()
         self.optimizer = torch.optim.SGD(self.net.parameters(),
@@ -105,7 +106,9 @@ class Client:
         self.args.distributed = True
         self.args.rank = self.rank
         self.args.world_size = self.world_size
-        self.dataset = DistCIFAR10Dataset(self.args)
+        # self.dataset = DistCIFAR10Dataset(self.args)
+        logging.info(f'Pre init dataloader, {self.args.dataset_name}')
+        self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args)
         self.finished_init = True
         logging.info('Done with init')
 
@@ -113,13 +116,14 @@ class Client:
         return self.finished_init
 
     def set_net(self, net):
+        logging.info('Pre set_sent')
         self.net = net
         self.net.to(self.device)
 
     def load_model_from_file(self, model_file_path):
         model_class = self.args.get_net()
         default_model_path = os.path.join(self.args.get_default_model_folder_path(), model_class.__name__ + ".model")
-
+        logging.info(f'Loading model "{default_model_path}" from file')
         return self.load_model_from_file(default_model_path)
 
     def get_nn_parameters(self):
@@ -135,7 +139,9 @@ class Client:
         This is used to ensure consistent default model behavior.
         """
         model_class = self.args.get_net()
+        logging.info(f'Loading model_class "{model_class}"')
         default_model_path = os.path.join(self.args.get_default_model_folder_path(), model_class.__name__ + ".model")
+        logging.info(f'Loading model_path "{default_model_path}" from file')
 
         return self.load_model_from_file(default_model_path)
 
@@ -175,17 +181,6 @@ class Client:
         """
         self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
         self.remote_log(f'Weigths of the model are updated')
-
-    def load_default_model(self):
-        """
-        Load a model from default model file.
-
-        This is used to ensure consistent default model behavior.
-        """
-        model_class = self.args.get_net()
-        default_model_path = os.path.join(self.args.get_default_model_folder_path(), model_class.__name__ + ".model")
-
-        return self.load_model_from_file(default_model_path)
 
     def train(self, epoch):
         """
