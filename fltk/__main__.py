@@ -38,17 +38,6 @@ def main():
     remote_parser.add_argument('--nic', type=str, default=None)
     remote_parser.add_argument('--host', type=str, default=None)
     add_default_arguments(remote_parser)
-
-
-
-
-    # parser.add_argument('mode', choices=['single', 'spawn', 'remote'])
-    # parser.add_argument('config', type=str)
-    # parser.add_argument('--rank', type=int)
-    # parser.add_argument('--nic', type=str, default=None)
-    # parser.add_argument('--host', type=str, default=None)
-    # parser.add_argument('--world_size', type=str, default=None, help='Number of entities in the world. This is the number of clients + 1')
-
     args = parser.parse_args()
     if args.mode == 'remote':
         if args.rank is None or args.host is None or args.world_size is None or args.nic is None:
