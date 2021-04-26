@@ -12,8 +12,6 @@ import logging
 import numpy as np
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
-
-from fltk.datasets.distributed import DistCIFAR10Dataset
 from fltk.schedulers import MinCapableStepLR
 from fltk.util.arguments import Arguments
 from fltk.util.log import FLLogger
@@ -105,7 +103,8 @@ class Client:
         self.args.distributed = True
         self.args.rank = self.rank
         self.args.world_size = self.world_size
-        self.dataset = DistCIFAR10Dataset(self.args)
+        # self.dataset = DistCIFAR10Dataset(self.args)
+        self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args)
         self.finished_init = True
         logging.info('Done with init')
 
@@ -119,7 +118,6 @@ class Client:
     def load_model_from_file(self, model_file_path):
         model_class = self.args.get_net()
         default_model_path = os.path.join(self.args.get_default_model_folder_path(), model_class.__name__ + ".model")
-
         return self.load_model_from_file(default_model_path)
 
     def get_nn_parameters(self):
@@ -174,18 +172,7 @@ class Client:
         :type new_params: dict
         """
         self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
-        self.remote_log(f'Weigths of the model are updated')
-
-    def load_default_model(self):
-        """
-        Load a model from default model file.
-
-        This is used to ensure consistent default model behavior.
-        """
-        model_class = self.args.get_net()
-        default_model_path = os.path.join(self.args.get_default_model_folder_path(), model_class.__name__ + ".model")
-
-        return self.load_model_from_file(default_model_path)
+        self.remote_log(f'Weights of the model are updated')
 
     def train(self, epoch):
         """
