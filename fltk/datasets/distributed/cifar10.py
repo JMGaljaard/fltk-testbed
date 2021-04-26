@@ -28,7 +28,6 @@ class DistCIFAR10Dataset(DistDataset):
         self.train_sampler = DistributedSampler(self.train_dataset, rank=self.args.get_rank(),
                                      num_replicas=self.args.get_world_size()) if self.args.get_distributed() else None
         self.train_loader = DataLoader(self.train_dataset, batch_size=16, sampler=self.train_sampler)
-        # self.train_loader = DataLoader(self.train_dataset, batch_size=len(self.train_dataset), sampler=self.train_sampler)
 
     def init_test_dataset(self):
         self.get_args().get_logger().debug("Loading CIFAR10 test data")

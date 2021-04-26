@@ -1,6 +1,7 @@
 import torch
 import json
 
+from fltk.datasets.distributed import DistCIFAR10Dataset, DistCIFAR100Dataset, DistFashionMNISTDataset
 from fltk.nets import Cifar10CNN, FashionMNISTCNN, Cifar100ResNet, FashionMNISTResNet, Cifar10ResNet, Cifar100VGG
 
 SEED = 1
@@ -57,6 +58,12 @@ class BareConfig:
         self.net = None
         self.set_net_by_name('Cifar10CNN')
         self.dataset_name = 'cifar10'
+
+        self.DistDatasets = {
+            'cifar10': DistCIFAR10Dataset,
+            'cifar100': DistCIFAR100Dataset,
+            'fashion-mnist': DistFashionMNISTDataset,
+        }
         self.train_data_loader_pickle_path = {
             'cifar10': 'data_loaders/cifar10/train_data_loader.pickle',
             'fashion-mnist': 'data_loaders/fashion-mnist/train_data_loader.pickle',
