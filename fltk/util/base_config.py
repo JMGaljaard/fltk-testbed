@@ -44,7 +44,8 @@ class BareConfig:
         self.federator_host = '0.0.0.0'
         self.rank = 0
         self.world_size = 0
-        self.data_sampler = None
+        self.data_sampler = "uniform"
+        self.data_sampler_args = None
         self.distributed = False
         self.available_nets = {
             "Cifar100ResNet": Cifar100ResNet,
@@ -78,7 +79,6 @@ class BareConfig:
         self.loss_function = torch.nn.CrossEntropyLoss
         self.default_model_folder_path = "default_models"
         self.data_path = "data"
-
 
     ###########
     # Methods #
@@ -129,6 +129,11 @@ class BareConfig:
                 self.cuda = True
             else:
                 self.cuda = False
+        if 'sampler' in cfg:
+            self.data_sampler = cfg['sampler']
+        if 'sampler_args' in cfg:
+            self.data_sampler_args = cfg['sampler_args']
+            
 
 
     def init_logger(self, logger):
@@ -148,6 +153,9 @@ class BareConfig:
 
     def get_sampler(self):
         return self.data_sampler
+    
+    def get_sampler_args(self):
+        return self.data_sampler_args
 
     def get_round_worker_selection_strategy(self):
         return self.round_worker_selection_strategy
