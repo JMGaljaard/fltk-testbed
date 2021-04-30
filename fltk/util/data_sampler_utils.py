@@ -2,18 +2,23 @@
 from torch.utils.data import Dataset
 import random
 import logging
+from torch.utils.data import DistributedSampler
+from typing import Iterator
 
-class LimitLabelsSampler(Dataset):
+
+
+class LimitLabelsSampler(DistributedSampler):
     """
     A sampler that limits the number of labels per client
     """
-    def __init__(self, dataset, rank, world_size, limit=5, seed=42):
-        self.dataset = dataset
-        n_clients = world_size - 1
+    def __init__(self, dataset, rank, world_size, limit=5, seed=42): 
+        super(LimitLabelsSampler, self).__init__(
+            dataset, world_size, rank, False)
+        
         client_id = rank - 1
-
+        n_clients = world_size - 1
         # order the indices by label
-        ordered_by_label = [[] for i in range(len(dataset.targets))]
+        ordered_by_label = [[] for i in range(len(dataset.classes))]
         for index, target in enumerate(dataset.targets):
             ordered_by_label[target].append(index)
 
@@ -73,6 +78,7 @@ class LimitLabelsSampler(Dataset):
         # all clients get the same amount of data, the first portion is given to client with rank 1, the second to rank 2, etc
 
         labels = client_labels[client_id]
+        logging.info("Client {} gets labels {}".format(rank, client_labels[client_id]))
         indices = []
         for label in labels:
             n_samples = int( len(ordered_by_label[label])/n_occurrences ) 
@@ -83,8 +89,7 @@ class LimitLabelsSampler(Dataset):
                 end_index = len(ordered_by_label[label])     # exclusive
             else:
                 end_index = start_index + n_samples # exclusive
-            
-            print(start_index, end_index)
+
             indices += ordered_by_label[label][start_index:end_index]
 
         random.seed(seed+client_id)  # give each client a unique shuffle
@@ -92,9 +97,8 @@ class LimitLabelsSampler(Dataset):
 
         self.indices = indices
 
-    def __len__(self):
-        return len(self.indices)
+    def __iter__(self) -> Iterator[int]:
+        return iter(self.indices)
 
-    def __getitem__(self, item):
-        idx = self.indices[item]
-        return self.dataset[idx]
+    def __len__(self) -> int:
+        return len(self.indices)

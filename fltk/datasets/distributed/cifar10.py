@@ -3,7 +3,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader, DistributedSampler
 
 from fltk.datasets.distributed.dataset import DistDataset
-
+from fltk.util.data_sampler_utils import LimitLabelsSampler
 
 class DistCIFAR10Dataset(DistDataset):
 
@@ -25,8 +25,7 @@ class DistCIFAR10Dataset(DistDataset):
         ])
         self.train_dataset = datasets.CIFAR10(root=self.get_args().get_data_path(), train=True, download=True,
                                          transform=transform)
-        self.train_sampler = DistributedSampler(self.train_dataset, rank=self.args.get_rank(),
-                                     num_replicas=self.args.get_world_size()) if self.args.get_distributed() else None
+        self.train_sampler = self.get_sampler(self.train_dataset)
         self.train_loader = DataLoader(self.train_dataset, batch_size=16, sampler=self.train_sampler)
 
     def init_test_dataset(self):
@@ -39,8 +38,7 @@ class DistCIFAR10Dataset(DistDataset):
         ])
         self.test_dataset = datasets.CIFAR10(root=self.get_args().get_data_path(), train=False, download=True,
                                         transform=transform)
-        self.test_sampler = DistributedSampler(self.test_dataset, rank=self.args.get_rank(),
-                                     num_replicas=self.args.get_world_size()) if self.args.get_distributed() else None
+        self.test_sampler = self.get_sampler(self.test_dataset)
         # self.test_sampler = None
         self.test_loader = DataLoader(self.test_dataset, batch_size=16, sampler=self.test_sampler)
 
@@ -84,3 +82,18 @@ class DistCIFAR10Dataset(DistDataset):
         self.get_args().get_logger().debug("Finished loading CIFAR10 test data")
 
         return test_data
+
+    def get_sampler(self, dataset):
+        sampler = None
+        if self.args.get_distributed():
+            method = self.args.get_sampler()
+            self.get_args().get_logger().info("Using {} sampler method, with args: {}".format(method, self.args.get_sampler_args()))
+            if method == "uniform":
+                sampler = DistributedSampler(dataset, rank=self.args.get_rank(), num_replicas=self.args.get_world_size())
+            elif method == "limit labels":
+                sampler = LimitLabelsSampler(dataset, self.args.get_rank(), self.args.get_world_size(), *self.args.get_sampler_args())
+            else:   # default
+                self.get_args().get_logger().warning("Unknown sampler " + method + ", using uniform instead")
+                sampler = DistributedSampler(dataset, rank=self.args.get_rank(), num_replicas=self.args.get_world_size())    
+
+        return sampler
