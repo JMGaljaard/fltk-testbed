@@ -172,7 +172,8 @@ class Client:
         :type new_params: dict
         """
         self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
-        self.remote_log(f'Weights of the model are updated')
+        if self.log_rref:
+            self.remote_log(f'Weights of the model are updated')
 
     def train(self, epoch):
         """
