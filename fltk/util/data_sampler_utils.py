@@ -1,11 +1,12 @@
 
 from torch.utils.data import Dataset
+from torchvision import datasets, transforms
 import random
 import logging
-from torch.utils.data import DistributedSampler
+from torch.utils.data import DistributedSampler, DataLoader
 from typing import Iterator
-
-
+from collections import Counter
+import numpy as np
 
 class LimitLabelsSampler(DistributedSampler):
     """
@@ -102,3 +103,130 @@ class LimitLabelsSampler(DistributedSampler):
 
     def __len__(self) -> int:
         return len(self.indices)
+
+class Probability_q_Sampler(DistributedSampler):
+    """
+    Clients are divided among M groups, with M being the number of labels.
+    A sample with label m is than given to a member of group m with probability q,
+    and to any other group with probability (1-q)/(m-1)
+
+    side effect of this method is that the reported loss on the test dataset becomes somewhat meaningless...logging.info("distribution in client with rank {}: {}".format(rank, Counter(labels)))
+    """
+    def __init__(self, dataset, rank, world_size, q=0.5, seed=42): 
+        self.rank = rank
+        super(Probability_q_Sampler, self).__init__(
+            dataset, world_size, rank, False)
+
+        client_id = rank - 1
+        n_clients = world_size - 1
+
+        # order the indices by label
+        ordered_by_label = [[] for i in range(len(dataset.classes))]
+        for index, target in enumerate(dataset.targets):
+            ordered_by_label[target].append(index)
+
+
+        n_labels = len(ordered_by_label)
+
+        if n_clients % n_labels != 0:
+            logging.error("multiples of {} clients are needed for the 'probability-q-sampler' data distribution method, {} does not work".format(n_labels, n_clients))
+            return
+
+        # divide data among groups
+        counter = 0   # for dividing data within a group
+        group_id = client_id % n_labels
+        group_clients = [client for client in range(n_clients) if client % n_labels == group_id]
+        indices = []
+        random.seed(seed)
+        for group, label_list in enumerate(ordered_by_label):
+            for sample_idx in label_list:
+                rnd_val = random.random()
+                if rnd_val < q:
+                    if group == group_id:
+                        if group_clients[counter] == client_id:
+                            indices.append(sample_idx)
+                        counter = (counter + 1) % len(group_clients)
+                else:
+                    others = [grp for grp in range(n_labels) if grp != group]
+                    if random.choice(others) == group_id:
+                        if group_clients[counter] == client_id:
+                            indices.append(sample_idx)
+                        counter = (counter + 1) % len(group_clients)
+
+        labels = [dataset.targets[i] for i in indices]
+        logging.info("nr of samplers in client with rank {}: {}".format(rank, len(indices)))
+        logging.info("distribution in client with rank {}: {}".format(rank, Counter(labels)))
+
+        random.seed(seed+client_id)  # give each client a unique shuffle
+        random.shuffle(indices) # shuffle indices to spread the labels
+        
+        self.indices = indices
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self.indices)
+
+    def __len__(self) -> int:
+        logging.info("length of client with rank {} : {}".format(self.rank, len(self.indices)))
+        return len(self.indices)
+
+class DirichletSampler(DistributedSampler):
+    def __init__(self, dataset, rank, world_size, alpha=0.5, seed=42): 
+        self.rank = rank
+        super(DirichletSampler, self).__init__(
+            dataset, world_size, rank, False)
+
+        client_id = rank - 1
+        n_clients = world_size - 1
+
+        # order the indices by label
+        ordered_by_label = [[] for i in range(len(dataset.classes))]
+        for index, target in enumerate(dataset.targets):
+            ordered_by_label[target].append(index)
+
+        n_labels = len(ordered_by_label)
+
+        np.random.seed(seed)
+        indices = []
+        for labels in ordered_by_label:
+            n_samples = len(labels)
+            allocation = np.random.dirichlet([alpha]*n_clients)*n_samples
+            allocation = allocation.astype(int)
+            start_index = allocation[0:client_id].sum()
+            end_index = 0
+            if client_id + 1 == n_clients: # last client
+                end_index = n_samples 
+            else:
+                end_index = start_index + allocation[client_id]
+
+            selection = labels[start_index:end_index]
+            indices.extend(selection)
+
+        labels = [dataset.targets[i] for i in indices]
+        logging.info("nr of samplers in client with rank {}: {}".format(rank, len(indices)))
+        logging.info("distribution in client with rank {}: {}".format(rank, Counter(labels)))
+
+        random.seed(seed+client_id)  # give each client a unique shuffle
+        random.shuffle(indices) # shuffle indices to spread the labels
+        
+        self.indices = indices
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self.indices)
+
+    def __len__(self) -> int:
+        logging.info("length of client with rank {} : {}".format(self.rank, len(self.indices)))
+        return len(self.indices)
+
+
+if __name__ == "__main__":
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(32, 4),
+        transforms.ToTensor(),
+        normalize
+    ])
+    data = datasets.CIFAR10(root="../../data", train=True, download=True,
+                                        transform=transform)
+    sampler = DirichletSampler(data, 3, 11)
+    loader = DataLoader(data, batch_size=16, sampler=sampler)
