@@ -85,6 +85,11 @@ When running in docker containers the following dependencies need to be installe
 python3 setup.py install
 ```
 
+### Load models
+```bash
+python3 fltk/util/default_models.py
+```
+
 ## Examples
 <details><summary>Show Examples</summary>
 
@@ -127,7 +132,7 @@ Use `ifconfig` to find the name of the interface name on your machine.
     docker-compose up
     ```
 ### Google Cloud Platform
-TBD
+See Manual on brightspace
 
 </p>
 </details>
