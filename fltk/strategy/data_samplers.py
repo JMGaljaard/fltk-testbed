@@ -1,8 +1,8 @@
 from torchvision import datasets, transforms
 import random
 import logging
-from torch.utils.data import DistributedSampler, DataLoader, Dataset
-from typing import Iterator, Optional
+from torch.utils.data import DistributedSampler, Dataset
+from typing import Iterator
 from collections import Counter
 import numpy as np
 
@@ -230,6 +230,11 @@ class DirichletSampler(DistributedSamplerWrapper):
 
         self.indices = indices
 
+class UniformSampler(DistributedSamplerWrapper):
+    def __init__(self, dataset, num_replicas=None, rank=None, seed=0):
+        super().__init__(dataset, num_replicas=num_replicas, rank=rank, seed=seed)
+        indices = list(range(len(self.dataset)))
+        self.indices = indices[self.rank:self.total_size:self.num_replicas]
 
 def get_sampler(dataset, args):
     sampler = None
@@ -239,7 +244,7 @@ def get_sampler(dataset, args):
             "Using {} sampler method, with args: {}".format(method, args.get_sampler_args()))
         
         if method == "uniform":
-            sampler = DistributedSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank())
+            sampler = UniformSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank())
         elif method == "q sampler":
             sampler = Probability_q_Sampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                             args=args.get_sampler_args())
@@ -251,6 +256,6 @@ def get_sampler(dataset, args):
                                        args=args.get_sampler_args())
         else:  # default
             args().get_logger().warning("Unknown sampler " + method + ", using uniform instead")
-            sampler = DistributedSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank())
+            sampler = UniformSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank())
 
     return sampler
