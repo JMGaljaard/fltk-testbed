@@ -171,9 +171,13 @@ class Client:
         :param new_params: New weights for the neural network
         :type new_params: dict
         """
+        start_time = time.time()
         self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
         if self.log_rref:
             self.remote_log(f'Weights of the model are updated')
+
+        end_time = time.time()
+        return end_time - start_time
 
     def train(self, epoch):
         """
@@ -248,10 +252,10 @@ class Client:
 
         self.args.get_logger().debug('Test set: Accuracy: {}/{} ({:.0f}%)'.format(correct, total, accuracy))
         self.args.get_logger().debug('Test set: Loss: {}'.format(loss))
-        self.args.get_logger().debug("Classification Report:\n" + classification_report(targets_, pred_))
-        self.args.get_logger().debug("Confusion Matrix:\n" + str(confusion_mat))
-        self.args.get_logger().debug("Class precision: {}".format(str(class_precision)))
-        self.args.get_logger().debug("Class recall: {}".format(str(class_recall)))
+        # self.args.get_logger().debug("Classification Report:\n" + classification_report(targets_, pred_))
+        # self.args.get_logger().debug("Confusion Matrix:\n" + str(confusion_mat))
+        # self.args.get_logger().debug("Class precision: {}".format(str(class_precision)))
+        # self.args.get_logger().debug("Class recall: {}".format(str(class_recall)))
 
         return accuracy, loss, class_precision, class_recall
 

@@ -1,4 +1,3 @@
-import datetime
 import time
 from typing import List
 
@@ -6,49 +5,17 @@ from dataclass_csv import DataclassWriter
 from torch.distributed import rpc
 
 from fltk.client import Client
-from fltk.datasets.data_distribution import distribute_batches_equally
 from fltk.strategy.client_selection import random_selection
-from fltk.util.arguments import Arguments
-from fltk.util.base_config import BareConfig
-from fltk.util.data_loader_utils import load_train_data_loader, load_test_data_loader, \
-    generate_data_loaders_from_distributed_dataset
 from fltk.util.fed_avg import average_nn_parameters
 from fltk.util.log import FLLogger
-from torchsummary import summary
 from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 import logging
 
+from fltk.util.remote import ClientRef, _remote_method, _remote_method_async, AsyncCall, time_remote_async_call
 from fltk.util.results import EpochData
-from fltk.util.tensor_converter import convert_distributed_data_into_numpy
 
 logging.basicConfig(level=logging.DEBUG)
-
-def _call_method(method, rref, *args, **kwargs):
-    return method(rref.local_value(), *args, **kwargs)
-
-
-def _remote_method(method, rref, *args, **kwargs):
-    args = [method, rref] + list(args)
-    return rpc.rpc_sync(rref.owner(), _call_method, args=args, kwargs=kwargs)
-
-def _remote_method_async(method, rref, *args, **kwargs):
-    args = [method, rref] + list(args)
-    return rpc.rpc_async(rref.owner(), _call_method, args=args, kwargs=kwargs)
-
-class ClientRef:
-    ref = None
-    name = ""
-    data_size = 0
-    tb_writer = None
-
-    def __init__(self, name, ref, tensorboard_writer):
-        self.name = name
-        self.ref = ref
-        self.tb_writer = tensorboard_writer
-
-    def __repr__(self):
-        return self.name
 
 class Federator:
     """
@@ -137,31 +104,42 @@ class Federator:
         logging.info('All clients are ready')
 
     def remote_run_epoch(self, epochs):
-        responses = []
+
+        responses: List[AsyncCall] = []
         client_weights = []
         selected_clients = self.select_clients(self.config.clients_per_round)
         for client in selected_clients:
-            responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs)))
+            response = time_remote_async_call(client, Client.run_epochs, client.ref, num_epoch=epochs)
+            responses.append(response)
+
         self.epoch_counter += epochs
+        durations = []
         for res in responses:
-            epoch_data, weights = res[1].wait()
+            res.future.wait()
+            epoch_data, weights = res.future.wait()
+            fed_stop_time = time.time()
             self.client_data[epoch_data.client_id].append(epoch_data)
-            logging.info(f'{res[0]} had a loss of {epoch_data.loss}')
-            logging.info(f'{res[0]} had a epoch data of {epoch_data}')
+            logging.info(f'{res.client.name} had a loss of {epoch_data.loss}')
+            logging.info(f'{res.client.name} had a epoch data of {epoch_data}')
+            logging.info(f'[TIMING FUT]\t{res.client.name} had a epoch duration of {res.duration()}')
+            fed_duration = fed_stop_time - res.end_time
+            logging.info(f'[TIMING LOCAL]\t{res.client.name} had a epoch duration of {fed_duration}')
+            durations.append((res.client.name, res.duration(), fed_duration))
 
-            res[0].tb_writer.add_scalar('training loss',
+
+            res.client.tb_writer.add_scalar('training loss',
                                         epoch_data.loss_train,  # for every 1000 minibatches
-                                        self.epoch_counter * res[0].data_size)
+                                        self.epoch_counter * res.client.data_size)
 
-            res[0].tb_writer.add_scalar('accuracy',
+            res.client.tb_writer.add_scalar('accuracy',
                                         epoch_data.accuracy,  # for every 1000 minibatches
-                                        self.epoch_counter * res[0].data_size)
+                                        self.epoch_counter * res.client.data_size)
 
-            res[0].tb_writer.add_scalar('training loss per epoch',
+            res.client.tb_writer.add_scalar('training loss per epoch',
                                         epoch_data.loss_train,  # for every 1000 minibatches
                                         self.epoch_counter)
 
-            res[0].tb_writer.add_scalar('accuracy per epoch',
+            res.client.tb_writer.add_scalar('accuracy per epoch',
                                         epoch_data.accuracy,  # for every 1000 minibatches
                                         self.epoch_counter)
 
@@ -172,19 +150,25 @@ class Federator:
         logging.info("Testing on global test set")
         self.test_data.update_nn_parameters(updated_model)
         accuracy, loss, class_precision, class_recall = self.test_data.test()
-        # self.tb_writer.add_scalar('training loss', loss, self.epoch_counter * self.test_data.get_client_datasize()) # does not seem to work :( )
         self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
         self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
 
-
         responses = []
         for client in self.clients:
-            responses.append(
-                (client, _remote_method_async(Client.update_nn_parameters, client.ref, new_params=updated_model)))
+            response = time_remote_async_call(client, Client.update_nn_parameters, client.ref, new_params=updated_model)
+            responses.append(response)
 
         for res in responses:
-            res[1].wait()
+            func_duration = res.future.wait()
+            print(f'[Client:: {res.client.name}] internal weights copied in {func_duration}')
+            print(f'[Client:: {res.client.name}] model transfer time: {res.duration()}')
         logging.info('Weights are updated')
+
+        print('Duration timing')
+        for name, fut_time, fed_time in durations:
+            print(f'Client: {name} has these timings:')
+            print(f'FUT:\t{fut_time}')
+            print(f'Fed:\t{fed_time}')
 
     def update_client_data_sizes(self):
         responses = []
