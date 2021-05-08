@@ -214,6 +214,8 @@ class Client:
                 final_running_loss = running_loss / self.args.get_log_interval()
                 running_loss = 0.0
 
+            break
+
         self.scheduler.step()
 
         # save model
@@ -308,4 +310,4 @@ class Client:
         return len(self.dataset.get_train_sampler())
 
     def __del__(self):
-        print(f'Client {self.id} is stopping')
+        logging.info(f'Client {self.id} is stopping')

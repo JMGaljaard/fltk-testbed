@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import torch
 import json
 
@@ -109,6 +111,8 @@ class BareConfig:
             self.dataset_name = cfg['dataset']
         if 'experiment_prefix' in cfg:
             self.experiment_prefix = cfg['experiment_prefix']
+        else:
+            self.experiment_prefix = f'{datetime.now()}'
         if 'output_location' in cfg:
             self.output_location = cfg['output_location']
         if 'tensor_board_active' in cfg:

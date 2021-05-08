@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 import logging
 
-from fltk.util.remote import ClientRef, _remote_method, _remote_method_async, AsyncCall, time_remote_async_call
+from fltk.util.remote import ClientRef, AsyncCall, timed_remote_async_call, _remote_method, TimingRecord
 from fltk.util.results import EpochData
 
 logging.basicConfig(level=logging.DEBUG)
@@ -70,17 +70,18 @@ class Federator:
             answer = _remote_method(Client.ping, client.ref)
             t_end = time.time()
             duration = (t_end - t_start)*1000
+            client.timing_data.append(TimingRecord(f'{client.name}', 'ping', duration))
             logging.info(f'Ping to {client} is {duration:.3}ms')
 
     def rpc_test_all(self):
         for client in self.clients:
-            res = _remote_method_async(Client.rpc_test, client.ref)
-            while not res.done():
+            res = timed_remote_async_call(client, Client.rpc_test, client.ref)
+            while not res.future.done():
                 pass
 
     def client_load_data(self):
         for client in self.clients:
-            _remote_method_async(Client.init_dataloader, client.ref)
+            timed_remote_async_call(client, Client.init_dataloader, client.ref)
 
     def clients_ready(self):
         all_ready = False
@@ -89,15 +90,16 @@ class Federator:
             responses = []
             for client in self.clients:
                 if client.name not in ready_clients:
-                    responses.append((client, _remote_method_async(Client.is_ready, client.ref)))
+                    response = timed_remote_async_call(client, Client.is_ready, client.ref)
+                    responses.append(response)
             all_ready = True
             for res in responses:
-                result = res[1].wait()
+                result = res.future.wait()
                 if result:
-                    logging.info(f'{res[0]} is ready')
-                    ready_clients.append(res[0])
+                    logging.info(f'{res.client} is ready')
+                    ready_clients.append(res.client)
                 else:
-                    logging.info(f'Waiting for {res[0]}')
+                    logging.info(f'Waiting for {res.client}')
                     all_ready = False
 
             time.sleep(2)
@@ -109,7 +111,7 @@ class Federator:
         client_weights = []
         selected_clients = self.select_clients(self.config.clients_per_round)
         for client in selected_clients:
-            response = time_remote_async_call(client, Client.run_epochs, client.ref, num_epoch=epochs)
+            response = timed_remote_async_call(client, Client.run_epochs, client.ref, num_epoch=epochs)
             responses.append(response)
 
         self.epoch_counter += epochs
@@ -121,11 +123,7 @@ class Federator:
             self.client_data[epoch_data.client_id].append(epoch_data)
             logging.info(f'{res.client.name} had a loss of {epoch_data.loss}')
             logging.info(f'{res.client.name} had a epoch data of {epoch_data}')
-            logging.info(f'[TIMING FUT]\t{res.client.name} had a epoch duration of {res.duration()}')
-            fed_duration = fed_stop_time - res.end_time
-            logging.info(f'[TIMING LOCAL]\t{res.client.name} had a epoch duration of {fed_duration}')
-            durations.append((res.client.name, res.duration(), fed_duration))
-
+            res.client.timing_data.append(TimingRecord(f'{res.client.name}', 'epoch_time_round_trip', res.duration()))
 
             res.client.tb_writer.add_scalar('training loss',
                                         epoch_data.loss_train,  # for every 1000 minibatches
@@ -155,40 +153,36 @@ class Federator:
 
         responses = []
         for client in self.clients:
-            response = time_remote_async_call(client, Client.update_nn_parameters, client.ref, new_params=updated_model)
+            response = timed_remote_async_call(client, Client.update_nn_parameters, client.ref, new_params=updated_model)
             responses.append(response)
 
         for res in responses:
             func_duration = res.future.wait()
-            print(f'[Client:: {res.client.name}] internal weights copied in {func_duration}')
-            print(f'[Client:: {res.client.name}] model transfer time: {res.duration()}')
+            res.client.timing_data.append(TimingRecord(res.client.name, 'update_param_inner', func_duration))
+            res.client.timing_data.append(TimingRecord(f'{res.client.name}', 'update_param_round_trip', res.duration()))
         logging.info('Weights are updated')
-
-        print('Duration timing')
-        for name, fut_time, fed_time in durations:
-            print(f'Client: {name} has these timings:')
-            print(f'FUT:\t{fut_time}')
-            print(f'Fed:\t{fed_time}')
 
     def update_client_data_sizes(self):
         responses = []
         for client in self.clients:
-            responses.append((client, _remote_method_async(Client.get_client_datasize, client.ref)))
+            response = timed_remote_async_call(client, Client.get_client_datasize, client.ref)
+            responses.append(response)
         for res in responses:
-            res[0].data_size = res[1].wait()
-            logging.info(f'{res[0]} had a result of datasize={res[0].data_size}')
+            res.client.data_size = res.future.wait()
+            logging.info(f'{res.client.name} had a result of datasize={res.client.data_size}')
 
     def remote_test_sync(self):
         responses = []
         for client in self.clients:
-            responses.append((client, _remote_method_async(Client.test, client.ref)))
+            response = timed_remote_async_call(client, Client.test, client.ref)
+            responses.append(response)
 
         for res in responses:
-            accuracy, loss, class_precision, class_recall = res[1].wait()
-            logging.info(f'{res[0]} had a result of accuracy={accuracy}')
+            accuracy, loss, class_precision, class_recall = res.future.wait()
+            logging.info(f'{res.client.name} had a result of accuracy={accuracy}')
 
     def save_epoch_data(self):
-        file_output = f'./{self.config.output_location}'
+        file_output = f'./{self.config.output_location}/{self.config.experiment_prefix}_data'
         self.ensure_path_exists(file_output)
         for key in self.client_data:
             filename = f'{file_output}/{key}_epochs.csv'
@@ -196,6 +190,18 @@ class Federator:
             with open(filename, "w") as f:
                 w = DataclassWriter(f, self.client_data[key], EpochData)
                 w.write()
+
+    def save_profiling_data(self):
+        file_output = f'./{self.config.output_location}/{self.config.experiment_prefix}_data'
+        filename = f'{file_output}/profiling_data.csv'
+        self.ensure_path_exists(file_output)
+        with open(filename, "w") as f:
+            for client in self.clients:
+                for record in client.timing_data:
+                    w = DataclassWriter(f, [record], TimingRecord)
+                    w.write()
+
+
 
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
@@ -216,13 +222,23 @@ class Federator:
         epoch_to_run = self.config.epochs
         epoch_size = self.config.epochs_per_cycle
         for epoch in range(epoch_to_run):
-            print(f'Running epoch {epoch}')
+            logging.info(f'Running epoch {epoch}')
             self.remote_run_epoch(epoch_size)
             addition += 1
-        logging.info('Printing client data')
-        print(self.client_data)
+        logging.info('Available clients with data')
+        logging.info(self.client_data.keys())
 
-        logging.info(f'Saving data')
+        logging.info('Saving data')
         self.save_epoch_data()
+
+        logging.info('Printing all clients timing data')
+        for client in self.clients:
+            logging.info(f"Timing data for client {client}")
+            for record in client.timing_data:
+                logging.info(f'{record}')
+
+        logging.info('Saving profiling data')
+        self.save_profiling_data()
+
         logging.info(f'Federator is stopping')
 
