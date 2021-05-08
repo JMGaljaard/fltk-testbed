@@ -107,7 +107,7 @@ class Federator:
             time.sleep(2)
         logging.info('All clients are ready')
 
-    def remote_run_epoch(self, epochs):
+    def remote_run_epoch(self, epochs_subset):
         """
         Federated Learning steps:
         1. Client selection
@@ -131,25 +131,33 @@ class Federator:
 
         for res in responses:
             func_duration = res.future.wait()
-            res.client.timing_data.append(TimingRecord(res.client.name, 'update_param_inner', func_duration))
-            res.client.timing_data.append(TimingRecord(f'{res.client.name}', 'update_param_round_trip', res.duration()))
+            res.client.timing_data.append(TimingRecord(res.client.name, 'update_param_inner', func_duration, epochs_subset[0]))
+            res.client.timing_data.append(TimingRecord(res.client.name, 'update_param_round_trip', res.duration(), epochs_subset[0]))
+            communication_duration_2way = res.duration() - func_duration
+            res.client.timing_data.append(
+                TimingRecord(res.client.name, 'communication_2way', communication_duration_2way, epochs_subset[0]))
         logging.info('Weights are updated')
 
         # 3. Local training
         responses: List[AsyncCall] = []
         client_weights = []
         for client in selected_clients:
-            response = timed_remote_async_call(client, Client.run_epochs, client.ref, num_epoch=epochs)
+            response = timed_remote_async_call(client, Client.run_epochs, client.ref, num_epoch=len(epochs_subset))
             responses.append(response)
 
-        self.epoch_counter += epochs
+        self.epoch_counter += len(epochs_subset)
         for res in responses:
             res.future.wait()
-            epoch_data, weights = res.future.wait()
+            epoch_data, weights, func_duration = res.future.wait()
             self.client_data[epoch_data.client_id].append(epoch_data)
             logging.info(f'{res.client.name} had a loss of {epoch_data.loss}')
             logging.info(f'{res.client.name} had a epoch data of {epoch_data}')
-            res.client.timing_data.append(TimingRecord(f'{res.client.name}', 'epoch_time_round_trip', res.duration()))
+            res.client.timing_data.append(TimingRecord(res.client.name, 'epoch_time_inner', func_duration, epochs_subset[0]))
+            res.client.timing_data.append(TimingRecord(res.client.name, 'epoch_time_train', epoch_data.duration_train, epochs_subset[0]))
+            res.client.timing_data.append(TimingRecord(res.client.name, 'epoch_time_test', epoch_data.duration_test, epochs_subset[0]))
+            res.client.timing_data.append(TimingRecord(res.client.name, 'epoch_time_round_trip', res.duration(), epochs_subset[0]))
+            communication_duration_2way = res.duration() - func_duration
+            res.client.timing_data.append(TimingRecord(res.client.name, 'communication_2way', communication_duration_2way, epochs_subset[0]))
 
             res.client.tb_writer.add_scalar('training loss',
                                             epoch_data.loss_train,  # for every 1000 minibatches
@@ -231,14 +239,17 @@ class Federator:
         self.clients_ready()
         self.update_client_data_sizes()
 
-        epoch_to_run = self.num_epoch
-        addition = 0
+
+
+        # Get total epoch to run
         epoch_to_run = self.config.epochs
         epoch_size = self.config.epochs_per_cycle
-        for epoch in range(epoch_to_run):
-            logging.info(f'Running epoch {epoch}')
-            self.remote_run_epoch(epoch_size)
-            addition += 1
+
+        epochs = list(range(1, epoch_to_run + 1))
+        epoch_chunks = [epochs[x:x + epoch_size] for x in range(0, len(epochs), epoch_size)]
+        for epoch_subset in epoch_chunks:
+            logging.info(f'Running epochs {epoch_subset}')
+            self.remote_run_epoch(epoch_subset)
         logging.info('Available clients with data')
         logging.info(self.client_data.keys())
 

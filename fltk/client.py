@@ -250,25 +250,24 @@ class Client:
         return accuracy, loss, class_precision, class_recall
 
     def run_epochs(self, num_epoch):
-        start_time_train = datetime.datetime.now()
+        start_time_train = time.time()
         self.dataset.get_train_sampler().set_epoch_size(num_epoch)
         loss, weights = self.train(self.epoch_counter)
         self.epoch_counter += num_epoch
-        elapsed_time_train = datetime.datetime.now() - start_time_train
-        train_time_ms = int(elapsed_time_train.total_seconds()*1000)
+        elapsed_train_time = time.time() - start_time_train
 
-        start_time_test = datetime.datetime.now()
+        start_time_test = time.time()
         accuracy, test_loss, class_precision, class_recall = self.test()
-        elapsed_time_test = datetime.datetime.now() - start_time_test
-        test_time_ms = int(elapsed_time_test.total_seconds()*1000)
+        elapsed_test_time = time.time() - start_time_test
 
-        data = EpochData(self.epoch_counter, train_time_ms, test_time_ms, loss, accuracy, test_loss, class_precision, class_recall, client_id=self.id)
+        data = EpochData(self.epoch_counter, num_epoch, elapsed_train_time, elapsed_test_time, loss, accuracy, test_loss, class_precision, class_recall, client_id=self.id)
         self.epoch_results.append(data)
 
         # Copy GPU tensors to CPU
         for k, v in weights.items():
             weights[k] = v.cpu()
-        return data, weights
+        end_func_time = time.time() - start_time_train
+        return data, weights, end_func_time
 
     def save_model(self, epoch, suffix):
         """
