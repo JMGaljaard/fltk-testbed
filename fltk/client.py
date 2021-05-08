@@ -93,9 +93,6 @@ class Client:
     def local_log(self, message):
         logging.info(f'[{self.id}: {time.time()}]: {message}')
 
-    def set_configuration(self, config: str):
-        yaml_config = yaml.safe_load(config)
-
     def init(self):
         pass
 
@@ -114,11 +111,6 @@ class Client:
     def set_net(self, net):
         self.net = net
         self.net.to(self.device)
-
-    def load_model_from_file(self, model_file_path):
-        model_class = self.args.get_net()
-        default_model_path = os.path.join(self.args.get_default_model_folder_path(), model_class.__name__ + ".model")
-        return self.load_model_from_file(default_model_path)
 
     def get_nn_parameters(self):
         """
@@ -184,8 +176,6 @@ class Client:
         :param epoch: Current epoch #
         :type epoch: int
         """
-        # self.net.train()
-
         # save model
         if self.args.should_save_model(epoch):
             self.save_model(epoch, self.args.get_epoch_save_start_suffix())
@@ -213,8 +203,6 @@ class Client:
                 self.args.get_logger().info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / self.args.get_log_interval()))
                 final_running_loss = running_loss / self.args.get_log_interval()
                 running_loss = 0.0
-
-            break
 
         self.scheduler.step()
 
@@ -254,10 +242,10 @@ class Client:
 
         self.args.get_logger().debug('Test set: Accuracy: {}/{} ({:.0f}%)'.format(correct, total, accuracy))
         self.args.get_logger().debug('Test set: Loss: {}'.format(loss))
-        # self.args.get_logger().debug("Classification Report:\n" + classification_report(targets_, pred_))
-        # self.args.get_logger().debug("Confusion Matrix:\n" + str(confusion_mat))
-        # self.args.get_logger().debug("Class precision: {}".format(str(class_precision)))
-        # self.args.get_logger().debug("Class recall: {}".format(str(class_recall)))
+        self.args.get_logger().debug("Classification Report:\n" + classification_report(targets_, pred_))
+        self.args.get_logger().debug("Confusion Matrix:\n" + str(confusion_mat))
+        self.args.get_logger().debug("Class precision: {}".format(str(class_precision)))
+        self.args.get_logger().debug("Class recall: {}".format(str(class_recall)))
 
         return accuracy, loss, class_precision, class_recall
 

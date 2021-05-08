@@ -1,6 +1,9 @@
+import copy
+import os
 import time
 from typing import List
 
+import torch
 from dataclass_csv import DataclassWriter
 from torch.distributed import rpc
 
@@ -51,7 +54,6 @@ class Federator:
         self.test_data = Client("test", None, 1, 2, config)
         self.test_data.init_dataloader()
         config.data_sampler = copy_sampler
-
 
     def create_clients(self, client_id_triple):
         for id, rank, world_size in client_id_triple:
@@ -106,42 +108,68 @@ class Federator:
         logging.info('All clients are ready')
 
     def remote_run_epoch(self, epochs):
+        """
+        Federated Learning steps:
+        1. Client selection
+        2. Selected clients download model
+        3. Local training
+        4. Model aggregation
+        Repeat
+        :param epochs:
+        :return:
+        """
 
+        # 1. Client selection
+        selected_clients = self.select_clients(self.config.clients_per_round)
+
+        # 2. Selected clients download model
+        responses = []
+        for client in selected_clients:
+            response = timed_remote_async_call(client, Client.update_nn_parameters, client.ref,
+                                               new_params=self.test_data.get_nn_parameters())
+            responses.append(response)
+
+        for res in responses:
+            func_duration = res.future.wait()
+            res.client.timing_data.append(TimingRecord(res.client.name, 'update_param_inner', func_duration))
+            res.client.timing_data.append(TimingRecord(f'{res.client.name}', 'update_param_round_trip', res.duration()))
+        logging.info('Weights are updated')
+
+        # 3. Local training
         responses: List[AsyncCall] = []
         client_weights = []
-        selected_clients = self.select_clients(self.config.clients_per_round)
         for client in selected_clients:
             response = timed_remote_async_call(client, Client.run_epochs, client.ref, num_epoch=epochs)
             responses.append(response)
 
         self.epoch_counter += epochs
-        durations = []
         for res in responses:
             res.future.wait()
             epoch_data, weights = res.future.wait()
-            fed_stop_time = time.time()
             self.client_data[epoch_data.client_id].append(epoch_data)
             logging.info(f'{res.client.name} had a loss of {epoch_data.loss}')
             logging.info(f'{res.client.name} had a epoch data of {epoch_data}')
             res.client.timing_data.append(TimingRecord(f'{res.client.name}', 'epoch_time_round_trip', res.duration()))
 
             res.client.tb_writer.add_scalar('training loss',
-                                        epoch_data.loss_train,  # for every 1000 minibatches
-                                        self.epoch_counter * res.client.data_size)
+                                            epoch_data.loss_train,  # for every 1000 minibatches
+                                            self.epoch_counter * res.client.data_size)
 
             res.client.tb_writer.add_scalar('accuracy',
-                                        epoch_data.accuracy,  # for every 1000 minibatches
-                                        self.epoch_counter * res.client.data_size)
+                                            epoch_data.accuracy,  # for every 1000 minibatches
+                                            self.epoch_counter * res.client.data_size)
 
             res.client.tb_writer.add_scalar('training loss per epoch',
-                                        epoch_data.loss_train,  # for every 1000 minibatches
-                                        self.epoch_counter)
+                                            epoch_data.loss_train,  # for every 1000 minibatches
+                                            self.epoch_counter)
 
             res.client.tb_writer.add_scalar('accuracy per epoch',
-                                        epoch_data.accuracy,  # for every 1000 minibatches
-                                        self.epoch_counter)
+                                            epoch_data.accuracy,  # for every 1000 minibatches
+                                            self.epoch_counter)
 
             client_weights.append(weights)
+
+        # 3. Model aggregation
         updated_model = average_nn_parameters(client_weights)
 
         # test global model
@@ -150,17 +178,6 @@ class Federator:
         accuracy, loss, class_precision, class_recall = self.test_data.test()
         self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
         self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
-
-        responses = []
-        for client in self.clients:
-            response = timed_remote_async_call(client, Client.update_nn_parameters, client.ref, new_params=updated_model)
-            responses.append(response)
-
-        for res in responses:
-            func_duration = res.future.wait()
-            res.client.timing_data.append(TimingRecord(res.client.name, 'update_param_inner', func_duration))
-            res.client.timing_data.append(TimingRecord(f'{res.client.name}', 'update_param_round_trip', res.duration()))
-        logging.info('Weights are updated')
 
     def update_client_data_sizes(self):
         responses = []
@@ -195,13 +212,10 @@ class Federator:
         file_output = f'./{self.config.output_location}/{self.config.experiment_prefix}_data'
         filename = f'{file_output}/profiling_data.csv'
         self.ensure_path_exists(file_output)
+        records = [data for client in self.clients for data in client.timing_data]
         with open(filename, "w") as f:
-            for client in self.clients:
-                for record in client.timing_data:
-                    w = DataclassWriter(f, [record], TimingRecord)
-                    w.write()
-
-
+            w = DataclassWriter(f, records, TimingRecord)
+            w.write()
 
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
