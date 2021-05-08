@@ -228,15 +228,9 @@ class Federator:
         logging.info('Available clients with data')
         logging.info(self.client_data.keys())
 
+        # Save experiment data
         logging.info('Saving data')
         self.save_epoch_data()
-
-        logging.info('Printing all clients timing data')
-        for client in self.clients:
-            logging.info(f"Timing data for client {client}")
-            for record in client.timing_data:
-                logging.info(f'{record}')
-
         logging.info('Saving profiling data')
         self.save_profiling_data()
 
