@@ -155,7 +155,7 @@ class BareConfig:
         return self.data_sampler
     
     def get_sampler_args(self):
-        return self.data_sampler_args
+        return tuple(self.data_sampler_args)
 
     def get_round_worker_selection_strategy(self):
         return self.round_worker_selection_strategy

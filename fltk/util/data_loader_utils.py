@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 import os
 import pickle
 import random
-from ..datasets import Dataset
+from ..datasets.distributed import DistDataset as Dataset
 
 def generate_data_loaders_from_distributed_dataset(distributed_dataset, batch_size):
     """
