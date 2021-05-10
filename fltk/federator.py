@@ -94,6 +94,11 @@ class Federator:
             self.client_data[id] = []
 
     def select_clients(self, n = 2):
+        """
+        TODO: Make this extensible.
+         1. E.g. 'time dependent' function.
+         2. E.g. make a progress dependent function.
+        """
         return random_selection(self.clients, n)
 
     def ping_all(self):
@@ -141,6 +146,9 @@ class Federator:
         client_weights = []
         selected_clients = self.select_clients(self.config.clients_per_round)
         for client in selected_clients:
+            """
+            TODO: Implement poisioning
+            """
             responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs)))
         self.epoch_counter += epochs
         for res in responses:

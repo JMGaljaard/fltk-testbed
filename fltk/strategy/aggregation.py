@@ -28,3 +28,14 @@ def fed_average_nn_parameters(parameters, sizes):
         new_params[name].data /= sum_size
 
     return new_params
+
+def fed_average_outlier_detection(parameters):
+    """
+    TODO: Aggregation function to run by the federator. The intent is to run as follows:
+     1. Collect updates to get to this function
+     2. Perform PCA on the received updates (i.e. torch.pca_lowrank).
+     3. Perform 1 class (kernalized) SVM on the first n- components.
+     4. Remove outliers (i.e. that lie outside of the kernalized SVM
+     5. Propagate update to the different workers.
+    """
+    pass

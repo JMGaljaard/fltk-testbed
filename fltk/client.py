@@ -256,6 +256,10 @@ class Client:
         return accuracy, loss, class_precision, class_recall
 
     def run_epochs(self, num_epoch):
+        """
+        TODO: Implement attack.
+        TODO: I propose to add a parameter to the call, to let the federator orchestrate the mapping.
+        """
         start_time_train = datetime.datetime.now()
         self.dataset.get_train_sampler().set_epoch_size(num_epoch)
         loss, weights = self.train(self.epoch_counter)
