@@ -147,7 +147,9 @@ class Federator:
         selected_clients = self.select_clients(self.config.clients_per_round)
         for client in selected_clients:
             """
-            TODO: Implement poisioning
+            TODO: Implement poisioning by providing arguments to the different clients. 
+            Either the federator selects n nodes at the start, or a (configurable) function is selected, which 
+            determines to send to which nodes and which are poisoned
             """
             responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs)))
         self.epoch_counter += epochs
