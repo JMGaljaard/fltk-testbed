@@ -172,7 +172,8 @@ class Client:
         :type new_params: dict
         """
         self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
-        self.remote_log(f'Weights of the model are updated')
+        if self.log_rref:
+            self.remote_log(f'Weights of the model are updated')
 
     def train(self, epoch):
         """
@@ -256,10 +257,9 @@ class Client:
 
     def run_epochs(self, num_epoch):
         start_time_train = datetime.datetime.now()
-        loss = weights = None
-        for e in range(num_epoch):
-            loss, weights = self.train(self.epoch_counter)
-            self.epoch_counter += 1
+        self.dataset.get_train_sampler().set_epoch_size(num_epoch)
+        loss, weights = self.train(self.epoch_counter)
+        self.epoch_counter += num_epoch
         elapsed_time_train = datetime.datetime.now() - start_time_train
         train_time_ms = int(elapsed_time_train.total_seconds()*1000)
 

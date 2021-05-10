@@ -78,6 +78,14 @@ class Federator:
         self.create_clients(client_id_triple)
         self.config.init_logger(logging)
 
+        logging.info("Creating test client")
+        copy_sampler = config.data_sampler
+        config.data_sampler = "uniform"
+        self.test_data = Client("test", None, 1, 2, config)
+        self.test_data.init_dataloader()
+        config.data_sampler = copy_sampler
+
+
     def create_clients(self, client_id_triple):
         for id, rank, world_size in client_id_triple:
             client = rpc.remote(id, Client, kwargs=dict(id=id, log_rref=self.log_rref, rank=rank, world_size=world_size, config=self.config))
@@ -149,8 +157,25 @@ class Federator:
                                         epoch_data.accuracy,  # for every 1000 minibatches
                                         self.epoch_counter * res[0].data_size)
 
+            res[0].tb_writer.add_scalar('training loss per epoch',
+                                        epoch_data.loss_train,  # for every 1000 minibatches
+                                        self.epoch_counter)
+
+            res[0].tb_writer.add_scalar('accuracy per epoch',
+                                        epoch_data.accuracy,  # for every 1000 minibatches
+                                        self.epoch_counter)
+
             client_weights.append(weights)
         updated_model = average_nn_parameters(client_weights)
+
+        # test global model
+        logging.info("Testing on global test set")
+        self.test_data.update_nn_parameters(updated_model)
+        accuracy, loss, class_precision, class_recall = self.test_data.test()
+        # self.tb_writer.add_scalar('training loss', loss, self.epoch_counter * self.test_data.get_client_datasize()) # does not seem to work :( )
+        self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
+        self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
+
 
         responses = []
         for client in self.clients:
