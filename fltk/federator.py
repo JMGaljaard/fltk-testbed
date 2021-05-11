@@ -1,6 +1,7 @@
+import abc
 import datetime
 import time
-from typing import List
+from typing import List, Any, Callable
 
 from dataclass_csv import DataclassWriter
 from torch.distributed import rpc
@@ -24,17 +25,29 @@ from fltk.util.tensor_converter import convert_distributed_data_into_numpy
 
 logging.basicConfig(level=logging.DEBUG)
 
+
 def _call_method(method, rref, *args, **kwargs):
     return method(rref.local_value(), *args, **kwargs)
 
 
-def _remote_method(method, rref, *args, **kwargs):
-    args = [method, rref] + list(args)
-    return rpc.rpc_sync(rref.owner(), _call_method, args=args, kwargs=kwargs)
+def _remote_method(method: Callable, rref, *args, **kwargs):
+    """
+    Wrapper function for executing remote code. This will launch an inference job at the federator learning side.
+    """
+    arguments = [method, rref] + list(args)
+    # Send marshalled request to the child process
+    return rpc.rpc_sync(rref.owner(), _call_method, args=arguments, kwargs=kwargs)
 
-def _remote_method_async(method, rref, *args, **kwargs):
-    args = [method, rref] + list(args)
-    return rpc.rpc_async(rref.owner(), _call_method, args=args, kwargs=kwargs)
+
+def _remote_method_async(method: Callable, rref, *args, **kwargs):
+    """
+    Wrapper function for executing remote code in asynchronous manner.
+    This will launch an inference job at the federator learning side, without a blocking request. A a callback must be pro
+    """
+    arguments = [method, rref] + list(args)
+    # Send marshalled request to the child process
+    return rpc.rpc_async(rref.owner(), _call_method, args=arguments, kwargs=kwargs)
+
 
 class ClientRef:
     ref = None
@@ -50,7 +63,8 @@ class ClientRef:
     def __repr__(self):
         return self.name
 
-class Federator:
+
+class Federator(object):
     """
     Central component of the Federated Learning System: The Federator
 
@@ -67,7 +81,7 @@ class Federator:
     epoch_counter = 0
     client_data = {}
 
-    def __init__(self, client_id_triple, num_epochs = 3, config=None):
+    def __init__(self, client_id_triple, num_epochs=3, config=None):
         log_rref = rpc.RRef(FLLogger())
         self.log_rref = log_rref
         self.num_epoch = num_epochs
@@ -85,15 +99,15 @@ class Federator:
         self.test_data.init_dataloader()
         config.data_sampler = copy_sampler
 
-
     def create_clients(self, client_id_triple):
         for id, rank, world_size in client_id_triple:
-            client = rpc.remote(id, Client, kwargs=dict(id=id, log_rref=self.log_rref, rank=rank, world_size=world_size, config=self.config))
+            client = rpc.remote(id, Client, kwargs=dict(id=id, log_rref=self.log_rref, rank=rank, world_size=world_size,
+                                                        config=self.config))
             writer = SummaryWriter(f'{self.tb_path}/{self.config.experiment_prefix}_client_{id}')
             self.clients.append(ClientRef(id, client, tensorboard_writer=writer))
             self.client_data[id] = []
 
-    def select_clients(self, n = 2):
+    def select_clients(self, n=2):
         """
         TODO: Make this extensible.
          1. E.g. 'time dependent' function.
@@ -107,7 +121,7 @@ class Federator:
             t_start = time.time()
             answer = _remote_method(Client.ping, client.ref)
             t_end = time.time()
-            duration = (t_end - t_start)*1000
+            duration = (t_end - t_start) * 1000
             logging.info(f'Ping to {client} is {duration:.3}ms')
 
     def rpc_test_all(self):
@@ -186,7 +200,6 @@ class Federator:
         self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
         self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
 
-
         responses = []
         for client in self.clients:
             responses.append(
@@ -251,4 +264,3 @@ class Federator:
         logging.info(f'Saving data')
         self.save_epoch_data()
         logging.info(f'Federator is stopping')
-

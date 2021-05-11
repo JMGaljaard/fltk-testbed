@@ -54,29 +54,59 @@ def main():
         print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=None, nic={nic}')
         run_single(rank=args.rank, world_size=world_size, host=master_address, args=None, nic=nic)
     else:
-        with open(args.config) as file:
+        with open(args.config) as config_file:
             cfg = BareConfig()
-            yaml_data = yaml.load(file, Loader=yaml.FullLoader)
+            yaml_data = yaml.load(config_file, Loader=yaml.FullLoader)
             cfg.merge_yaml(yaml_data)
-            if args.mode == 'single':
-                if args.rank is None:
-                    print('Missing rank argument when in \'single\' mode!')
-                    parser.print_help()
-                    exit(1)
-                world_size = args.world_size
-                master_address = args.host
-                nic = args.nic
-
-                if not world_size:
-                    world_size = yaml_data['system']['clients']['amount'] + 1
-                if not master_address:
-                    master_address = yaml_data['system']['federator']['hostname']
-                if not nic:
-                    nic = yaml_data['system']['federator']['nic']
-                print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
-                run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
+            if args.mode == 'poison':
+                perform_poison_experiment(args, cfg, yaml_data)
+            elif args.mod == 'single':
+                perform_single_experiment(args, cfg, parser, yaml_data)
             else:
                 run_spawn(cfg)
+
+
+def perform_single_experiment(args, cfg, parser, yaml_data):
+    if args.rank is None:
+        print('Missing rank argument when in \'single\' mode!')
+        parser.print_help()
+        exit(1)
+    world_size = args.world_size
+    master_address = args.host
+    nic = args.nic
+
+    if not world_size:
+        world_size = yaml_data['system']['clients']['amount'] + 1
+    if not master_address:
+        master_address = yaml_data['system']['federator']['hostname']
+    if not nic:
+        nic = yaml_data['system']['federator']['nic']
+    print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
+    run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
+
+def perform_poison_experiment(args, cfg, yaml_data):
+    """
+    Function to start poisoned experiment.
+    """
+    if args.rank is None:
+        print('Missing rank argument when in \'poison\' mode!')
+        exit(1)
+    if not yaml_data.get('poison'):
+        print(f'Missing poison configuration for \'poison\' mode')
+        exit(1)
+
+    world_size = args.world_size
+    master_address = args.host
+    nic = args.nic
+
+    if not world_size:
+        world_size = yaml_data['system']['clients']['amount'] + 1
+    if not master_address:
+        master_address = yaml_data['system']['federator']['hostname']
+    if not nic:
+        nic = yaml_data['system']['federator']['nic']
+    print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
+    run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
 
 if __name__ == "__main__":
     main()

@@ -1,3 +1,5 @@
+from typing import Dict
+
 import torch
 import json
 
@@ -7,7 +9,7 @@ from fltk.nets import Cifar10CNN, FashionMNISTCNN, Cifar100ResNet, FashionMNISTR
 SEED = 1
 torch.manual_seed(SEED)
 
-class BareConfig:
+class BareConfig(object):
 
     def __init__(self):
         # self.logger = logger
@@ -84,7 +86,7 @@ class BareConfig:
     # Methods #
     ###########
 
-    def merge_yaml(self, cfg = {}):
+    def merge_yaml(self, cfg: Dict[str, str] = {}):
         """
         total_epochs: 20
         epochs_per_cycle: 2

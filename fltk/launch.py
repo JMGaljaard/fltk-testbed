@@ -9,6 +9,7 @@ import argparse
 import torch.multiprocessing as mp
 from fltk.federator import Federator
 from fltk.util.base_config import BareConfig
+from fltk.util.env.learner_environment import prepare_environment
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -20,20 +21,11 @@ def run_ps(rpc_ids_triple, args):
 
 def run_single(rank, world_size, host = None, args = None, nic = None):
     logging.info(f'Starting with rank={rank} and world size={world_size}')
-    if host:
-        os.environ['MASTER_ADDR'] = host
-    else:
-        os.environ['MASTER_ADDR'] = '0.0.0.0'
-    os.environ['MASTER_PORT'] = '5000'
-    if nic:
-        os.environ['GLOO_SOCKET_IFNAME'] = nic
-        os.environ['TP_SOCKET_IFNAME'] = nic
-    else:
-        os.environ['GLOO_SOCKET_IFNAME'] = 'wlo1'
-        os.environ['TP_SOCKET_IFNAME'] = 'wlo1'
+    prepare_environment(host, nic)
+
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
     options = rpc.TensorPipeRpcBackendOptions(
-        num_worker_threads=16,
+        num_worker_threads=16, # TODO: Retrieve number of cores from system
         rpc_timeout=0,  # infinite timeout
         init_method=f'tcp://{os.environ["MASTER_ADDR"]}:{os.environ["MASTER_PORT"]}'
     )
@@ -60,6 +52,7 @@ def run_single(rank, world_size, host = None, args = None, nic = None):
     # block until all rpc finish
     rpc.shutdown()
 
+# def run_single(rank, world_size, host = None, args = None, nic = None):
 
 def run_spawn(config):
     world_size = config.world_size
