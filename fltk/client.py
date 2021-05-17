@@ -192,6 +192,7 @@ class Client:
             self.dataset.train_sampler.set_epoch(epoch)
 
         for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
+            # TODO: Implement swap based on received attack.
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             # zero the parameter gradients
