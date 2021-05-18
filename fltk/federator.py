@@ -8,6 +8,7 @@ from torch.distributed import rpc
 
 from fltk.client import Client
 from fltk.datasets.data_distribution import distribute_batches_equally
+from fltk.strategy.attack import Attack, LabelFlipAttack
 from fltk.strategy.client_selection import random_selection
 from fltk.util.arguments import Arguments
 from fltk.util.base_config import BareConfig
@@ -20,6 +21,7 @@ from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 import logging
 
+from fltk.util.poison.poisonpill import FlipPill
 from fltk.util.results import EpochData
 from fltk.util.tensor_converter import convert_distributed_data_into_numpy
 
@@ -80,6 +82,7 @@ class Federator(object):
     clients: List[ClientRef] = []
     epoch_counter = 0
     client_data = {}
+    poisoned_workers = {}
 
     def __init__(self, client_id_triple, num_epochs=3, config=None):
         log_rref = rpc.RRef(FLLogger())
@@ -165,7 +168,12 @@ class Federator(object):
             Either the federator selects n nodes at the start, or a (configurable) function is selected, which 
             determines to send to which nodes and which are poisoned
             """
-            responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs)))
+            pill = None
+            if client in self.poisoned_workers:
+                # TODO create the correct pill,
+                #  I think it would be a good idea to store the type of attack as a field so it can easily be accessed
+                pill = FlipPill({1: 2})
+            responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, pill=pill)))
         self.epoch_counter += epochs
         for res in responses:
             epoch_data, weights = res[1].wait()
@@ -249,6 +257,12 @@ class Federator(object):
         self.ping_all()
         self.clients_ready()
         self.update_client_data_sizes()
+
+        # # Select clients which will be poisened
+        # TODO: get attack type and ratio from config, temp solution now
+        ratio = 0.2
+        attack = LabelFlipAttack(10, ratio, {1: 2})
+        self.poisoned_workers = attack.select_poisoned_workers(self.clients, ratio)
 
         epoch_to_run = self.num_epoch
         addition = 0

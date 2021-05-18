@@ -18,6 +18,7 @@ from fltk.util.log import FLLogger
 
 import yaml
 
+from fltk.util.poison.poisonpill import PoisonPill
 from fltk.util.results import EpochData
 
 logging.basicConfig(level=logging.DEBUG)
@@ -175,7 +176,7 @@ class Client:
         if self.log_rref:
             self.remote_log(f'Weights of the model are updated')
 
-    def train(self, epoch):
+    def train(self, epoch, pill: PoisonPill = None):
         """
         :param epoch: Current epoch #
         :type epoch: int
@@ -192,9 +193,11 @@ class Client:
             self.dataset.train_sampler.set_epoch(epoch)
 
         for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
-            # TODO: Implement swap based on received attack.
             inputs, labels = inputs.to(self.device), labels.to(self.device)
-            # TODO: call Pill attack with input & output
+            # TODO: check if these parameters are correct, labels or ouputs?
+            if pill is not None:
+                pill.poison_input(inputs)
+                pill.poison_output(inputs, labels)
 
             # zero the parameter gradients
             self.optimizer.zero_grad()
@@ -260,14 +263,12 @@ class Client:
 
         return accuracy, loss, class_precision, class_recall
 
-    def run_epochs(self, num_epoch):
+    def run_epochs(self, num_epoch, pill: PoisonPill = None):
         """
-        TODO: Implement attack.
-        TODO: I propose to add a parameter to the call, to let the federator orchestrate the mapping.
         """
         start_time_train = datetime.datetime.now()
         self.dataset.get_train_sampler().set_epoch_size(num_epoch)
-        loss, weights = self.train(self.epoch_counter)
+        loss, weights = self.train(self.epoch_counter, pill)
         self.epoch_counter += num_epoch
         elapsed_time_train = datetime.datetime.now() - start_time_train
         train_time_ms = int(elapsed_time_train.total_seconds()*1000)

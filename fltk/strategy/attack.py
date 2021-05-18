@@ -43,6 +43,7 @@ class LabelFlipAttack(Attack):
             raise Exception("ratio is out of bounds")
         Attack.__init__(self, max_rounds, seed)
         self.ratio = ratio
+        self.label_shuffle = label_shuffle
         self.random = random
 
     def select_poisoned_workers(self, workers: List, ratio: float):
