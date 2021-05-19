@@ -158,7 +158,7 @@ class Federator(object):
             time.sleep(2)
         logging.info('All clients are ready')
 
-    def remote_run_epoch(self, epochs):
+    def remote_run_epoch(self, epochs, attack: Attack):
         responses = []
         client_weights = []
         selected_clients = self.select_clients(self.config.clients_per_round)
@@ -170,9 +170,7 @@ class Federator(object):
             """
             pill = None
             if client in self.poisoned_workers:
-                # TODO create the correct pill,
-                #  I think it would be a good idea to store the type of attack as a field so it can easily be accessed
-                pill = FlipPill({1: 2})
+                pill = attack.get_poison_pill()
             responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, pill=pill)))
         self.epoch_counter += epochs
         for res in responses:
@@ -270,7 +268,7 @@ class Federator(object):
         epoch_size = self.config.epochs_per_cycle
         for epoch in range(epoch_to_run):
             print(f'Running epoch {epoch}')
-            self.remote_run_epoch(epoch_size)
+            self.remote_run_epoch(epoch_size, attack)
             addition += 1
         logging.info('Printing client data')
         print(self.client_data)

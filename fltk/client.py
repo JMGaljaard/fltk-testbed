@@ -196,8 +196,8 @@ class Client:
             inputs, labels = inputs.to(self.device), labels.to(self.device)
             # TODO: check if these parameters are correct, labels or ouputs?
             if pill is not None:
-                pill.poison_input(inputs)
-                pill.poison_output(inputs, labels)
+                inputs = pill.poison_input(inputs)
+                inputs, labels = pill.poison_output(inputs, labels)
 
             # zero the parameter gradients
             self.optimizer.zero_grad()
