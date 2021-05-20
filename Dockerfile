@@ -18,18 +18,17 @@ RUN apt-get update \
   && apt-get install -y vim curl python3 python3-pip net-tools iproute2
 
 # Copy the current folder to the working directory
-COPY setup.py ./
+ADD setup.py requirements.txt ./
+RUN python3 -m pip install -r requirements.txt
+
+ADD configs configs
 
 # Install all required packages for the generator
-RUN pip3 setup.py install
+ADD fltk fltk
+# Install newest version of library
+RUN python3 -m setup install
 
-#RUN mkdir -p ./data/MNIST
-#COPY ./data/MNIST ../data/MNIST
-ADD fltk ./fedsim
-#RUN ls -la
-COPY federated_learning.py ./
-COPY custom_mnist.py ./
-#RUN ls -la ./fedsim
+
 
 # Expose the container's port to the host OS
 EXPOSE 5000
