@@ -1,9 +1,10 @@
 import logging
 from abc import abstractmethod, ABC
-from typing import Dict
-from torch.nn.functional import one_hot
-import torch
 from logging import WARNING, ERROR
+from typing import Dict
+
+import torch
+from torch.nn.functional import one_hot
 
 
 class PoisonPill(ABC):
@@ -28,7 +29,6 @@ class PoisonPill(ABC):
 
 class FlipPill(PoisonPill):
 
-
     @staticmethod
     def check_consistency(flips) -> None:
         for attack in flips.keys():
@@ -52,6 +52,8 @@ class FlipPill(PoisonPill):
         """
         if kwargs['classification']:
             decoded: torch.Tensor = Y.argmax(-1).cpu()
+            # TODO: Figure out how to do this on GPU
+            # TODO: Maybe implement on client in numpy in dataloader.
             updated_decoded = decoded.apply_(lambda x: self.flips.get(x, x)).to(Y.device)
             new_Y = torch.nn.functional.one_hot(updated_decoded)
         else:

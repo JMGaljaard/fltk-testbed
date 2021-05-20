@@ -1,5 +1,4 @@
 from setuptools import setup, find_packages
-from fltk import __version__
 setup(
     name="fltk",
     author="Bart Cox",
@@ -8,7 +7,7 @@ setup(
     maintainer_email="b.a.cox@tudelft.nl",
     description="Federated Learning Toolkit",
     packages=find_packages(),
-    version=__version__,
+    version='0.3.1',
     entry_points={
         "console_scripts": [
             "fltk = fltk.__main__:main",

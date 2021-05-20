@@ -41,7 +41,7 @@ class BareConfig(object):
         self.epoch_save_end_suffix = "end"
         self.get_poison_effort = 'half'
         self.num_workers = 50
-        # self.num_poisoned_workers = 10
+        self.num_poisoned_workers = 10
 
         self.federator_host = '0.0.0.0'
         self.rank = 0
