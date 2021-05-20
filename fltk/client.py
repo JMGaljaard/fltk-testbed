@@ -3,6 +3,7 @@ import datetime
 import os
 import random
 import time
+import traceback
 from dataclasses import dataclass
 from typing import List
 
@@ -12,8 +13,11 @@ import logging
 import numpy as np
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
+
+from fltk.datasets import DistCIFAR10Dataset
 from fltk.schedulers import MinCapableStepLR
 from fltk.util.arguments import Arguments
+from fltk.util.base_config import BareConfig
 from fltk.util.log import FLLogger
 
 import yaml
@@ -49,7 +53,7 @@ class Client:
     epoch_counter = 0
 
 
-    def __init__(self, id, log_rref, rank, world_size, config = None):
+    def __init__(self, id, log_rref, rank, world_size, config: BareConfig = None):
         logging.info(f'Welcome to client {id}')
         self.id = id
         self.log_rref = log_rref
@@ -102,13 +106,24 @@ class Client:
     def init_dataloader(self, ):
         self.args.distributed = True
         self.args.rank = self.rank
+
         self.args.world_size = self.world_size
-        # self.dataset = DistCIFAR10Dataset(self.args)
-        self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args)
+
+        try:
+            self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args)
+        except Exception as e:
+            tb = traceback.format_exc()
+            print(tb)
+        # self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args)
+
+
         self.finished_init = True
+        self.finished_init = True
+        print("Done with init")
         logging.info('Done with init')
 
     def is_ready(self):
+        print(self.finished_init)
         return self.finished_init
 
     def set_net(self, net):
@@ -145,7 +160,8 @@ class Client:
         """
         model_class = self.args.get_net()
         model = model_class()
-
+        # TODO undo
+        # model_file_path = '/opt/federation-lab/' + model_file_path
         if os.path.exists(model_file_path):
             try:
                 model.load_state_dict(torch.load(model_file_path))
@@ -310,7 +326,10 @@ class Client:
         return np.diagonal(confusion_mat) / np.sum(confusion_mat, axis=1)
 
     def get_client_datasize(self):
-        return len(self.dataset.get_train_sampler())
+        if self.dataset is not None:
+            return len(self.dataset.get_train_sampler())
+        else:
+            return False
 
     def __del__(self):
         print(f'Client {self.id} is stopping')
