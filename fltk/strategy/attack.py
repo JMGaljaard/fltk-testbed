@@ -4,6 +4,7 @@ from logging import ERROR, WARNING, INFO
 from math import floor
 from typing import List, Dict
 
+from fltk.util.poison.poisonpill import FlipPill
 from numpy import random
 
 
@@ -31,6 +32,9 @@ class Attack(ABC):
     def build_attack(self):
         pass
 
+    @abstractmethod
+    def get_poison_pill(self):
+        pass
 
 class LabelFlipAttack(Attack):
 
@@ -43,6 +47,7 @@ class LabelFlipAttack(Attack):
             raise Exception("ratio is out of bounds")
         Attack.__init__(self, max_rounds, seed)
         self.ratio = ratio
+        self.label_shuffle = label_shuffle
         self.random = random
 
     def select_poisoned_workers(self, workers: List, ratio: float):
@@ -53,3 +58,6 @@ class LabelFlipAttack(Attack):
         if not self.random:
             random.seed(self.seed)
         return random.choice(workers, floor(len(workers) * ratio), replace=False)
+
+    def get_poison_pill(self):
+        return FlipPill(self.label_shuffle)
