@@ -60,7 +60,7 @@ def main():
             cfg.merge_yaml(yaml_data)
             if args.mode == 'poison':
                 perform_poison_experiment(args, cfg, yaml_data)
-            elif args.mod == 'single':
+            elif args.mode == 'single':
                 perform_single_experiment(args, cfg, parser, yaml_data)
             else:
                 run_spawn(cfg)
