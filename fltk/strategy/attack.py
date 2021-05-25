@@ -4,8 +4,9 @@ from logging import ERROR, WARNING, INFO
 from math import floor
 from typing import List, Dict
 
-from fltk.util.poison.poisonpill import FlipPill
 from numpy import random
+
+from fltk.util.poison.poisonpill import FlipPill, PoisonPill
 
 
 class Attack(ABC):
@@ -33,10 +34,20 @@ class Attack(ABC):
         pass
 
     @abstractmethod
-    def get_poison_pill(self):
+    def get_poison_pill(self, *ars, **kwargs) -> PoisonPill:
         pass
 
+
 class LabelFlipAttack(Attack):
+
+    def build_attack(self, flip_description=None) -> PoisonPill:
+        """
+        Build Label flip attack pill, default will flip the classes 0 and 9, assuming it is trained on Fasion MNIST.
+        If a different train class is used, and has less than 10 classes, this will result in exceptions.
+        """
+        if flip_description is None:
+            flip_description = {0: 9, 9: 0}
+        return FlipPill(flip_description=flip_description)
 
     def __init__(self, max_rounds: int, ratio: float, label_shuffle: Dict, seed: int = 42, random=False):
         """
@@ -54,7 +65,7 @@ class LabelFlipAttack(Attack):
         """
         Randomly select workers from a list of workers provided by the Federator.
         """
-        self.logger.log(INFO)
+        self.logger.log(INFO, "Selecting workers to gather from")
         if not self.random:
             random.seed(self.seed)
         return random.choice(workers, floor(len(workers) * ratio), replace=False)
