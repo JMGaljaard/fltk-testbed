@@ -1,5 +1,7 @@
 import os
 import sys
+from pathlib import Path
+
 import torch.distributed.rpc as rpc
 import logging
 
@@ -51,7 +53,7 @@ def main():
     poison_parser.add_argument('--rank', type=int)
     poison_parser.add_argument('--nic', type=str, default=None)
     poison_parser.add_argument('--host', type=str, default=None)
-    add_default_arguments(remote_parser)
+    add_default_arguments(poison_parser)
 
     args = parser.parse_args()
     if args.mode == 'remote':
@@ -126,5 +128,5 @@ def perform_poison_experiment(args, cfg, yaml_data):
 
 
 if __name__ == "__main__":
-    load_dotenv()
+    load_dotenv(Path("./"))
     main()
