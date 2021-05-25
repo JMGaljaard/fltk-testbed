@@ -21,7 +21,7 @@ system:
     nic: 'ens4'
   clients:
     # TODO set this in environment variable
-    amount: 2
+    amount: 1
 # For a simple config is provided in configs/poison.example.yaml
 poison:
   experiments:
