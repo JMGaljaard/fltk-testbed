@@ -1,11 +1,11 @@
 import logging
 from abc import abstractmethod, ABC
 from logging import ERROR, WARNING, INFO
-from math import floor
+from math import floor, ceil
 from typing import List, Dict
 
 from numpy import random
-
+from collections import ChainMap
 from fltk.util.base_config import BareConfig
 from fltk.util.poison.poisonpill import FlipPill, PoisonPill
 
@@ -27,7 +27,7 @@ class Attack(ABC):
             self.logger.log(WARNING, f'Advancing outside of preset number of rounds {self.round} / {self.max_rounds}')
 
     @abstractmethod
-    def select_poisoned_workers(self, workers: List, ratio: float) -> List:
+    def select_poisoned_workers(self, workers: List, ratio: float = None) -> List:
         pass
 
     @abstractmethod
@@ -35,7 +35,7 @@ class Attack(ABC):
         pass
 
     @abstractmethod
-    def get_poison_pill(self, *args, **kwargs) -> PoisonPill:
+    def get_poison_pill(self) -> PoisonPill:
         pass
 
 
@@ -51,7 +51,7 @@ class LabelFlipAttack(Attack):
         return FlipPill(flip_description=flip_description)
 
     def __init__(self, max_rounds: int = 0, ratio: float = 0, label_shuffle: Dict = None, seed: int = 42, random=False,
-                 cfg: dict = None):
+                 cfg: BareConfig = None):
         """
         @param max_rounds:
         @type max_rounds: int
@@ -70,21 +70,23 @@ class LabelFlipAttack(Attack):
             if 0 > ratio > 1:
                 self.logger.log(ERROR, f'Cannot run with a ratio of {ratio}, needs to be in range [0, 1]')
                 raise Exception("ratio is out of bounds")
-            Attack.__init__(self, cfg.get('total_epochs', 0), cfg.get('poison', None).get('seed', None))
+            Attack.__init__(self, cfg.epochs, cfg.get_poison_config().get('seed', None))
         else:
             Attack.__init__(self, max_rounds, seed)
-        self.ratio = ratio
-        self.label_shuffle = label_shuffle
+            self.ratio = cfg.poison['ratio']
+        self.label_shuffle = dict(ChainMap(*cfg.get_attack_config()['config']))
         self.random = random
 
-    def select_poisoned_workers(self, workers: List, ratio: float):
+    def select_poisoned_workers(self, workers: List, ratio: float = None):
         """
         Randomly select workers from a list of workers provided by the Federator.
         """
         self.logger.log(INFO, "Selecting workers to gather from")
         if not self.random:
             random.seed(self.seed)
-        return random.choice(workers, floor(len(workers) * ratio), replace=False)
+        cloned_workers = workers.copy()
+        random.shuffle(cloned_workers)
+        return cloned_workers[0:ceil(len(workers) * self.ratio)]
 
     def get_poison_pill(self):
         return FlipPill(self.label_shuffle)
@@ -101,6 +103,7 @@ def create_attack(cfg: BareConfig) -> Attack:
     attack_class = attack_mapper.get(cfg.get_attack_type(), None)
 
     if not attack_class is None:
-        attack = attack_class(cfg=cfg.get_attack_config())
+        attack = attack_class(cfg=cfg)
     else:
         raise Exception("Requested attack is not supported...")
+    return attack

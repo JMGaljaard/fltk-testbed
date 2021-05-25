@@ -15,10 +15,10 @@ from fltk.util.env.learner_environment import prepare_environment
 logging.basicConfig(level=logging.DEBUG)
 
 
-def run_ps(rpc_ids_triple, args, attack=Attack):
+def run_ps(rpc_ids_triple, args, attack: Attack = None):
     print(f'Starting the federator...')
-    fed = Federator(rpc_ids_triple, config=args, attack=Attack)
-    fed.run(attack)
+    fed = Federator(rpc_ids_triple, config=args, attack=attack)
+    fed.run()
 
 def run_single(rank, world_size, host = None, args = None, nic = None, attack=None):
     logging.info(f'Starting with rank={rank} and world size={world_size}')

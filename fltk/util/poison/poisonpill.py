@@ -44,13 +44,14 @@ class FlipPill(PoisonPill):
         return list(map(lambda y: self.flips.get(y, y), targets))
 
     @staticmethod
-    def check_consistency(flips) -> None:
+    def check_consistency(flips) -> bool:
         for attack in flips.keys():
-            if flips.get(flips[attack], -1) != attack:
+            if flips.get(flips.get(attack, -2), -1) != attack:
                 # -1 because ONE_HOT encoding can never represent a negative number
                 logging.getLogger().log(ERROR,
                                         f'Cyclic inconsistency, {attack} resolves back to {flips[flips[attack]]}')
                 raise Exception('Inconsistent flip attack!')
+        return True
 
     def __init__(self, flip_description: Dict[int, int]):
         """

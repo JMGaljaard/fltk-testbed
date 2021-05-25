@@ -1,29 +1,19 @@
-import abc
-import datetime
+import logging
 import time
-from typing import List, Any, Callable
+from pathlib import Path
+from typing import List, Callable
 
 from dataclass_csv import DataclassWriter
 from torch.distributed import rpc
+from torch.utils.tensorboard import SummaryWriter
 
 from fltk.client import Client
-from fltk.datasets.data_distribution import distribute_batches_equally
-from fltk.strategy.attack import Attack, LabelFlipAttack
+from fltk.strategy.attack import Attack
 from fltk.strategy.client_selection import random_selection
-from fltk.util.arguments import Arguments
 from fltk.util.base_config import BareConfig
-from fltk.util.data_loader_utils import load_train_data_loader, load_test_data_loader, \
-    generate_data_loaders_from_distributed_dataset
 from fltk.util.fed_avg import average_nn_parameters
 from fltk.util.log import FLLogger
-from torchsummary import summary
-from torch.utils.tensorboard import SummaryWriter
-from pathlib import Path
-import logging
-
-from fltk.util.poison.poisonpill import FlipPill
 from fltk.util.results import EpochData
-from fltk.util.tensor_converter import convert_distributed_data_into_numpy
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -84,7 +74,7 @@ class Federator(object):
     client_data = {}
     poisoned_workers = {}
 
-    def __init__(self, client_id_triple, num_epochs=3, config=None, attack=Attack):
+    def __init__(self, client_id_triple, num_epochs=3, config: BareConfig = None, attack: Attack = None):
         log_rref = rpc.RRef(FLLogger())
         self.log_rref = log_rref
         self.num_epoch = num_epochs
@@ -104,7 +94,6 @@ class Federator(object):
 
         # Poisoning
         self.attack = attack
-
 
     def create_clients(self, client_id_triple):
         for id, rank, world_size in client_id_triple:
@@ -139,7 +128,8 @@ class Federator(object):
 
     def client_load_data(self, poison_pill):
         for client in self.clients:
-            _remote_method_async(Client.init_dataloader, client.ref, pill=None if poison_pill and client not in self.poisoned_workers else poison_pill)
+            _remote_method_async(Client.init_dataloader, client.ref,
+                                 pill=None if poison_pill and client not in self.poisoned_workers else poison_pill)
 
     def clients_ready(self):
         all_ready = False
@@ -162,7 +152,7 @@ class Federator(object):
             time.sleep(2)
         logging.info('All clients are ready')
 
-    def remote_run_epoch(self, epochs, attack: Attack):
+    def remote_run_epoch(self, epochs):
         responses = []
         client_weights = []
         selected_clients = self.select_clients(self.config.clients_per_round)
@@ -174,7 +164,7 @@ class Federator(object):
             """
             pill = None
             if client in self.poisoned_workers:
-                pill = attack.get_poison_pill()
+                pill = self.attack.get_poison_pill()
             responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, pill=pill)))
         self.epoch_counter += epochs
         for res in responses:
@@ -249,7 +239,7 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self, attack: Attack = None):
+    def run(self):
         """
         Main loop of the Federator
         :return:
@@ -257,10 +247,9 @@ class Federator(object):
 
         # # Select clients which will be poisened
         # TODO: get attack type and ratio from config, temp solution now
-        ratio = 0.2
         poison_pill = None
-        if attack:
-            self.poisoned_workers = attack.select_poisoned_workers(self.clients, ratio)
+        if self.attack:
+            self.poisoned_workers = self.attack.select_poisoned_workers(self.clients)
             poison_pill = self.attack.get_poison_pill()
 
         self.client_load_data(poison_pill)
@@ -268,15 +257,13 @@ class Federator(object):
         self.clients_ready()
         self.update_client_data_sizes()
 
-
-
         epoch_to_run = self.num_epoch
         addition = 0
         epoch_to_run = self.config.epochs
         epoch_size = self.config.epochs_per_cycle
         for epoch in range(epoch_to_run):
             print(f'Running epoch {epoch}')
-            self.remote_run_epoch(epoch_size, attack)
+            self.remote_run_epoch(epoch_size)
             addition += 1
         logging.info('Printing client data')
         print(self.client_data)
@@ -284,4 +271,3 @@ class Federator(object):
         logging.info(f'Saving data')
         self.save_epoch_data()
         logging.info(f'Federator is stopping')
-

@@ -313,7 +313,7 @@ class BareConfig(object):
         return self.poison['attack']['type']
 
     def get_attack_config(self) -> dict:
-        return self.poison['attack']['config']
+        return self.poison['attack']
 
 
     def __str__(self):
