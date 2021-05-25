@@ -1,0 +1,33 @@
+---
+# Experiment configuration
+total_epochs: 5
+epochs_per_cycle: 1
+wait_for_clients: true
+net: Cifar10CNN
+dataset: cifar10
+sampler: "uniform"
+sampler_args:
+  - 0.5     # p degree
+  - 42      # random seed
+# Use cuda is available; setting to false will force CPU
+cuda: false
+experiment_prefix: 'experiment_single_machine'
+output_location: 'output'
+tensor_board_active: true
+clients_per_round: 1
+system:
+  federator:
+    hostname: '10.128.0.2'
+    nic: 'ens4'
+  clients:
+    # TODO set this in environment variable
+    amount: 2
+# For a simple config is provided in configs/poison.example.yaml
+poison:
+  experiments:
+    min_ratio: 0.0
+    max_ratio: 0.25
+    steps: 2
+  attack:
+    scenario: "fraction"
+    type: "LABEL_FLIP"
