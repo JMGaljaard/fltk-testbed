@@ -15,6 +15,7 @@ cuda: false
 experiment_prefix: 'experiment_single_machine'
 output_location: 'output'
 tensor_board_active: true
+clients_per_round: 1
 system:
   federator:
     hostname: '172.18.0.2'
@@ -30,5 +31,4 @@ poison:
     steps: 2
   attack:
     type: "flip"
-    # Flip 9 and 0
-    config: { 0:9, 9:0 }
+    config: [ { 0:9, 9:0 } ]
