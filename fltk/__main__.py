@@ -5,6 +5,7 @@ import logging
 
 import yaml
 import argparse
+from dotenv import load_dotenv
 
 import torch.multiprocessing as mp
 from fltk.federator import Federator
@@ -13,9 +14,11 @@ from fltk.util.base_config import BareConfig
 
 logging.basicConfig(level=logging.DEBUG)
 
+
 def add_default_arguments(parser):
     parser.add_argument('--world_size', type=str, default=None,
                         help='Number of entities in the world. This is the number of clients + 1')
+
 
 def main():
     parser = argparse.ArgumentParser(description='Experiment launcher for the Federated Learning Testbed')
@@ -84,6 +87,7 @@ def perform_single_experiment(args, cfg, parser, yaml_data):
     print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
     run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
 
+
 def perform_poison_experiment(args, cfg, yaml_data):
     """
     Function to start poisoned experiment.
@@ -108,5 +112,7 @@ def perform_poison_experiment(args, cfg, yaml_data):
     print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
     run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
 
+
 if __name__ == "__main__":
+    load_dotenv()
     main()

@@ -17,6 +17,7 @@ setup(
     data_files=[('share/tudelft/fltk/configs', ['configs/experiment.yaml'])],
     install_requires=
     [
+        'python-dotenv==0.17.1',
         'tqdm==4.49.0',
         'scikit-learn==0.23.2',
         'pandas==1.1.2',
