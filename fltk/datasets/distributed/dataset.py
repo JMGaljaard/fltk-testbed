@@ -5,6 +5,7 @@ import torch
 import numpy
 
 from fltk.util.arguments import Arguments
+from fltk.util.poison.poisonpill import PoisonPill
 
 
 class DistDataset:
@@ -15,8 +16,9 @@ class DistDataset:
 	test_dataset = None
 	train_loader = None
 	test_loader = None
-	def __init__(self, args: Arguments):
+	def __init__(self, args: Arguments, pill: PoisonPill = None):
 		self.args = args
+		self.pill = pill
 		# self.train_dataset = self.load_train_dataset()
 		# self.test_dataset = self.load_test_dataset()
 
@@ -137,3 +139,14 @@ class DistDataset:
 	# 	:return: tuple
 	# 	"""
 	# 	return (next(iter(data_loader))[0].numpy(), next(iter(data_loader))[1].numpy())
+	def ingest_pill(self, pill: PoisonPill):
+		"""
+		Drink the CoolAid, apply poison to the input regarding the pill. Note that the pill may implement a noop,
+		meaning that this has no real result.
+		@param pill:
+		@type pill:
+		@return:
+		@rtype:
+		"""
+		self.train_dataset.targets = pill.poison_targets(self.train_dataset.targets)
+		self.test_dataset.targets = pill.poison_targets(self.test_dataset)

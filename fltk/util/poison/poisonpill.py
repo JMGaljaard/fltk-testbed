@@ -1,10 +1,9 @@
 import logging
 from abc import abstractmethod, ABC
-from logging import WARNING, ERROR
-from typing import Dict
+from logging import ERROR
+from typing import Dict, List
 
 import torch
-from torch.nn.functional import one_hot
 
 
 class PoisonPill(ABC):
@@ -26,8 +25,23 @@ class PoisonPill(ABC):
         """
         pass
 
+    def poison_targets(self, targets):
+        return targets
+
 
 class FlipPill(PoisonPill):
+
+    def poison_targets(self, targets: List[int]) -> List[int]:
+        """
+        Apply poison to the targets of a dataset. Note that this is a somewhat strange approach, as the pill ingest the
+        targets, instead of the Dataset itself. However, this allows for a more efficient implementation.
+        @param targets: Original targets of the dataset.
+        @type targets: list
+        @return: List of mapped targets according to self.flips.
+        @rtype: list
+        """
+        # Apply mapping to the input, default value is the target itself!
+        return list(map(lambda y: self.flips.get(y, y), targets))
 
     @staticmethod
     def check_consistency(flips) -> None:
@@ -48,18 +62,9 @@ class FlipPill(PoisonPill):
 
     def poison_output(self, X: torch.Tensor, Y: torch.Tensor, *args, **kwargs) -> (torch.Tensor, torch.Tensor):
         """
-        Apply flip attack, assumes a ONE_HOT encoded input (see torch.nn.functional.one_hot). The
+        Flip attack does not affect output, rather the pill is taken by the dataset.
         """
-        if kwargs['classification']:
-            decoded: torch.Tensor = Y.argmax(-1).cpu()
-            # TODO: Figure out how to do this on GPU
-            # TODO: Maybe implement on client in numpy in dataloader.
-            updated_decoded = decoded.apply_(lambda x: self.flips.get(x, x)).to(Y.device)
-            new_Y = torch.nn.functional.one_hot(updated_decoded)
-        else:
-            self.logger.log(WARNING, f'Label flip attack only support classification')
-            new_Y = Y
-        return X, new_Y
+        return X, Y
 
     def poison_input(self, X: torch.Tensor, *args, **kwargs) -> torch.Tensor:
         """

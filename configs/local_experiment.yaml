@@ -15,7 +15,6 @@ cuda: false
 experiment_prefix: 'experiment_single_machine'
 output_location: 'output'
 tensor_board_active: true
-clients_per_round: 1
 system:
   federator:
     hostname: '172.18.0.2'
@@ -24,10 +23,12 @@ system:
     amount: 1
 # For a simple config is provided in configs/poison.example.yaml
 poison:
+  seed: 420
   experiments:
     min_ratio: 0.0
     max_ratio: 0.25
     steps: 2
   attack:
-    scenario: "fraction"
-    type: "LABEL_FLIP"
+    type: "flip"
+    # Flip 9 and 0
+    config: { 0:9, 9:0 }

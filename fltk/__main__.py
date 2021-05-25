@@ -12,7 +12,9 @@ from dotenv import load_dotenv
 import torch.multiprocessing as mp
 from fltk.federator import Federator
 from fltk.launch import run_single, run_spawn
+from fltk.strategy.attack import create_attack
 from fltk.util.base_config import BareConfig
+from fltk.util.poison.poisonpill import FlipPill
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -76,7 +78,7 @@ def main():
             yaml_data = yaml.load(config_file, Loader=yaml.FullLoader)
             cfg.merge_yaml(yaml_data)
             if args.mode == 'poison':
-                perform_poison_experiment(args, cfg, yaml_data)
+                perform_poison_experiment(args, cfg, parser, yaml_data)
             elif args.mode == 'single':
                 perform_single_experiment(args, cfg, parser, yaml_data)
             else:
@@ -102,7 +104,9 @@ def perform_single_experiment(args, cfg, parser, yaml_data):
     run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
 
 
-def perform_poison_experiment(args, cfg, yaml_data):
+
+
+def perform_poison_experiment(args, cfg, parser, yaml_data):
     """
     Function to start poisoned experiment.
     """
@@ -117,6 +121,7 @@ def perform_poison_experiment(args, cfg, yaml_data):
     master_address = args.host
     nic = args.nic
 
+    attack = create_attack(cfg)
     if not world_size:
         world_size = yaml_data['system']['clients']['amount'] + 1
     if not master_address:
@@ -124,9 +129,9 @@ def perform_poison_experiment(args, cfg, yaml_data):
     if not nic:
         nic = yaml_data['system']['federator']['nic']
     print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
-    run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
+    run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic, attack=attack)
 
 
 if __name__ == "__main__":
-    load_dotenv(Path("./"))
+    load_dotenv()
     main()

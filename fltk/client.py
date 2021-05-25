@@ -104,14 +104,14 @@ class Client:
     def init(self):
         pass
 
-    def init_dataloader(self, ):
+    def init_dataloader(self, pill: PoisonPill = None):
         self.args.distributed = True
         self.args.rank = self.rank
 
         self.args.world_size = self.world_size
 
         try:
-            self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args)
+            self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args, pill)
         except Exception as e:
             tb = traceback.format_exc()
             print(tb)

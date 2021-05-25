@@ -26,21 +26,40 @@ services:
     command: python3 -m fltk single configs/local_experiment.yaml --rank=1
     volumes:
     - ./configs:/opt/federation-lab/configs
-    - ./docker_data:/opt/federation-lab/data
+#    - ./docker_data:/opt/federation-lab/data
     - ./default_models:/opt/federation-lab/default_models
-    - ./data_loaders:/opt/federation-lab/data_loaders
+#    - ./data_loaders:/opt/federation-lab/data_loaders
     environment:
     - PYTHONUNBUFFERED=1
     - RANK=1
     - WORLD_SIZE=2
     - GLOO_SOCKET_IFNAME=eth0
     - TP_SOCKET_IFNAME=eth0
-    ports:
-    - 5001:5000
     depends_on:
     - fl_server
-    networks:
-      - local_network_dev
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1024M
+
+  client_slow_2:
+    restart: 'no'
+    build: .
+    command: python3 -m fltk single configs/local_experiment.yaml --rank=2
+    volumes:
+      - ./configs:/opt/federation-lab/configs
+      #    - ./docker_data:/opt/federation-lab/data
+      - ./default_models:/opt/federation-lab/default_models
+    #    - ./data_loaders:/opt/federation-lab/data_loaders
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RANK=1
+      - WORLD_SIZE=2
+      - GLOO_SOCKET_IFNAME=eth0
+      - TP_SOCKET_IFNAME=eth0
+    depends_on:
+      - fl_server
     deploy:
       resources:
         limits:

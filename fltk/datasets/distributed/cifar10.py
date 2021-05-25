@@ -6,15 +6,19 @@ from fltk.datasets.distributed.dataset import DistDataset
 from fltk.strategy.data_samplers import get_sampler
 import logging
 
+from fltk.util.poison.poisonpill import PoisonPill
+
 
 class DistCIFAR10Dataset(DistDataset):
 
-    def __init__(self, args):
-        super(DistCIFAR10Dataset, self).__init__(args)
+    def __init__(self, args, pill: PoisonPill = None):
+        super(DistCIFAR10Dataset, self).__init__(args, pill)
         self.init_train_dataset()
         self.init_test_dataset()
+        if pill:
+            self.ingest_pill(pill)
 
-    def init_train_dataset(self):
+    def init_train_dataset(self, pill: PoisonPill = None):
         dist_loader_text = "distributed" if self.args.get_distributed() else ""
         self.get_args().get_logger().debug(f"Loading '{dist_loader_text}' CIFAR10 train data")
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -26,6 +30,10 @@ class DistCIFAR10Dataset(DistDataset):
         ])
         self.train_dataset = datasets.CIFAR10(root=self.get_args().get_data_path(), train=True, download=True,
                                          transform=transform)
+
+        # Poison
+        if pill:
+            self.ingest_pill(pill)
         self.train_sampler = get_sampler(self.train_dataset, self.args)
         self.train_loader = DataLoader(self.train_dataset, batch_size=16, sampler=self.train_sampler)
         logging.info("this client gets {} samples".format(len(self.train_sampler)))
@@ -42,3 +50,4 @@ class DistCIFAR10Dataset(DistDataset):
                                         transform=transform)
         self.test_sampler = get_sampler(self.test_dataset, self.args)
         self.test_loader = DataLoader(self.test_dataset, batch_size=16, sampler=self.test_sampler)
+

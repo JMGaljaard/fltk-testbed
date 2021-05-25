@@ -13,8 +13,8 @@ tensor_board_active: true
 clients_per_round: 1
 system:
   federator:
-    hostname: '131.180.40.72'
-    nic: 'wlo1'
+    hostname: '10.5.0.2'
+    nic: 'eth0'
   clients:
     amount: 1
 # For a simple config is provided in configs/poison.example.yaml

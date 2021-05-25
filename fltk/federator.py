@@ -84,7 +84,7 @@ class Federator(object):
     client_data = {}
     poisoned_workers = {}
 
-    def __init__(self, client_id_triple, num_epochs=3, config=None):
+    def __init__(self, client_id_triple, num_epochs=3, config=None, attack=Attack):
         log_rref = rpc.RRef(FLLogger())
         self.log_rref = log_rref
         self.num_epoch = num_epochs
@@ -101,6 +101,10 @@ class Federator(object):
         self.test_data = Client("test", None, 1, 2, config)
         self.test_data.init_dataloader()
         config.data_sampler = copy_sampler
+
+        # Poisoning
+        self.attack = attack
+
 
     def create_clients(self, client_id_triple):
         for id, rank, world_size in client_id_triple:
@@ -133,9 +137,9 @@ class Federator(object):
             while not res.done():
                 pass
 
-    def client_load_data(self):
+    def client_load_data(self, poison_pill):
         for client in self.clients:
-            _remote_method_async(Client.init_dataloader, client.ref)
+            _remote_method_async(Client.init_dataloader, client.ref, pill=None if poison_pill and client not in self.poisoned_workers else poison_pill)
 
     def clients_ready(self):
         all_ready = False
@@ -245,22 +249,26 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self):
+    def run(self, attack: Attack = None):
         """
         Main loop of the Federator
         :return:
         """
-        # # Make sure the clients have loaded all the data
-        self.client_load_data()
-        self.ping_all()
-        self.clients_ready()
-        self.update_client_data_sizes()
 
         # # Select clients which will be poisened
         # TODO: get attack type and ratio from config, temp solution now
         ratio = 0.2
-        attack = LabelFlipAttack(10, ratio, {1: 2})
-        self.poisoned_workers = attack.select_poisoned_workers(self.clients, ratio)
+        poison_pill = None
+        if attack:
+            self.poisoned_workers = attack.select_poisoned_workers(self.clients, ratio)
+            poison_pill = self.attack.get_poison_pill()
+
+        self.client_load_data(poison_pill)
+        self.ping_all()
+        self.clients_ready()
+        self.update_client_data_sizes()
+
+
 
         epoch_to_run = self.num_epoch
         addition = 0
@@ -276,3 +284,4 @@ class Federator(object):
         logging.info(f'Saving data')
         self.save_epoch_data()
         logging.info(f'Federator is stopping')
+

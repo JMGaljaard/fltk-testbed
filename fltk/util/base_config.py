@@ -1,7 +1,9 @@
-from typing import Dict
+from typing import Dict, Type
 
 import torch
 import json
+
+from torch.nn.modules.loss import _Loss
 
 from fltk.datasets.distributed import DistCIFAR10Dataset, DistCIFAR100Dataset, DistFashionMNISTDataset
 from fltk.nets import Cifar10CNN, FashionMNISTCNN, Cifar100ResNet, FashionMNISTResNet, Cifar10ResNet, Cifar100VGG
@@ -12,8 +14,6 @@ torch.manual_seed(SEED)
 class BareConfig(object):
 
     def __init__(self):
-        # self.logger = logger
-
         self.batch_size = 10
         self.test_batch_size = 1000
         self.epochs = 1
@@ -56,7 +56,6 @@ class BareConfig(object):
             "Cifar10ResNet": Cifar10ResNet,
             "FashionMNISTCNN": FashionMNISTCNN,
             "FashionMNISTResNet": FashionMNISTResNet
-
         }
         self.net = None
         self.set_net_by_name('Cifar10CNN')
@@ -78,10 +77,12 @@ class BareConfig(object):
             'fashion-mnist': 'data_loaders/fashion-mnist/test_data_loader.pickle',
             'cifar100': 'data_loaders/cifar100/test_data_loader.pickle',
         }
-        self.loss_function = torch.nn.CrossEntropyLoss
+        self.loss_function: Type[_Loss] = torch.nn.CrossEntropyLoss
         self.default_model_folder_path = "default_models"
         self.data_path = "data"
 
+        # Poison
+        self.poison: dict = None
     ###########
     # Methods #
     ###########
@@ -135,6 +136,9 @@ class BareConfig(object):
             self.data_sampler = cfg['sampler']
         if 'sampler_args' in cfg:
             self.data_sampler_args = cfg['sampler_args']
+
+        if 'poison' in cfg:
+            self.poison = cfg['poison']
             
 
 
@@ -279,6 +283,7 @@ class BareConfig(object):
 
         return lr
 
+
     def get_contribution_measurement_round(self):
         return self.contribution_measurement_round
 
@@ -303,6 +308,13 @@ class BareConfig(object):
         Log this arguments object to the logger.
         """
         self.logger.debug("Arguments: {}", str(self))
+
+    def get_attack_type(self) -> str:
+        return self.poison['attack']['type']
+
+    def get_attack_config(self) -> dict:
+        return self.poison['attack']['config']
+
 
     def __str__(self):
         return "\nBatch Size: {}\n".format(self.batch_size) + \

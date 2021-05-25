@@ -6,6 +6,7 @@ from typing import List, Dict
 
 from numpy import random
 
+from fltk.util.base_config import BareConfig
 from fltk.util.poison.poisonpill import FlipPill, PoisonPill
 
 
@@ -34,7 +35,7 @@ class Attack(ABC):
         pass
 
     @abstractmethod
-    def get_poison_pill(self, *ars, **kwargs) -> PoisonPill:
+    def get_poison_pill(self, *args, **kwargs) -> PoisonPill:
         pass
 
 
@@ -49,14 +50,29 @@ class LabelFlipAttack(Attack):
             flip_description = {0: 9, 9: 0}
         return FlipPill(flip_description=flip_description)
 
-    def __init__(self, max_rounds: int, ratio: float, label_shuffle: Dict, seed: int = 42, random=False):
+    def __init__(self, max_rounds: int = 0, ratio: float = 0, label_shuffle: Dict = None, seed: int = 42, random=False,
+                 cfg: dict = None):
         """
-
+        @param max_rounds:
+        @type max_rounds: int
+        @param ratio:
+        @type ratio: float
+        @param label_shuffle:
+        @type label_shuffle: dict
+        @param seed:
+        @type seed: int
+        @param random:
+        @type random: bool
+        @param cfg:
+        @type cfg: dict
         """
-        if 0 > ratio > 1:
-            self.logger.log(ERROR, f'Cannot run with a ratio of {ratio}, needs to be in range [0, 1]')
-            raise Exception("ratio is out of bounds")
-        Attack.__init__(self, max_rounds, seed)
+        if cfg is None:
+            if 0 > ratio > 1:
+                self.logger.log(ERROR, f'Cannot run with a ratio of {ratio}, needs to be in range [0, 1]')
+                raise Exception("ratio is out of bounds")
+            Attack.__init__(self, cfg.get('total_epochs', 0), cfg.get('poison', None).get('seed', None))
+        else:
+            Attack.__init__(self, max_rounds, seed)
         self.ratio = ratio
         self.label_shuffle = label_shuffle
         self.random = random
@@ -72,3 +88,19 @@ class LabelFlipAttack(Attack):
 
     def get_poison_pill(self):
         return FlipPill(self.label_shuffle)
+
+
+def create_attack(cfg: BareConfig) -> Attack:
+    """
+    Function to create Poison attack based on the configuration that was passed during execution.
+    Exception gets thrown when the configuration file is not correct.
+    """
+    assert not cfg is None and not cfg.poison is None
+    attack_mapper = {'flip': LabelFlipAttack}
+
+    attack_class = attack_mapper.get(cfg.get_attack_type(), None)
+
+    if not attack_class is None:
+        attack = attack_class(cfg=cfg.get_attack_config())
+    else:
+        raise Exception("Requested attack is not supported...")

@@ -8,18 +8,19 @@ import argparse
 
 import torch.multiprocessing as mp
 from fltk.federator import Federator
+from fltk.strategy.attack import Attack
 from fltk.util.base_config import BareConfig
 from fltk.util.env.learner_environment import prepare_environment
 
 logging.basicConfig(level=logging.DEBUG)
 
 
-def run_ps(rpc_ids_triple, args):
+def run_ps(rpc_ids_triple, args, attack=Attack):
     print(f'Starting the federator...')
-    fed = Federator(rpc_ids_triple, config=args)
-    fed.run()
+    fed = Federator(rpc_ids_triple, config=args, attack=Attack)
+    fed.run(attack)
 
-def run_single(rank, world_size, host = None, args = None, nic = None):
+def run_single(rank, world_size, host = None, args = None, nic = None, attack=None):
     logging.info(f'Starting with rank={rank} and world size={world_size}')
     prepare_environment(host, nic)
 
@@ -48,7 +49,7 @@ def run_single(rank, world_size, host = None, args = None, nic = None):
             rpc_backend_options=options
 
         )
-        run_ps([(f"client{r}", r, world_size) for r in range(1, world_size)], args)
+        run_ps([(f"client{r}", r, world_size) for r in range(1, world_size)], args, attack)
     # block until all rpc finish
     rpc.shutdown()
 
