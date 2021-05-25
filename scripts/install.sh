@@ -7,6 +7,6 @@ cd /home/$USER/fltk-testbed-gr-30
 git pull
 
 # Install the changes
-sudo python3 -m setup.py install
+sudo python3 setup.py install
 
 
