@@ -8,6 +8,14 @@ Pytorch Distributed ([docs](https://pytorch.org/tutorials/beginner/dist_overview
 The goal if this project is to launch Federated Learning nodes in truly distribution fashion.
 
 This project is tested with Ubuntu 20.04 and python {3.7, 3.8}.
+
+### Building locally
+
+To build locally, run the following command in the project root directory.
+
+```bash 
+DOCKER_BUILDKIT=1 docker build . --tag fltk
+```
 ### Global idea
 Pytorch distributed works based on a world_size and ranks. The ranks should be between 0 and world_size-1.
 Generally, the federator has rank 0 and the clients have ranks between 1 and world_size-1.
