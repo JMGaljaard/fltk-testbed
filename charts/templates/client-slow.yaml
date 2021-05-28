@@ -1,0 +1,50 @@
+{{ $worldsize := (.Values.fltk.worldsize | int) }}
+{{ $workercpu := (.Values.worker.cpu | int) }}
+{{ $workermemory := (.Values.worker.memory | int) }}
+
+{{- range untilStep 1 (add1 $worldsize | int) 1 }}
+{{ $rank := ( . | int)}}
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    kompose.cmd: kompose convert -c -f ../docker-compose-gcloud.yml
+    kompose.version: 1.22.0 (HEAD)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: client-slow-{{ . }}
+  name: client-slow-{{ . }}
+spec:
+  containers:
+    - args:
+        - python3
+        - -m
+        - fltk
+        - single
+        - configs/local_experiment.yaml
+        - --rank={{ . }}
+      env:
+        - name: GLOO_SOCKET_IFNAME
+          value: eth0
+        - name: MASTER_PORT
+          value: "5000"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: RANK
+          value: {{ $rank }}
+        - name: TP_SOCKET_IFNAME
+          value: eth0
+        - name: WORLD_SIZE
+          value: {{ $worldsize }}
+      image: gcr.io/cs4290-dml/fltk:latest
+      name: client-slow
+      resources:
+        limits:
+          cpu: {{ $workercpu }}
+          # 1 GiB ?
+          memory: {{ $workermemory }}
+  restartPolicy: Never
+status: {}
+# Helm requires seperation.
+---
+{{- end }}

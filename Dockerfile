@@ -19,15 +19,15 @@ RUN apt-get update \
   && apt-get install -y vim curl python3 python3-pip net-tools iproute2
 
 # Copy the current folder to the working directory
-ADD setup.py requirements.txt ./
+ADD setup.py default_models requirements.txt ./
 
 # Use cache for pip, otherwise we repeatedly pull from repository
 RUN --mount=type=cache,target=/root/.cache/pip python3 -m pip install -r requirements.txt
 
 ADD configs configs
 
-# Install all required packages for the generator
 ADD fltk fltk
+
 # Install newest version of library
 RUN python3 -m setup install
 
