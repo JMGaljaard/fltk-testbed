@@ -38,8 +38,15 @@ class Attack(ABC):
     def get_poison_pill(self) -> PoisonPill:
         pass
 
+    @abstractmethod
+    def isActive(self, current_round: int = 0) -> bool:
+        pass
+
 
 class LabelFlipAttack(Attack):
+
+    def isActive(self, current_round=0) -> bool:
+        return True
 
     def build_attack(self, flip_description=None) -> PoisonPill:
         """
@@ -90,6 +97,36 @@ class LabelFlipAttack(Attack):
 
     def get_poison_pill(self):
         return FlipPill(self.label_shuffle)
+
+
+class TimedLabelFlipAttack(LabelFlipAttack):
+    def __init__(self, start_round, end_round, availability, max_rounds: int = 0, ratio: float = 0, label_shuffle: Dict = None, seed: int = 42, random=False,
+                 cfg: BareConfig = None, ):
+        LabelFlipAttack.__init__(self, max_rounds, ratio, label_shuffle, seed, random, cfg)
+        self.start_round = start_round
+        self.end_round = end_round
+        self.availability = availability
+
+    def isActive(self, currentRound=0) -> bool:
+        """
+        Timed attack is only active when the current round is in between the start and end rounds of the attack.
+        """
+        return self.start_round <= currentRound <= self.end_round
+
+    def select_workers_for_round(self, poisoned_workers: List, healty_workers: List, participants_per_round: int):
+        """
+        Select poisoned workers based on availability.
+        When availability = 0.5, selecting a participant has a 50% chance of being a poisoned one.
+        """
+        poison_counter = 0
+        healthy_counter = 0
+        nr_poisoned_workers = len(poisoned_workers)
+        for i in range(participants_per_round):
+            if random.random() <= self.availability & poison_counter < nr_poisoned_workers:
+                poison_counter += 1
+            else:
+                healthy_counter += 1
+        return random.sample(poisoned_workers, poison_counter) + random.sample(healty_workers, healthy_counter)
 
 
 def create_attack(cfg: BareConfig) -> Attack:
