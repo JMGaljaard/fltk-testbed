@@ -25,7 +25,7 @@ services:
       - MASTER_PORT=5000
       - PYTHONUNBUFFERED=1
       - RANK=1
-      - WORLD_SIZE=2
+      - WORLD_SIZE=20
       - GLOO_SOCKET_IFNAME=eth0
       - TP_SOCKET_IFNAME=eth0
     depends_on:
@@ -44,7 +44,7 @@ services:
       - MASTER_PORT=5000
       - PYTHONUNBUFFERED=1
       - RANK=2
-      - WORLD_SIZE=2
+      - WORLD_SIZE=20
       - GLOO_SOCKET_IFNAME=eth0
       - TP_SOCKET_IFNAME=eth0
     depends_on:
@@ -54,3 +54,43 @@ services:
         limits:
           cpus: '0.5'
           memory: 1024M
+
+  client_slow_3:
+    restart: 'no'
+    image: gcr.io/cs4290-dml/fltk:latest
+    command: python3 -m fltk single configs/local_experiment.yaml --rank=3
+    environment:
+      - MASTER_PORT=5000
+      - PYTHONUNBUFFERED=1
+      - RANK=3
+      - WORLD_SIZE=20
+      - GLOO_SOCKET_IFNAME=eth0
+      - TP_SOCKET_IFNAME=eth0
+    depends_on:
+      - fl_server
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1024M
+
+  client_slow_4:
+    restart: 'no'
+    image: gcr.io/cs4290-dml/fltk:latest
+    command: python3 -m fltk single configs/local_experiment.yaml --rank=3
+    environment:
+      - MASTER_PORT=5000
+      - PYTHONUNBUFFERED=1
+      - RANK=4
+      -
+      - WORLD_SIZE=20
+      - GLOO_SOCKET_IFNAME=eth0
+      - TP_SOCKET_IFNAME=eth0
+    depends_on:
+      - fl_server
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1024M
+

@@ -1,7 +1,7 @@
 import logging
 from abc import abstractmethod, ABC
 from logging import ERROR
-from typing import Dict, List
+from typing import Dict, List, Union, Callable
 
 import torch
 
@@ -25,13 +25,16 @@ class PoisonPill(ABC):
         """
         pass
 
-    def poison_targets(self, targets):
-        return targets
+    def poison_targets(self) -> Union[Callable, None]:
+        return None
 
+    @abstractmethod
+    def __str__(self):
+        pass
 
 class FlipPill(PoisonPill):
 
-    def poison_targets(self, targets: List[int]) -> List[int]:
+    def poison_targets(self) -> Callable:
         """
         Apply poison to the targets of a dataset. Note that this is a somewhat strange approach, as the pill ingest the
         targets, instead of the Dataset itself. However, this allows for a more efficient implementation.
@@ -41,7 +44,9 @@ class FlipPill(PoisonPill):
         @rtype: list
         """
         # Apply mapping to the input, default value is the target itself!
-        return list(map(lambda y: self.flips.get(y, y), targets))
+        def flipper(y):
+            return  self.flips.get(y, y)
+        return flipper
 
     @staticmethod
     def check_consistency(flips) -> bool:
@@ -72,3 +77,6 @@ class FlipPill(PoisonPill):
         Flip attack does not change the input during training.
         """
         return X
+
+    def __str__(self):
+        return f""""Flip attack: {self.flips}"""

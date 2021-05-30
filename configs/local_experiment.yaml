@@ -1,7 +1,7 @@
 ---
 # Experiment configuration
 # Experiment configuration
-total_epochs: 5
+total_epochs: 2
 epochs_per_cycle: 1
 wait_for_clients: true
 net: Cifar10CNN
@@ -15,13 +15,13 @@ cuda: false
 experiment_prefix: 'experiment_single_machine'
 output_location: 'output'
 tensor_board_active: true
-clients_per_round: 1
+clients_per_round: 2
 system:
   federator:
     hostname: '172.18.0.2'
     nic: 'eth0'
   clients:
-    amount: 1
+    amount: 2
 # For a simple config is provided in configs/poison.example.yaml
 poison:
   seed: 420

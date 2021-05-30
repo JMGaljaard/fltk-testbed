@@ -1,5 +1,4 @@
 venv
-default_models
 data_loaders
 data/cifar-10-batches-py
 data/cifar-100-python.tar.gz

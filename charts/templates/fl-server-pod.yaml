@@ -20,9 +20,9 @@ spec:
         - name: RANK
           value: "0"
         - name: TP_SOCKET_IFNAME
-          value: eth0
+          value: "eth0"
         - name: WORLD_SIZE
-          value: {{ (.Values.fltk.worldsize | int) }}
+          value: {{ quote (.Values.fltk.worldsize | int) }}
       image: gcr.io/cs4290-dml/fltk:latest
       name: federation-lab-server
       ports:
