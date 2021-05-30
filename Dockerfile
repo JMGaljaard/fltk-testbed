@@ -18,8 +18,10 @@ WORKDIR /opt/federation-lab
 RUN apt-get update \
   && apt-get install -y vim curl python3 python3-pip net-tools iproute2
 
+COPY data/ ./data
+COPY default_models ./default_models
 # Copy the current folder to the working directory
-ADD setup.py default_models requirements.txt ./
+ADD setup.py requirements.txt ./
 
 # Use cache for pip, otherwise we repeatedly pull from repository
 RUN --mount=type=cache,target=/root/.cache/pip python3 -m pip install -r requirements.txt
