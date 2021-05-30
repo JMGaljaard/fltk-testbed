@@ -6,6 +6,8 @@ from typing import List, Dict
 
 from numpy import random
 from collections import ChainMap
+
+from fltk.strategy.client_selection import random_selection
 from fltk.util.base_config import BareConfig
 from fltk.util.poison.poisonpill import FlipPill, PoisonPill
 
@@ -39,13 +41,17 @@ class Attack(ABC):
         pass
 
     @abstractmethod
-    def isActive(self, current_round: int = 0) -> bool:
+    def is_active(self, current_round: int = 0) -> bool:
+        pass
+
+    @abstractmethod
+    def select_clients(self, poisoned_clients, healthy_workers, n):
         pass
 
 
 class LabelFlipAttack(Attack):
 
-    def isActive(self, current_round=0) -> bool:
+    def is_active(self, current_round=0) -> bool:
         return True
 
     def build_attack(self, flip_description=None) -> PoisonPill:
@@ -98,8 +104,11 @@ class LabelFlipAttack(Attack):
     def get_poison_pill(self):
         return FlipPill(self.label_shuffle)
 
+    def select_clients(self, poisoned_clients, healthy_clients, n):
+        return random_selection(poisoned_clients + healthy_clients, n)
 
 class TimedLabelFlipAttack(LabelFlipAttack):
+
     def __init__(self, start_round, end_round, availability, max_rounds: int = 0, ratio: float = 0, label_shuffle: Dict = None, seed: int = 42, random=False,
                  cfg: BareConfig = None, ):
         LabelFlipAttack.__init__(self, max_rounds, ratio, label_shuffle, seed, random, cfg)
@@ -107,32 +116,33 @@ class TimedLabelFlipAttack(LabelFlipAttack):
         self.end_round = end_round
         self.availability = availability
 
-    def isActive(self, currentRound=0) -> bool:
+    def is_active(self, currentRound=0) -> bool:
         """
         Timed attack is only active when the current round is in between the start and end rounds of the attack.
         """
         return self.start_round <= currentRound <= self.end_round
 
-    def select_workers_for_round(self, poisoned_workers: List, healty_workers: List, participants_per_round: int):
+    def select_clients(self, poisoned_clients: List, healthy_clients: List, n):
         """
         Select poisoned workers based on availability.
         When availability = 0.5, selecting a participant has a 50% chance of being a poisoned one.
         """
         poison_counter = 0
         healthy_counter = 0
-        nr_poisoned_workers = len(poisoned_workers)
-        for i in range(participants_per_round):
+        nr_poisoned_workers = len(poisoned_clients)
+        for i in range(n):
             if random.random() <= self.availability & poison_counter < nr_poisoned_workers:
                 poison_counter += 1
             else:
                 healthy_counter += 1
-        return random.sample(poisoned_workers, poison_counter) + random.sample(healty_workers, healthy_counter)
+        return random.sample(poisoned_clients, poison_counter) + random.sample(healthy_clients, healthy_counter)
 
 
 def create_attack(cfg: BareConfig) -> Attack:
     """
     Function to create Poison attack based on the configuration that was passed during execution.
     Exception gets thrown when the configuration file is not correct.
+    TODO parse TimedFlipAttack from config
     """
     assert not cfg is None and not cfg.poison is None
     attack_mapper = {'flip': LabelFlipAttack}

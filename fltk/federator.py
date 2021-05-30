@@ -72,7 +72,8 @@ class Federator(object):
     clients: List[ClientRef] = []
     epoch_counter = 0
     client_data = {}
-    poisoned_workers = {}
+    poisoned_clients = {}
+    healthy_clients = {}
 
     def __init__(self, client_id_triple, num_epochs=3, config: BareConfig = None, attack: Attack = None):
         log_rref = rpc.RRef(FLLogger())
@@ -104,12 +105,7 @@ class Federator(object):
             self.client_data[id] = []
 
     def select_clients(self, n=2):
-        """
-        TODO: Make this extensible.
-         1. E.g. 'time dependent' function.
-         2. E.g. make a progress dependent function.
-        """
-        return random_selection(self.clients, n)
+        return self.attack.select_clients(self.poisoned_clients, self.healthy_clients, n)
 
     def ping_all(self):
         for client in self.clients:
@@ -129,7 +125,7 @@ class Federator(object):
     def client_load_data(self, poison_pill):
         for client in self.clients:
             _remote_method_async(Client.init_dataloader, client.ref,
-                                 pill=None if poison_pill and client not in self.poisoned_workers else poison_pill)
+                                 pill=None if poison_pill and client not in self.poisoned_clients else poison_pill)
 
     def clients_ready(self):
         all_ready = False
@@ -163,7 +159,7 @@ class Federator(object):
             determines to send to which nodes and which are poisoned
             """
             pill = None
-            if client in self.poisoned_workers:
+            if (client in self.poisoned_clients) & self.attack.is_active():
                 pill = self.attack.get_poison_pill()
             responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, pill=pill)))
         self.epoch_counter += epochs
@@ -249,7 +245,9 @@ class Federator(object):
         # TODO: get attack type and ratio from config, temp solution now
         poison_pill = None
         if self.attack:
-            self.poisoned_workers = self.attack.select_poisoned_workers(self.clients)
+            self.poisoned_clients = self.attack.select_poisoned_workers(self.clients)
+            # Rest of the clients are healthy
+            self.healthy_clients = list(set(self.clients).symmetric_difference(set(self.poisoned_clients)))
             poison_pill = self.attack.get_poison_pill()
 
         self.client_load_data(poison_pill)
