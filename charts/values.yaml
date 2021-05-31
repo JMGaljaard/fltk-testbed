@@ -1,6 +1,0 @@
-fltk:
-    worldsize: 20
-
-worker:
-    cpu: 500m
-    memory: 1073742000
