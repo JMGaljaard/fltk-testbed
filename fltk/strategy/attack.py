@@ -47,10 +47,10 @@ class LabelFlipAttack(Attack):
         If a different train class is used, and has less than 10 classes, this will result in exceptions.
         """
         if flip_description is None:
-            flip_description = {0: 9, 9: 0}
+            flip_description = {0: 9}
         return FlipPill(flip_description=flip_description)
 
-    def __init__(self, max_rounds: int = 0, ratio: float = 0, label_shuffle: Dict = None, seed: int = 42, random=False,
+    def __init__(self, max_rounds: int = 0, ratio: float = 0.0, label_shuffle: Dict = None, seed: int = 42, random=False,
                  cfg: BareConfig = None):
         """
         @param max_rounds:
@@ -86,7 +86,7 @@ class LabelFlipAttack(Attack):
             random.seed(self.seed)
         cloned_workers = workers.copy()
         random.shuffle(cloned_workers)
-        return cloned_workers[0:ceil(len(workers) * self.ratio)]
+        return cloned_workers[0:ceil(len(workers) * ratio)]
 
     def get_poison_pill(self):
         return FlipPill(self.label_shuffle)
@@ -106,4 +106,5 @@ def create_attack(cfg: BareConfig) -> Attack:
         attack = attack_class(cfg=cfg)
     else:
         raise Exception("Requested attack is not supported...")
+    print(f'')
     return attack

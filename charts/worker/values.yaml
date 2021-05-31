@@ -1,7 +1,3 @@
-fltk:
-    worldsize: 10
-    config: cloud_experiment.yaml
-    port: 5001
 worker:
-    cpu: 500m
-    memory: 1073742000
+    cpu: 750m
+    memory: 1300000000

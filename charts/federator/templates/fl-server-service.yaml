@@ -11,8 +11,8 @@ metadata:
 spec:
   ports:
     - name: "5000"
-      port: 5000
-      targetPort: 5000
+      port: {{ (.Values.fltk.port | int) }}
+      targetPort: {{ (.Values.fltk.port | int) }}
   selector:
     io.kompose.service: fl-server
 status:

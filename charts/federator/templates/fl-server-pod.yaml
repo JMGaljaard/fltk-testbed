@@ -14,25 +14,28 @@ spec:
         - python3
         - -m
         - fltk
-        - single
+        - poison
         - configs/cloud_experiment.yaml
         - --rank=0
       env:
         - name: MASTER_PORT
-          value: "5000"
+          value: {{ quote (.Values.fltk.port | int) }}
         - name: PYTHONUNBUFFERED
           value: "1"
       image: gcr.io/cs4290-dml/fltk:latest
       name: federation-lab-server
       ports:
-        - containerPort: 5000
-      resources: {}
+        - containerPort: {{ (.Values.fltk.port)}}
+      resources:
+        limits:
+          cpu: {{ (.Values.federator.cpu | int) }}
+          memory: {{ (.Values.federator.memory | int) }}
       volumeMounts:
         - mountPath: /opt/federation-lab/output
-          name: fl-server-claim0
+          name: fl-server-claim
   restartPolicy: Never
   volumes:
-    - name: fl-server-claim0
+    - name: fl-server-claim
       persistentVolumeClaim:
-        claimName: fl-server-claim0
+        claimName: fl-server-claim
 status: {}

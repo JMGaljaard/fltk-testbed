@@ -80,6 +80,10 @@ class Federator(object):
 
     def __init__(self, client_id_triple, num_epochs=3, config: BareConfig = None, attack: Attack = None):
         log_rref = rpc.RRef(FLLogger())
+        # Poisoning
+        self.attack = attack
+        logging.info(f'Federator with attack {attack}')
+
         self.log_rref = log_rref
         self.num_epoch = num_epochs
         self.config = config
@@ -97,8 +101,7 @@ class Federator(object):
         self.test_data.init_dataloader()
         config.data_sampler = copy_sampler
 
-        # Poisoning
-        self.attack = attack
+
 
     def create_clients(self, client_id_triple):
         for id, rank, world_size in client_id_triple:
@@ -263,7 +266,7 @@ class Federator(object):
             if ratio:
                 filename = f'{file_output}/{key}_epochs_{ratio}.csv'
             else:
-                filename = f'{file_output}/{key}_epochs.csv'
+                filename = f'{file_output}/{key}_{ratio}.csv'
             logging.info(f'Saving data at {filename}')
             with open(filename, "w") as f:
                 w = DataclassWriter(f, self.client_data[key], EpochData)
@@ -272,7 +275,7 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self, ratio = [0.0, 0.05, 0.1, 0.15, 0.2], ):
+    def run(self, ratios = [0.1, 0.2, 0.3] ):
         """
         Main loop of the Federator
         :return:
@@ -282,13 +285,14 @@ class Federator(object):
         # TODO: get attack type and ratio from config, temp solution now
         poison_pill = None
         save_path = self.config
-        for rat in ratio:
+        for rat in ratios:
             # Get model to calculate gradient updates
             model = initialize_default_model(self.config, self.config.get_net())
 
             self.update_clients(rat)
             if self.attack:
-                self.poisoned_workers: List[ClientRef] = self.attack.select_poisoned_workers(self.clients)
+                self.poisoned_workers: List[ClientRef] = self.attack.select_poisoned_workers(self.clients, rat)
+                print(f"Poisoning workers: {self.poisoned_workers}")
                 with open(f"{self.tb_path_base}/config_{rat}_poisoned.txt", 'w') as f:
                     f.writelines(list(map(lambda worker: worker.name, self.poisoned_workers)))
                 poison_pill = self.attack.get_poison_pill()
@@ -305,13 +309,13 @@ class Federator(object):
                 print(f'Running epoch {epoch}')
                 # Get new model during run, update iteratively. The model is needed to calculate the
                 # gradient by the federator.
-                model = self.remote_run_epoch(epoch_size, model, ratio)
+                model = self.remote_run_epoch(epoch_size, model, rat)
                 addition += 1
             logging.info('Printing client data')
             print(self.client_data)
 
             logging.info(f'Saving data')
-            self.save_epoch_data()
+            self.save_epoch_data(rat)
         logging.info(f'Federator is stopping')
 
     def store_gradient(self, gradient, client_id, epoch, ratio):

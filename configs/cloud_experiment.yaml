@@ -1,11 +1,9 @@
----
 # Experiment configuration
-# Experiment configuration
-total_epochs: 5
+total_epochs: 130
 epochs_per_cycle: 1
 wait_for_clients: true
-net: FashionMNISTCNN
-dataset: fashion-mnist
+net: Cifar10CNN
+dataset: cifar10
 sampler: "uniform"
 sampler_args:
   - 0.5     # p degree
@@ -15,22 +13,19 @@ cuda: false
 experiment_prefix: 'experiment_single_machine'
 output_location: 'output'
 tensor_board_active: true
-clients_per_round: 20
+clients_per_round: 10
 system:
   federator:
     # Use the SERVICE provided by the fl-server to connect
-    hostname: 'fl-server.default.svc.cluster.local'
+    hostname: 'fl-server.test.svc.cluster.local'
     # Default NIC is eth0
     nic: 'eth0'
   clients:
-    amount: 20
-# For a simple config is provided in configs/poison.example.yaml
+    amount: 10
 poison:
   seed: 420
   ratio: 0.2
   attack:
     type: "flip"
     config:
-      - 4: 6
       - 6: 4
-

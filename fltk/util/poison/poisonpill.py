@@ -48,22 +48,11 @@ class FlipPill(PoisonPill):
             return  self.flips.get(y, y)
         return flipper
 
-    @staticmethod
-    def check_consistency(flips) -> bool:
-        for attack in flips.keys():
-            if flips.get(flips.get(attack, -2), -1) != attack:
-                # -1 because ONE_HOT encoding can never represent a negative number
-                logging.getLogger().log(ERROR,
-                                        f'Cyclic inconsistency, {attack} resolves back to {flips[flips[attack]]}')
-                raise Exception('Inconsistent flip attack!')
-        return True
-
     def __init__(self, flip_description: Dict[int, int]):
         """
             Implements the flip attack scenario, where one or multiple attacks are implemented
             """
         super().__init__()
-        assert FlipPill.check_consistency(flip_description)
         self.flips = flip_description
 
     def poison_output(self, X: torch.Tensor, Y: torch.Tensor, *args, **kwargs) -> (torch.Tensor, torch.Tensor):
