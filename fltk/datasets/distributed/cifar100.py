@@ -24,7 +24,7 @@ class DistCIFAR100Dataset(DistDataset):
             normalize
         ])
         self.train_dataset = datasets.CIFAR100(root=self.get_args().get_data_path(), train=True, download=True,
-                                              transform=transform)
+                                              transform=transform, target_transform=self.pill.poison_targets())
         self.train_sampler = get_sampler(self.train_dataset, self.args)
         self.train_loader = DataLoader(self.train_dataset, batch_size=16, sampler=self.train_sampler)
 

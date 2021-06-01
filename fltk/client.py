@@ -56,11 +56,13 @@ class Client:
 
     def __init__(self, id, log_rref, rank, world_size, config: BareConfig = None):
         logging.info(f'Welcome to client {id}')
+        self.net = None
         self.id = id
         self.log_rref = log_rref
         self.rank = rank
         self.world_size = world_size
         # self.args = Arguments(logging)
+
         self.args = config
         self.args.init_logger(logging)
         self.device = self.init_device()
@@ -80,7 +82,43 @@ class Client:
         else:
             return torch.device("cpu")
 
+    def reset_model(self):
+        """
+        Function to reset the learning process. In addition, reset the loss function and the
+        optimizer, in case this uses certain decay according to some internal counter.
+        @return: None
+        @rtype: None
+        """
+        # Load the default model
+        # Delete the network to prevent out of memory exceptions being thrown
+        try:
+            del self.net
+
+            # Delete dataloader to prevent out of memory exceptions being thrown
+            del self.dataset
+        except Exception as e:
+            print(f"something went wrong: {e}")
+        # Load network
+        self.set_net(self.load_default_model())
+        # Set loss function for gradient calculation
+        self.loss_function = self.args.get_loss_function()()
+        # Create optimizer (default is SGD): TODO: Move to AdamW?
+        self.optimizer = torch.optim.SGD(self.net.parameters(),
+                                         lr=self.args.get_learning_rate(),
+                                         momentum=self.args.get_momentum())
+        self.scheduler = MinCapableStepLR(self.args.get_logger(), self.optimizer,
+                                          self.args.get_scheduler_step_size(),
+                                          self.args.get_scheduler_gamma(),
+                                          self.args.get_min_lr())
+        # Reset the epoch counter
+        self.epoch_counter = 0
+
     def ping(self):
+        """
+        Aliveness checker for the federator during initialization.
+        @return: String to the important question, `ping?', which is pong.
+        @rtype: str
+        """
         return 'pong'
 
     def rpc_test(self):

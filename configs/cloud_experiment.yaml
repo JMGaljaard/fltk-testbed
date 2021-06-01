@@ -1,6 +1,5 @@
----
 # Experiment configuration
-total_epochs: 5
+total_epochs: 130
 epochs_per_cycle: 1
 wait_for_clients: true
 net: Cifar10CNN
@@ -14,20 +13,19 @@ cuda: false
 experiment_prefix: 'experiment_single_machine'
 output_location: 'output'
 tensor_board_active: true
-clients_per_round: 1
+clients_per_round: 10
 system:
   federator:
-    hostname: '10.128.0.2'
-    nic: 'ens4'
+    # Use the SERVICE provided by the fl-server to connect
+    hostname: 'fl-server.test.svc.cluster.local'
+    # Default NIC is eth0
+    nic: 'eth0'
   clients:
-    # TODO set this in environment variable
-    amount: 1
-# For a simple config is provided in configs/poison.example.yaml
+    amount: 10
 poison:
-  experiments:
-    min_ratio: 0.0
-    max_ratio: 0.25
-    steps: 2
+  seed: 420
+  ratio: 0.2
   attack:
-    scenario: "fraction"
-    type: "LABEL_FLIP"
+    type: "flip"
+    config:
+      - 6: 4

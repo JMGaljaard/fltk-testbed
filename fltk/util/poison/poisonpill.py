@@ -1,7 +1,7 @@
 import logging
 from abc import abstractmethod, ABC
 from logging import ERROR
-from typing import Dict, List
+from typing import Dict, List, Union, Callable
 
 import torch
 
@@ -25,13 +25,16 @@ class PoisonPill(ABC):
         """
         pass
 
-    def poison_targets(self, targets):
-        return targets
+    def poison_targets(self) -> Union[Callable, None]:
+        return None
 
+    @abstractmethod
+    def __str__(self):
+        pass
 
 class FlipPill(PoisonPill):
 
-    def poison_targets(self, targets: List[int]) -> List[int]:
+    def poison_targets(self) -> Callable:
         """
         Apply poison to the targets of a dataset. Note that this is a somewhat strange approach, as the pill ingest the
         targets, instead of the Dataset itself. However, this allows for a more efficient implementation.
@@ -41,24 +44,15 @@ class FlipPill(PoisonPill):
         @rtype: list
         """
         # Apply mapping to the input, default value is the target itself!
-        return list(map(lambda y: self.flips.get(y, y), targets))
-
-    @staticmethod
-    def check_consistency(flips) -> bool:
-        for attack in flips.keys():
-            if flips.get(flips.get(attack, -2), -1) != attack:
-                # -1 because ONE_HOT encoding can never represent a negative number
-                logging.getLogger().log(ERROR,
-                                        f'Cyclic inconsistency, {attack} resolves back to {flips[flips[attack]]}')
-                raise Exception('Inconsistent flip attack!')
-        return True
+        def flipper(y):
+            return  self.flips.get(y, y)
+        return flipper
 
     def __init__(self, flip_description: Dict[int, int]):
         """
             Implements the flip attack scenario, where one or multiple attacks are implemented
             """
         super().__init__()
-        assert FlipPill.check_consistency(flip_description)
         self.flips = flip_description
 
     def poison_output(self, X: torch.Tensor, Y: torch.Tensor, *args, **kwargs) -> (torch.Tensor, torch.Tensor):
@@ -72,3 +66,6 @@ class FlipPill(PoisonPill):
         Flip attack does not change the input during training.
         """
         return X
+
+    def __str__(self):
+        return f""""Flip attack: {self.flips}"""

@@ -21,21 +21,21 @@ spec:
         - -m
         - fltk
         - single
-        - configs/local_experiment.yaml
+        - configs/cloud_experiment.yaml
         - --rank={{ . }}
       env:
-        - name: GLOO_SOCKET_IFNAME
-          value: eth0
         - name: MASTER_PORT
           value: "5000"
+        - name: GLOO_SOCKET_IFNAME
+          value: eth0
         - name: PYTHONUNBUFFERED
           value: "1"
         - name: RANK
-          value: {{ $rank }}
+          value: {{ quote $rank }}
         - name: TP_SOCKET_IFNAME
           value: eth0
         - name: WORLD_SIZE
-          value: {{ $worldsize }}
+          value: {{ quote $worldsize }}
       image: gcr.io/cs4290-dml/fltk:latest
       name: client-slow
       resources:

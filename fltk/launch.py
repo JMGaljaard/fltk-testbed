@@ -26,7 +26,7 @@ def run_single(rank, world_size, host = None, args = None, nic = None, attack=No
 
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
     options = rpc.TensorPipeRpcBackendOptions(
-        num_worker_threads=16, # TODO: Retrieve number of cores from system
+        num_worker_threads=20, # TODO: Retrieve number of cores from system
         rpc_timeout=0,  # infinite timeout
         init_method=f'tcp://{os.environ["MASTER_ADDR"]}:{os.environ["MASTER_PORT"]}'
     )
@@ -50,6 +50,7 @@ def run_single(rank, world_size, host = None, args = None, nic = None, attack=No
 
         )
         run_ps([(f"client{r}", r, world_size) for r in range(1, world_size)], args, attack)
+
     # block until all rpc finish
     rpc.shutdown()
 

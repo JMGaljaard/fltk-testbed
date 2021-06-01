@@ -1,13 +1,17 @@
 import logging
+import pathlib
 import time
 from pathlib import Path
 from typing import List, Callable
 
+import torch
 from dataclass_csv import DataclassWriter
 from torch.distributed import rpc
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.client import Client
+from fltk.nets import Cifar10CNN
+from fltk.nets.util.utils import flatten_params, initialize_default_model
 from fltk.strategy.attack import Attack
 from fltk.strategy.client_selection import random_selection
 from fltk.util.base_config import BareConfig
@@ -77,13 +81,18 @@ class Federator(object):
 
     def __init__(self, client_id_triple, num_epochs=3, config: BareConfig = None, attack: Attack = None):
         log_rref = rpc.RRef(FLLogger())
+        # Poisoning
+        self.attack = attack
+        logging.info(f'Federator with attack {attack}')
+
         self.log_rref = log_rref
         self.num_epoch = num_epochs
         self.config = config
-        self.tb_path = config.output_location
-        self.ensure_path_exists(self.tb_path)
-        self.tb_writer = SummaryWriter(f'{self.tb_path}/{config.experiment_prefix}_federator')
+        self.tb_path_base = self.config.output_location
+        self.ensure_path_exists(self.tb_path_base)
+        self.tb_writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_federator')
         self.create_clients(client_id_triple)
+
         self.config.init_logger(logging)
 
         logging.info("Creating test client")
@@ -93,16 +102,23 @@ class Federator(object):
         self.test_data.init_dataloader()
         config.data_sampler = copy_sampler
 
-        # Poisoning
-        self.attack = attack
+
 
     def create_clients(self, client_id_triple):
         for id, rank, world_size in client_id_triple:
             client = rpc.remote(id, Client, kwargs=dict(id=id, log_rref=self.log_rref, rank=rank, world_size=world_size,
                                                         config=self.config))
-            writer = SummaryWriter(f'{self.tb_path}/{self.config.experiment_prefix}_client_{id}')
+            writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_client_{id}')
             self.clients.append(ClientRef(id, client, tensorboard_writer=writer))
             self.client_data[id] = []
+
+    def update_clients(self, ratio):
+        self.tb_writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_federator')
+        for client in self.clients:
+            writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_client_{client.name}_{ratio}')
+            client.tb_writer = writer
+            self.client_data[client.name] = []
+
 
     def select_clients(self, n=2):
         return self.attack.select_clients(self.poisoned_clients, self.healthy_clients, n)
@@ -121,6 +137,17 @@ class Federator(object):
             res = _remote_method_async(Client.rpc_test, client.ref)
             while not res.done():
                 pass
+
+
+    def client_reset_model(self):
+        """
+        Function to reset the model at all learners
+        @return:
+        @rtype:
+        """
+        for client in self.clients:
+            _remote_method_async(Client.reset_model, client.ref)
+
 
     def client_load_data(self, poison_pill):
         for client in self.clients:
@@ -148,7 +175,7 @@ class Federator(object):
             time.sleep(2)
         logging.info('All clients are ready')
 
-    def remote_run_epoch(self, epochs):
+    def remote_run_epoch(self, epochs, cur_model: torch.nn.Module, ratio = None):
         responses = []
         client_weights = []
         selected_clients = self.select_clients(self.config.clients_per_round)
@@ -163,8 +190,13 @@ class Federator(object):
                 pill = self.attack.get_poison_pill()
             responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, pill=pill)))
         self.epoch_counter += epochs
+        flat_current = flatten_params(cur_model.state_dict())
         for res in responses:
+
             epoch_data, weights = res[1].wait()
+            # get flatten
+
+            self.store_gradient(flatten_params(weights) - flat_current, epoch_data.client_id, self.epoch_counter, ratio)
             self.client_data[epoch_data.client_id].append(epoch_data)
             logging.info(f'{res[0]} had a loss of {epoch_data.loss}')
             logging.info(f'{res[0]} had a epoch data of {epoch_data}')
@@ -204,6 +236,7 @@ class Federator(object):
         for res in responses:
             res[1].wait()
         logging.info('Weights are updated')
+        return self.test_data.net
 
     def update_client_data_sizes(self):
         responses = []
@@ -222,11 +255,14 @@ class Federator(object):
             accuracy, loss, class_precision, class_recall = res[1].wait()
             logging.info(f'{res[0]} had a result of accuracy={accuracy}')
 
-    def save_epoch_data(self):
+    def save_epoch_data(self, ratio = None):
         file_output = f'./{self.config.output_location}'
         self.ensure_path_exists(file_output)
         for key in self.client_data:
-            filename = f'{file_output}/{key}_epochs.csv'
+            if ratio:
+                filename = f'{file_output}/{key}_epochs_{ratio}.csv'
+            else:
+                filename = f'{file_output}/{key}_{ratio}.csv'
             logging.info(f'Saving data at {filename}')
             with open(filename, "w") as f:
                 w = DataclassWriter(f, self.client_data[key], EpochData)
@@ -235,7 +271,7 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self):
+    def run(self, ratios = [0.1, 0.2, 0.3] ):
         """
         Main loop of the Federator
         :return:
@@ -244,28 +280,57 @@ class Federator(object):
         # # Select clients which will be poisened
         # TODO: get attack type and ratio from config, temp solution now
         poison_pill = None
-        if self.attack:
-            self.poisoned_clients = self.attack.select_poisoned_workers(self.clients)
-            # Rest of the clients are healthy
-            self.healthy_clients = list(set(self.clients).symmetric_difference(set(self.poisoned_clients)))
-            poison_pill = self.attack.get_poison_pill()
+        save_path = self.config
+        for rat in ratios:
+            # Get model to calculate gradient updates
+            model = initialize_default_model(self.config, self.config.get_net())
 
-        self.client_load_data(poison_pill)
-        self.ping_all()
-        self.clients_ready()
-        self.update_client_data_sizes()
+            self.update_clients(rat)
+            if self.attack:
+                self.poisoned_clients: List[ClientRef] = self.attack.select_poisoned_clients(self.clients, rat)
+                self.healthy_clients = list(set(self.clients).symmetric_difference(set(self.poisoned_clients)))
+                print(f"Poisoning workers: {self.poisoned_clients}")
+                with open(f"{self.tb_path_base}/config_{rat}_poisoned.txt", 'w') as f:
+                    f.writelines(list(map(lambda worker: worker.name, self.poisoned_clients)))
+                poison_pill = self.attack.get_poison_pill()
+            self.client_reset_model()
+            self.client_load_data(poison_pill)
+            self.ping_all()
+            self.clients_ready()
+            self.update_client_data_sizes()
 
-        epoch_to_run = self.num_epoch
-        addition = 0
-        epoch_to_run = self.config.epochs
-        epoch_size = self.config.epochs_per_cycle
-        for epoch in range(epoch_to_run):
-            print(f'Running epoch {epoch}')
-            self.remote_run_epoch(epoch_size)
-            addition += 1
-        logging.info('Printing client data')
-        print(self.client_data)
+            addition = 0
+            epoch_to_run = self.config.epochs
+            epoch_size = self.config.epochs_per_cycle
+            for epoch in range(epoch_to_run):
+                print(f'Running epoch {epoch}')
+                # Get new model during run, update iteratively. The model is needed to calculate the
+                # gradient by the federator.
+                model = self.remote_run_epoch(epoch_size, model, rat)
+                addition += 1
+            logging.info('Printing client data')
+            print(self.client_data)
 
-        logging.info(f'Saving data')
-        self.save_epoch_data()
+            logging.info(f'Saving data')
+            self.save_epoch_data(rat)
         logging.info(f'Federator is stopping')
+
+    def store_gradient(self, gradient, client_id, epoch, ratio):
+        """
+        Function to save the gradient of a client in a specific directory.
+        @param gradient:
+        @type gradient:
+        @param client_id:
+        @type client_id:
+        @param epoch:
+        @type epoch:
+        @param ratio:
+        @type ratio:
+        @return:
+        @rtype:
+        """
+        directory: str = f"{self.tb_path_base}/gradient/{ratio}/{epoch}/{client_id}"
+        # Ensure path exists (mkdir -p)
+        pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+        # Save using pytorch.
+        torch.save(gradient, f"{directory}/gradient.pt")

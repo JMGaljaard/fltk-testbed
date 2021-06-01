@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   annotations:
-    kompose.cmd: kompose convert -c -f ../docker-compose-gcloud.yml
+    kompose.cmd: kompose convert -f ../docker-compose.yml
     kompose.version: 1.22.0 (HEAD)
   creationTimestamp: null
   labels:
@@ -10,24 +10,26 @@ metadata:
   name: fl-server
 spec:
   containers:
-    - env:
-        - name: GLOO_SOCKET_IFNAME
-          value: eth0
+    - args:
+        - python3
+        - -m
+        - fltk
+        - poison
+        - configs/cloud_experiment.yaml
+        - --rank=0
+      env:
         - name: MASTER_PORT
-          value: "5000"
+          value: {{ quote (.Values.fltk.port | int) }}
         - name: PYTHONUNBUFFERED
           value: "1"
-        - name: RANK
-          value: "0"
-        - name: TP_SOCKET_IFNAME
-          value: eth0
-        - name: WORLD_SIZE
-          value: {{ (.Values.fltk.worldsize | int) }}
       image: gcr.io/cs4290-dml/fltk:latest
       name: federation-lab-server
       ports:
-        - containerPort: 5000
-      resources: {}
+        - containerPort: {{ (.Values.fltk.port)}}
+      resources:
+        limits:
+          cpu: {{ (.Values.federator.cpu | int) }}
+          memory: {{ (.Values.federator.memory | int) }}
       volumeMounts:
         - mountPath: /opt/federation-lab/output
           name: fl-server-claim

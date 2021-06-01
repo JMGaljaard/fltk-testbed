@@ -78,7 +78,8 @@ def main():
             yaml_data = yaml.load(config_file, Loader=yaml.FullLoader)
             cfg.merge_yaml(yaml_data)
             if args.mode == 'poison':
-                perform_poison_experiment(args, cfg, parser, yaml_data)
+                for ratio in [0.0, 0.05, 0.1, 0.15, 0.2]:
+                    perform_poison_experiment(args, cfg, parser, yaml_data, ratio)
             elif args.mode == 'single':
                 perform_single_experiment(args, cfg, parser, yaml_data)
             else:
@@ -106,7 +107,7 @@ def perform_single_experiment(args, cfg, parser, yaml_data):
 
 
 
-def perform_poison_experiment(args, cfg, parser, yaml_data):
+def perform_poison_experiment(args, cfg, parser, yaml_data, ratio=None):
     """
     Function to start poisoned experiment.
     """
@@ -129,6 +130,9 @@ def perform_poison_experiment(args, cfg, parser, yaml_data):
     if not nic:
         nic = yaml_data['system']['federator']['nic']
     print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
+    if ratio:
+        print(f'Setting ratio to {ratio}')
+        attack.ratio = ratio
     run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic, attack=attack)
 
 
