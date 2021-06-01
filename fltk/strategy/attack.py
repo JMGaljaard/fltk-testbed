@@ -1,10 +1,11 @@
 import logging
+import numpy as np
+import random
 from abc import abstractmethod, ABC
 from logging import ERROR, WARNING, INFO
 from math import floor, ceil
 from typing import List, Dict
 
-from numpy import random
 from collections import ChainMap
 
 from fltk.strategy.client_selection import random_selection
@@ -96,9 +97,9 @@ class LabelFlipAttack(Attack):
         """
         self.logger.log(INFO, "Selecting workers to gather from")
         if not self.random:
-            random.seed(self.seed)
+            np.random.seed(self.seed)
         cloned_workers = workers.copy()
-        random.shuffle(cloned_workers)
+        np.random.shuffle(cloned_workers)
         return cloned_workers[0:ceil(len(workers) * ratio)]
 
     def get_poison_pill(self):
@@ -109,7 +110,7 @@ class LabelFlipAttack(Attack):
 
 class TimedLabelFlipAttack(LabelFlipAttack):
 
-    def __init__(self, start_round, end_round, availability, max_rounds: int = 0, ratio: float = 0, label_shuffle: Dict = None, seed: int = 42, random=False,
+    def __init__(self, start_round=0, end_round=0, availability=0, max_rounds: int = 0, ratio: float = 0, label_shuffle: Dict = None, seed: int = 42, random=False,
                  cfg: BareConfig = None, ):
         LabelFlipAttack.__init__(self, max_rounds, ratio, label_shuffle, seed, random, cfg)
         self.start_round = start_round
@@ -131,26 +132,26 @@ class TimedLabelFlipAttack(LabelFlipAttack):
         healthy_counter = 0
         nr_poisoned_workers = len(poisoned_clients)
         for i in range(n):
-            if random.random() <= self.availability & poison_counter < nr_poisoned_workers:
+            if random.random() <= self.availability and poison_counter < nr_poisoned_workers or healthy_counter >= len(healthy_clients):
                 poison_counter += 1
             else:
                 healthy_counter += 1
         return random.sample(poisoned_clients, poison_counter) + random.sample(healthy_clients, healthy_counter)
 
 
-def create_attack(cfg: BareConfig) -> Attack:
+def create_attack(cfg: BareConfig, **kwargs) -> Attack:
     """
     Function to create Poison attack based on the configuration that was passed during execution.
     Exception gets thrown when the configuration file is not correct.
     TODO parse TimedFlipAttack from config
     """
     assert not cfg is None and not cfg.poison is None
-    attack_mapper = {'flip': LabelFlipAttack}
+    attack_mapper = {'flip': LabelFlipAttack, 'timed': TimedLabelFlipAttack}
 
     attack_class = attack_mapper.get(cfg.get_attack_type(), None)
 
     if not attack_class is None:
-        attack = attack_class(cfg=cfg)
+        attack = attack_class(cfg=cfg, **kwargs)
     else:
         raise Exception("Requested attack is not supported...")
     print(f'')

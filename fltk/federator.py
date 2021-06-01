@@ -120,7 +120,7 @@ class Federator(object):
             self.client_data[client.name] = []
 
 
-    def select_clients(self, n=2):
+    def select_clients(self, n):
         return self.attack.select_clients(self.poisoned_clients, self.healthy_clients, n)
 
     def ping_all(self):
