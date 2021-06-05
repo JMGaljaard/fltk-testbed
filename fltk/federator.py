@@ -3,6 +3,7 @@ import pathlib
 import time
 from pathlib import Path
 from typing import List, Callable
+import numpy as np
 
 import torch
 from dataclass_csv import DataclassWriter
@@ -102,8 +103,6 @@ class Federator(object):
         self.test_data.init_dataloader()
         config.data_sampler = copy_sampler
 
-
-
     def create_clients(self, client_id_triple):
         for id, rank, world_size in client_id_triple:
             client = rpc.remote(id, Client, kwargs=dict(id=id, log_rref=self.log_rref, rank=rank, world_size=world_size,
@@ -118,7 +117,6 @@ class Federator(object):
             writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_client_{client.name}_{ratio}')
             client.tb_writer = writer
             self.client_data[client.name] = []
-
 
     def select_clients(self, n):
         return self.attack.select_clients(self.poisoned_clients, self.healthy_clients, n)
@@ -138,7 +136,6 @@ class Federator(object):
             while not res.done():
                 pass
 
-
     def client_reset_model(self):
         """
         Function to reset the model at all learners
@@ -147,7 +144,6 @@ class Federator(object):
         """
         for client in self.clients:
             _remote_method_async(Client.reset_model, client.ref)
-
 
     def client_load_data(self, poison_pill):
         for client in self.clients:
@@ -192,7 +188,6 @@ class Federator(object):
         self.epoch_counter += epochs
         flat_current = flatten_params(cur_model.state_dict())
         for res in responses:
-
             epoch_data, weights = res[1].wait()
             # get flatten
 
@@ -255,7 +250,7 @@ class Federator(object):
             accuracy, loss, class_precision, class_recall = res[1].wait()
             logging.info(f'{res[0]} had a result of accuracy={accuracy}')
 
-    def save_epoch_data(self, ratio = None):
+    def save_epoch_data(self, ratio=None):
         file_output = f'./{self.config.output_location}'
         self.ensure_path_exists(file_output)
         for key in self.client_data:
@@ -271,7 +266,7 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self, ratios = [0.1, 0.2, 0.3] ):
+    def run(self, ratios=[0.1, 0.2, 0.3]):
         """
         Main loop of the Federator
         :return:
@@ -334,3 +329,31 @@ class Federator(object):
         pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
         # Save using pytorch.
         torch.save(gradient, f"{directory}/gradient.pt")
+
+    def krum(self, f: int, gradients: List):
+        """
+        Function which returns the gradient with the lowest score.
+        """
+        # Initialize dict holding all distances.
+        n = len(gradients)
+        dict = {}
+        for i in range(n):
+            dict[i] = []
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                # Calculate sum_squared_distance (ssd) of each pair.
+                ssd = np.linalg.norm(gradients[i] - gradients[j]) ** 2
+                dict[i].append(ssd)
+                dict[j].append(ssd)
+
+        # Calculate the score of each worker.
+        score = []
+        for i in range(n):
+            dict[i].sort()
+            closests = [x for index, x in enumerate(dict[i]) if index < (n - f - 2)]
+            score.append(sum(closests))
+
+        # Return gradient with lowest score
+        index = score.index(min(score))
+        return gradients[index]
