@@ -114,12 +114,13 @@ class Federator(object):
     def update_clients(self, ratio):
         # Prevent abrupt ending of the client
         self.tb_writer.close()
-        self.tb_writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_federator')
+        self.tb_writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_federator_{ratio}')
         for client in self.clients:
             # Create new writer and close old writer
             writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_client_{client.name}_{ratio}')
             client.tb_writer.close()
             client.tb_writer = writer
+            # Clear client updates ofteraf
             self.client_data[client.name] = []
 
 
@@ -277,7 +278,7 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self, ratios = [0.06, 0.12, 0.18] ):
+    def run(self, ratios = [0.0, 0.06, 0.12, 0.18]):
         """
         Main loop of the Federator
         :return:
@@ -292,6 +293,7 @@ class Federator(object):
             model = initialize_default_model(self.config, self.config.get_net())
             # Re-use the functionality to update
             self.distribute_new_model(model.state_dict())
+
             # Update the clients to point to the newer version.
             self.update_clients(rat)
             if self.attack:
@@ -308,6 +310,7 @@ class Federator(object):
             addition = 0
             epoch_to_run = self.config.epochs
             epoch_size = self.config.epochs_per_cycle
+            print(f"Running a total of {epoch_to_run} epochs...")
             for epoch in range(epoch_to_run):
                 print(f'Running epoch {epoch}')
                 # Get new model during run, update iteratively. The model is needed to calculate the

@@ -1,5 +1,5 @@
 # Experiment configuration
-total_epochs: 130
+total_epochs: 1
 epochs_per_cycle: 1
 wait_for_clients: true
 net: Cifar10CNN
@@ -30,6 +30,5 @@ poison:
     type: "flip"
     config:
       - 5: 3
-      - 3: 5
 
 

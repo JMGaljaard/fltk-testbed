@@ -99,9 +99,16 @@ class Client:
                                           self.args.get_scheduler_step_size(),
                                           self.args.get_scheduler_gamma(),
                                           self.args.get_min_lr())
+        # Reset logger
+        self.args.init_logger(logging)
         # Reset the epoch counter
         self.epoch_counter = 0
-        self.finished_init = True
+        self.finished_init = False
+        # Dataset will be re-initialized
+        del self.dataset
+        # This will be set afterwards, but we delete possible gradient information.
+        del self.net
+        self.set_net(self.load_default_model())
 
     def ping(self):
         """
@@ -215,6 +222,7 @@ class Client:
         :param new_params: New weights for the neural network
         :type new_params: dict
         """
+
         self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
         if self.log_rref:
             self.remote_log(f'Weights of the model are updated')
@@ -235,6 +243,7 @@ class Client:
         if self.args.distributed:
             self.dataset.train_sampler.set_epoch(epoch)
 
+
         for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
             inputs, labels = inputs.to(self.device), labels.to(self.device)
             # TODO: check if these parameters are correct, labels or ouputs?
@@ -243,7 +252,7 @@ class Client:
                 inputs, labels = pill.poison_output(inputs, labels)
 
             # zero the parameter gradients
-            self.optimizer.zero_grad()
+            self.optimizer.zero_grad(set_to_none=True)
 
             # forward + backward + optimize
 
@@ -254,7 +263,7 @@ class Client:
             self.optimizer.step()
 
             # print statistics
-            running_loss += loss.item()
+            running_loss += loss.detach().item()
             if i % self.args.get_log_interval() == 0:
                 self.args.get_logger().info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / self.args.get_log_interval()))
                 final_running_loss = running_loss / self.args.get_log_interval()
@@ -327,7 +336,7 @@ class Client:
 
         # Copy GPU tensors to CPU
         for k, v in weights.items():
-            weights[k] = v.cpu()
+            weights[k] = v.cpu().detach()
         return data, weights
 
     def save_model(self, epoch, suffix):
