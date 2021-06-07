@@ -89,17 +89,6 @@ class Client:
         @return: None
         @rtype: None
         """
-        # Load the default model
-        # Delete the network to prevent out of memory exceptions being thrown
-        try:
-            del self.net
-
-            # Delete dataloader to prevent out of memory exceptions being thrown
-            del self.dataset
-        except Exception as e:
-            print(f"something went wrong: {e}")
-        # Load network
-        self.set_net(self.load_default_model())
         # Set loss function for gradient calculation
         self.loss_function = self.args.get_loss_function()()
         # Create optimizer (default is SGD): TODO: Move to AdamW?
@@ -112,6 +101,7 @@ class Client:
                                           self.args.get_min_lr())
         # Reset the epoch counter
         self.epoch_counter = 0
+        self.finished_init = True
 
     def ping(self):
         """
@@ -156,7 +146,6 @@ class Client:
         # self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args)
 
 
-        self.finished_init = True
         self.finished_init = True
         print("Done with init")
         logging.info('Done with init')
@@ -320,6 +309,7 @@ class Client:
     def run_epochs(self, num_epoch, pill: PoisonPill = None):
         """
         """
+        self.finished_init = False
         start_time_train = datetime.datetime.now()
         self.dataset.get_train_sampler().set_epoch_size(num_epoch)
         loss, weights = self.train(self.epoch_counter, pill)

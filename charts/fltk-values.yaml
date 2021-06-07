@@ -1,4 +1,4 @@
 fltk:
-    worldsize: 10
+    worldsize: 50
     config: cloud_experiment.yaml
     port: 5000

@@ -13,7 +13,7 @@ cuda: false
 experiment_prefix: 'experiment_single_machine'
 output_location: 'output'
 tensor_board_active: true
-clients_per_round: 10
+clients_per_round: 50
 system:
   federator:
     # Use the SERVICE provided by the fl-server to connect
@@ -21,11 +21,11 @@ system:
     # Default NIC is eth0
     nic: 'eth0'
   clients:
-    amount: 10
+    amount: 50
 poison:
   seed: 420
   ratio: 0.2
   attack:
     type: "flip"
     config:
-      - 6: 4
+      - 5: 3

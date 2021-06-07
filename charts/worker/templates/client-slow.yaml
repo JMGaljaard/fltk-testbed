@@ -43,8 +43,11 @@ spec:
           cpu: {{ $workercpu }}
           # 1 GiB ?
           memory: {{ $workermemory }}
+        requests:
+          memory: 1500000000
   restartPolicy: Never
-status: {}
+status:
+  qosClass: Guaranteed
 # Helm requires seperation.
 ---
 {{- end }}

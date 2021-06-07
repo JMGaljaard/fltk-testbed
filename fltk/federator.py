@@ -112,9 +112,13 @@ class Federator(object):
             self.client_data[id] = []
 
     def update_clients(self, ratio):
+        # Prevent abrupt ending of the client
+        self.tb_writer.close()
         self.tb_writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_federator')
         for client in self.clients:
+            # Create new writer and close old writer
             writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_client_{client.name}_{ratio}')
+            client.tb_writer.close()
             client.tb_writer = writer
             self.client_data[client.name] = []
 
@@ -179,7 +183,7 @@ class Federator(object):
             time.sleep(2)
         logging.info('All clients are ready')
 
-    def remote_run_epoch(self, epochs, cur_model: torch.nn.Module, ratio = None):
+    def remote_run_epoch(self, epochs, cur_model: torch.nn.Module, ratio = None, store_grad=False):
         responses = []
         client_weights = []
         selected_clients = self.select_clients(self.config.clients_per_round)
@@ -194,13 +198,23 @@ class Federator(object):
                 pill = self.attack.get_poison_pill()
             responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, pill=pill)))
         self.epoch_counter += epochs
-        flat_current = flatten_params(cur_model.state_dict())
+
+        accuracy, loss, class_precision, class_recall = self.test_data.test()
+        # self.tb_writer.add_scalar('training loss', loss, self.epoch_counter * self.test_data.get_client_datasize()) # does not seem to work :( )
+        self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
+        self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
+        flat_current = None
+
+        # Test the model before waiting for the model.
+        self.test_model()
+
+        if store_grad:
+            flat_current = flatten_params(cur_model.state_dict())
         for res in responses:
-
             epoch_data, weights = res[1].wait()
-            # get flatten
-
-            self.store_gradient(flatten_params(weights) - flat_current, epoch_data.client_id, self.epoch_counter, ratio)
+            if store_grad:
+                # get flatten
+                self.store_gradient(flatten_params(weights) - flat_current, epoch_data.client_id, self.epoch_counter, ratio)
             self.client_data[epoch_data.client_id].append(epoch_data)
             logging.info(f'{res[0]} had a loss of {epoch_data.loss}')
             logging.info(f'{res[0]} had a epoch data of {epoch_data}')
@@ -227,20 +241,8 @@ class Federator(object):
         # test global model
         logging.info("Testing on global test set")
         self.test_data.update_nn_parameters(updated_model)
-        accuracy, loss, class_precision, class_recall = self.test_data.test()
-        # self.tb_writer.add_scalar('training loss', loss, self.epoch_counter * self.test_data.get_client_datasize()) # does not seem to work :( )
-        self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
-        self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
-
-        responses = []
-        for client in self.clients:
-            responses.append(
-                (client, _remote_method_async(Client.update_nn_parameters, client.ref, new_params=updated_model)))
-
-        for res in responses:
-            res[1].wait()
-        logging.info('Weights are updated')
-        return self.test_data.net
+        self.distribute_new_model(updated_model)
+        return updated_model
 
     def update_client_data_sizes(self):
         responses = []
@@ -275,7 +277,7 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self, ratios = [0.1, 0.2, 0.3] ):
+    def run(self, ratios = [0.06, 0.12, 0.18] ):
         """
         Main loop of the Federator
         :return:
@@ -286,9 +288,11 @@ class Federator(object):
         poison_pill = None
         save_path = self.config
         for rat in ratios:
-            # Get model to calculate gradient updates
+            # Get model to calculate gradient updates, default is shared between all.
             model = initialize_default_model(self.config, self.config.get_net())
-
+            # Re-use the functionality to update
+            self.distribute_new_model(model.state_dict())
+            # Update the clients to point to the newer version.
             self.update_clients(rat)
             if self.attack:
                 self.poisoned_workers: List[ClientRef] = self.attack.select_poisoned_workers(self.clients, rat)
@@ -296,7 +300,6 @@ class Federator(object):
                 with open(f"{self.tb_path_base}/config_{rat}_poisoned.txt", 'w') as f:
                     f.writelines(list(map(lambda worker: worker.name, self.poisoned_workers)))
                 poison_pill = self.attack.get_poison_pill()
-            self.client_reset_model()
             self.client_load_data(poison_pill)
             self.ping_all()
             self.clients_ready()
@@ -316,6 +319,11 @@ class Federator(object):
 
             logging.info(f'Saving data')
             self.save_epoch_data(rat)
+            # Perform last test on the current model.
+            self.test_model()
+            # Reset the model to continue with the next round
+            self.client_reset_model()
+
         logging.info(f'Federator is stopping')
 
     def store_gradient(self, gradient, client_id, epoch, ratio):
@@ -337,3 +345,30 @@ class Federator(object):
         pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
         # Save using pytorch.
         torch.save(gradient, f"{directory}/gradient.pt")
+
+    def distribute_new_model(self, updated_model):
+        """
+        Function to update the model on the clients
+        @return:
+        @rtype:
+        """
+        responses = []
+        for client in self.clients:
+            responses.append(
+                (client, _remote_method_async(Client.update_nn_parameters, client.ref, new_params=updated_model)))
+
+        for res in responses:
+            res[1].wait()
+        logging.info('Weights are updated')
+
+    def test_model(self):
+        """
+        Function to test the model on the test dataset.
+        @return:
+        @rtype:
+        """
+        # Test interleaved to speed up execution, i.e. don't keep the clients waiting.
+        accuracy, loss, class_precision, class_recall = self.test_data.test()
+        # self.tb_writer.add_scalar('training loss', loss, self.epoch_counter * self.test_data.get_client_datasize()) # does not seem to work :( )
+        self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
+        self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
