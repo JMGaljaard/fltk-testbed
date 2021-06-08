@@ -280,7 +280,7 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self, ratios = [0.0, 0.06, 0.12, 0.18]):
+    def run(self, ratios = [0.06, 0.12, 0.17999, 0.18]):
         """
         Main loop of the Federator
         :return:

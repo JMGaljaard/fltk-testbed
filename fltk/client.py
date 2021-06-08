@@ -50,7 +50,7 @@ class Client:
     counter = 0
     finished_init = False
     dataset = None
-    epoch_results: List[EpochData] = []
+    # epoch_results: List[EpochData] = []
     epoch_counter = 0
 
 
@@ -335,7 +335,7 @@ class Client:
         test_time_ms = int(elapsed_time_test.total_seconds()*1000)
 
         data = EpochData(self.epoch_counter, train_time_ms, test_time_ms, loss, accuracy, test_loss, class_precision, class_recall, client_id=self.id)
-        self.epoch_results.append(data)
+        # self.epoch_results.append(data)
 
         # Copy GPU tensors to CPU
         for k, v in weights.items():
