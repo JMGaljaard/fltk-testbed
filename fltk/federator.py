@@ -1,4 +1,5 @@
 import logging
+import math
 import pathlib
 import time
 from pathlib import Path
@@ -184,7 +185,7 @@ class Federator(object):
             time.sleep(2)
         logging.info('All clients are ready')
 
-    def remote_run_epoch(self, epochs, cur_model: torch.nn.Module, ratio = None, store_grad=False):
+    def remote_run_epoch(self, epochs, ratio = None, store_grad=False):
         responses = []
         client_weights = []
         selected_clients = self.select_clients(self.config.clients_per_round)
@@ -200,17 +201,18 @@ class Federator(object):
             responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, pill=pill)))
         self.epoch_counter += epochs
 
-        accuracy, loss, class_precision, class_recall = self.test_data.test()
-        # self.tb_writer.add_scalar('training loss', loss, self.epoch_counter * self.test_data.get_client_datasize()) # does not seem to work :( )
-        self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
-        self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
+        try:
+            # Test the model before waiting for the model.
+            self.test_model()
+        except Exception as e:
+            print(e)
+
         flat_current = None
 
-        # Test the model before waiting for the model.
-        self.test_model()
+
 
         if store_grad:
-            flat_current = flatten_params(cur_model.state_dict())
+            flat_current = flatten_params(self.test_data.net.state_dict())
         for res in responses:
             epoch_data, weights = res[1].wait()
             if store_grad:
@@ -238,7 +240,7 @@ class Federator(object):
 
             client_weights.append(weights)
         updated_model = average_nn_parameters(client_weights)
-
+        self.test_data.net.load_state_dict(updated_model)
         # test global model
         logging.info("Testing on global test set")
         self.test_data.update_nn_parameters(updated_model)
@@ -289,11 +291,7 @@ class Federator(object):
         poison_pill = None
         save_path = self.config
         for rat in ratios:
-            # Get model to calculate gradient updates, default is shared between all.
-            model = initialize_default_model(self.config, self.config.get_net())
-            # Re-use the functionality to update
-            self.distribute_new_model(model.state_dict())
-
+            self.test_data.net = initialize_default_model(self.config, self.config.get_net())
             # Update the clients to point to the newer version.
             self.update_clients(rat)
             if self.attack:
@@ -306,7 +304,6 @@ class Federator(object):
             self.ping_all()
             self.clients_ready()
             self.update_client_data_sizes()
-
             addition = 0
             epoch_to_run = self.config.epochs
             epoch_size = self.config.epochs_per_cycle
@@ -315,7 +312,7 @@ class Federator(object):
                 print(f'Running epoch {epoch}')
                 # Get new model during run, update iteratively. The model is needed to calculate the
                 # gradient by the federator.
-                model = self.remote_run_epoch(epoch_size, model, rat)
+                self.remote_run_epoch(epoch_size, rat)
                 addition += 1
             logging.info('Printing client data')
             print(self.client_data)

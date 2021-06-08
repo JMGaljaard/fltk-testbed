@@ -29,6 +29,8 @@ RUN --mount=type=cache,target=/root/.cache/pip python3 -m pip install -r require
 ADD configs configs
 
 ADD fltk fltk
+
+# Update relevant runtime configuration for experiment
 COPY cloud_configs/cloud_experiment.yaml configs/cloud_config.yaml
 # Install newest version of library
 RUN python3 -m setup install

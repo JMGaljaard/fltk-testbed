@@ -56,7 +56,7 @@ class Client:
 
     def __init__(self, id, log_rref, rank, world_size, config: BareConfig = None):
         logging.info(f'Welcome to client {id}')
-        self.net = None
+        self.net: torch.nn.Module = None
         self.id = id
         self.log_rref = log_rref
         self.rank = rank
@@ -89,9 +89,21 @@ class Client:
         @return: None
         @rtype: None
         """
+        # Reset logger
+        self.args.init_logger(logging)
+        # Reset the epoch counter
+        self.epoch_counter = 0
+        self.finished_init = False
+        # Dataset will be re-initialized so save memory
+        del self.dataset
+        # This will be set afterwards, but we delete possible gradient information.
+        del self.net
+        self.set_net(self.load_default_model())
+        self.net.requires_grad_(True)
+
         # Set loss function for gradient calculation
         self.loss_function = self.args.get_loss_function()()
-        # Create optimizer (default is SGD): TODO: Move to AdamW?
+
         self.optimizer = torch.optim.SGD(self.net.parameters(),
                                          lr=self.args.get_learning_rate(),
                                          momentum=self.args.get_momentum())
@@ -99,16 +111,6 @@ class Client:
                                           self.args.get_scheduler_step_size(),
                                           self.args.get_scheduler_gamma(),
                                           self.args.get_min_lr())
-        # Reset logger
-        self.args.init_logger(logging)
-        # Reset the epoch counter
-        self.epoch_counter = 0
-        self.finished_init = False
-        # Dataset will be re-initialized
-        del self.dataset
-        # This will be set afterwards, but we delete possible gradient information.
-        del self.net
-        self.set_net(self.load_default_model())
 
     def ping(self):
         """
@@ -243,7 +245,7 @@ class Client:
         if self.args.distributed:
             self.dataset.train_sampler.set_epoch(epoch)
 
-
+        self.net.train()
         for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
             inputs, labels = inputs.to(self.device), labels.to(self.device)
             # TODO: check if these parameters are correct, labels or ouputs?
@@ -252,7 +254,7 @@ class Client:
                 inputs, labels = pill.poison_output(inputs, labels)
 
             # zero the parameter gradients
-            self.optimizer.zero_grad(set_to_none=True)
+            self.optimizer.zero_grad()
 
             # forward + backward + optimize
 
@@ -285,20 +287,21 @@ class Client:
         targets_ = []
         pred_ = []
         loss = 0.0
-        with torch.no_grad():
-            for (images, labels) in self.dataset.get_test_loader():
-                images, labels = images.to(self.device), labels.to(self.device)
+        self.net.eval()
 
-                outputs = self.net(images)
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                # TODO: Log the information regarding the poisoned accuracy
-                correct += (predicted == labels).sum().item()
+        for (images, labels) in self.dataset.get_test_loader():
+            images, labels = images.to(self.device), labels.to(self.device)
 
-                targets_.extend(labels.cpu().view_as(predicted).numpy())
-                pred_.extend(predicted.cpu().numpy())
+            outputs = self.net(images)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            # TODO: Log the information regarding the poisoned accuracy
+            correct += (predicted == labels).sum().item()
 
-                loss += self.loss_function(outputs, labels).item()
+            targets_.extend(labels.cpu().view_as(predicted).numpy())
+            pred_.extend(predicted.cpu().numpy())
+
+            loss += self.loss_function(outputs, labels).item()
 
         accuracy = 100 * correct / total
         confusion_mat = confusion_matrix(targets_, pred_)
