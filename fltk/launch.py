@@ -15,12 +15,12 @@ from fltk.util.env.learner_environment import prepare_environment
 logging.basicConfig(level=logging.DEBUG)
 
 
-def run_ps(rpc_ids_triple, args, attack: Attack = None):
+def run_ps(rpc_ids_triple, args, attack: Attack = None, antidote: Antidote = None):
     print(f'Starting the federator...')
-    fed = Federator(rpc_ids_triple, config=args, attack=attack)
+    fed = Federator(rpc_ids_triple, config=args, attack=attack, antidote=antidote)
     fed.run()
 
-def run_single(rank, world_size, host = None, args = None, nic = None, attack=None):
+def run_single(rank, world_size, host = None, args = None, nic = None, attack=None, antidote=None):
     logging.info(f'Starting with rank={rank} and world size={world_size}')
     prepare_environment(host, nic)
 
@@ -49,7 +49,7 @@ def run_single(rank, world_size, host = None, args = None, nic = None, attack=No
             rpc_backend_options=options
 
         )
-        run_ps([(f"client{r}", r, world_size) for r in range(1, world_size)], args, attack)
+        run_ps([(f"client{r}", r, world_size) for r in range(1, world_size)], args, attack, antidote)
 
     # block until all rpc finish
     rpc.shutdown()

@@ -26,8 +26,7 @@ system:
 poison:
   seed: 420
   experiments:
-    min_ratio: 0.0
-    max_ratio: 0.25
+    ratio: 0.2
     steps: 2
   attack:
     type: "timed"

@@ -13,6 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 from fltk.client import Client
 from fltk.nets import Cifar10CNN
 from fltk.nets.util.utils import flatten_params, initialize_default_model
+from fltk.strategy.antidote import Antidote
 from fltk.strategy.attack import Attack
 from fltk.strategy.client_selection import random_selection
 from fltk.util.base_config import BareConfig
@@ -80,11 +81,13 @@ class Federator(object):
     poisoned_clients = {}
     healthy_clients = {}
 
-    def __init__(self, client_id_triple, num_epochs=3, config: BareConfig = None, attack: Attack = None):
+    def __init__(self, client_id_triple, num_epochs=3, config: BareConfig = None, attack: Attack = None, antidote: Antidote = None):
         log_rref = rpc.RRef(FLLogger())
         # Poisoning
         self.attack = attack
         logging.info(f'Federator with attack {attack}')
+        self.antidote = antidote
+        logging.info(f'Fedetrator with antidote {antidote}')
 
         self.log_rref = log_rref
         self.num_epoch = num_epochs
@@ -213,7 +216,7 @@ class Federator(object):
                                         self.epoch_counter)
 
             client_weights.append(weights)
-        updated_model = average_nn_parameters(client_weights)
+        updated_model = self.antidote.process_gradients(client_weights)
 
         # test global model
         logging.info("Testing on global test set")
@@ -329,31 +332,3 @@ class Federator(object):
         pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
         # Save using pytorch.
         torch.save(gradient, f"{directory}/gradient.pt")
-
-    def krum(self, f: int, gradients: List):
-        """
-        Function which returns the gradient with the lowest score.
-        """
-        # Initialize dict holding all distances.
-        n = len(gradients)
-        dict = {}
-        for i in range(n):
-            dict[i] = []
-
-        for i in range(n):
-            for j in range(i + 1, n):
-                # Calculate sum_squared_distance (ssd) of each pair.
-                ssd = np.linalg.norm(gradients[i] - gradients[j]) ** 2
-                dict[i].append(ssd)
-                dict[j].append(ssd)
-
-        # Calculate the score of each worker.
-        score = []
-        for i in range(n):
-            dict[i].sort()
-            closests = [x for index, x in enumerate(dict[i]) if index < (n - f - 2)]
-            score.append(sum(closests))
-
-        # Return gradient with lowest score
-        index = score.index(min(score))
-        return gradients[index]
