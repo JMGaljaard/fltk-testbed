@@ -54,12 +54,13 @@ class MultiKrumAntidote(Antidote):
             closests = [x for index, x in enumerate(dict[i]) if index < (n - self.f - 2)]
             score.append(sum(closests))
 
+        score = np.array(score)
         # Compute n vectors with lowest score
         idx = np.argpartition(score, self.k)
         selected = score[idx[:self.k]]
 
         # Return average of selected gradients
-        avg = np.add.reduce(selected) / np.array(float(self.k))
+        avg = np.add.reduce(selected) / np.array(float(self.k) + 1)
         return avg
 
 def create_antidote(cfg: BareConfig, **kwargs) -> Antidote:

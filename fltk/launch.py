@@ -8,6 +8,7 @@ import argparse
 
 import torch.multiprocessing as mp
 from fltk.federator import Federator
+from fltk.strategy.antidote import Antidote
 from fltk.strategy.attack import Attack
 from fltk.util.base_config import BareConfig
 from fltk.util.env.learner_environment import prepare_environment
