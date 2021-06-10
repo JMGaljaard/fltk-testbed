@@ -1,5 +1,4 @@
 import logging
-import math
 import pathlib
 import time
 from pathlib import Path
@@ -11,7 +10,6 @@ from torch.distributed import rpc
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.client import Client
-from fltk.nets import Cifar10CNN
 from fltk.nets.util.utils import flatten_params, initialize_default_model
 from fltk.strategy.attack import Attack
 from fltk.strategy.client_selection import random_selection
@@ -155,6 +153,7 @@ class Federator(object):
         @return:
         @rtype:
         """
+        self.epoch_counter = 0
         for client in self.clients:
             _remote_method_async(Client.reset_model, client.ref)
 
@@ -280,7 +279,7 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self, ratios = [0.06, 0.12, 0.17999, 0.18]):
+    def run(self, ratios = [0.17999, 0.18]):
         """
         Main loop of the Federator
         :return:
@@ -369,6 +368,5 @@ class Federator(object):
         """
         # Test interleaved to speed up execution, i.e. don't keep the clients waiting.
         accuracy, loss, class_precision, class_recall = self.test_data.test()
-        # self.tb_writer.add_scalar('training loss', loss, self.epoch_counter * self.test_data.get_client_datasize()) # does not seem to work :( )
         self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
         self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)

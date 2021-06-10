@@ -1,27 +1,21 @@
 import copy
 import datetime
+import logging
 import os
 import random
 import time
 import traceback
-from dataclasses import dataclass
-from typing import List
-
-import torch
-from torch.distributed import rpc
-import logging
+import gc
 import numpy as np
-from sklearn.metrics import confusion_matrix
+import torch
+import yaml
 from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
+from torch.distributed import rpc
 
-from fltk.datasets import DistCIFAR10Dataset
 from fltk.schedulers import MinCapableStepLR
-from fltk.util.arguments import Arguments
 from fltk.util.base_config import BareConfig
 from fltk.util.log import FLLogger
-
-import yaml
-
 from fltk.util.poison.poisonpill import PoisonPill
 from fltk.util.results import EpochData
 
@@ -50,7 +44,6 @@ class Client:
     counter = 0
     finished_init = False
     dataset = None
-    # epoch_results: List[EpochData] = []
     epoch_counter = 0
 
 
@@ -61,7 +54,6 @@ class Client:
         self.log_rref = log_rref
         self.rank = rank
         self.world_size = world_size
-        # self.args = Arguments(logging)
 
         self.args = config
         self.args.init_logger(logging)
@@ -80,6 +72,8 @@ class Client:
         if self.args.cuda and torch.cuda.is_available():
             return torch.device("cuda:0")
         else:
+            # Force usage of CPU
+            torch.cuda.is_available = lambda: False
             return torch.device("cpu")
 
     def reset_model(self):
@@ -111,6 +105,8 @@ class Client:
                                           self.args.get_scheduler_step_size(),
                                           self.args.get_scheduler_gamma(),
                                           self.args.get_min_lr())
+        # Force collect garbage after running.
+        gc.collect()
 
     def ping(self):
         """
@@ -152,8 +148,6 @@ class Client:
         except Exception as e:
             tb = traceback.format_exc()
             print(tb)
-        # self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args)
-
 
         self.finished_init = True
         print("Done with init")
@@ -265,7 +259,7 @@ class Client:
             self.optimizer.step()
 
             # print statistics
-            running_loss += loss.detach().item()
+            running_loss += float(loss.detach().item())
             if i % self.args.get_log_interval() == 0:
                 self.args.get_logger().info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / self.args.get_log_interval()))
                 final_running_loss = running_loss / self.args.get_log_interval()
@@ -277,6 +271,8 @@ class Client:
         if self.args.should_save_model(epoch):
             self.save_model(epoch, self.args.get_epoch_save_end_suffix())
 
+        # Force collect garbage after running.
+        gc.collect()
         return final_running_loss, self.get_nn_parameters()
 
     def test(self):
@@ -335,10 +331,9 @@ class Client:
         test_time_ms = int(elapsed_time_test.total_seconds()*1000)
 
         data = EpochData(self.epoch_counter, train_time_ms, test_time_ms, loss, accuracy, test_loss, class_precision, class_recall, client_id=self.id)
-        # self.epoch_results.append(data)
-
         # Copy GPU tensors to CPU
         for k, v in weights.items():
+            # Detach to remove computational graph.
             weights[k] = v.cpu().detach()
         return data, weights
 
@@ -346,12 +341,12 @@ class Client:
         """
         Saves the model if necessary.
         """
-        self.args.get_logger().debug("Saving model to flat file storage. Save #{}", epoch)
+        self.args.get_logger().debug(f"Saving model to flat file storage. Save #{epoch}")
 
         if not os.path.exists(self.args.get_save_model_folder_path()):
             os.mkdir(self.args.get_save_model_folder_path())
 
-        full_save_path = os.path.join(self.args.get_save_model_folder_path(), "model_" + str(self.client_idx) + "_" + str(epoch) + "_" + suffix + ".model")
+        full_save_path = os.path.join(self.args.get_save_model_folder_path(), f"model_{self.id}_{epoch}_{suffix}.model")
         torch.save(self.get_nn_parameters(), full_save_path)
 
     def calculate_class_precision(self, confusion_mat):
