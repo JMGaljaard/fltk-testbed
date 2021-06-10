@@ -10,7 +10,7 @@ from torch.distributed import rpc
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.client import Client
-from fltk.nets.util.utils import flatten_params, initialize_default_model
+from fltk.nets.util.utils import flatten_params, initialize_default_model, save_model
 from fltk.strategy.attack import Attack
 from fltk.strategy.client_selection import random_selection
 from fltk.util.base_config import BareConfig
@@ -74,6 +74,7 @@ class Federator(object):
     """
     clients: List[ClientRef] = []
     epoch_counter = 0
+    # TODO: Misnormer, but no time to refactor
     client_data = {}
     poisoned_workers = {}
 
@@ -109,7 +110,8 @@ class Federator(object):
             writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_client_{id}')
             self.clients.append(ClientRef(id, client, tensorboard_writer=writer))
             self.client_data[id] = []
-
+        # In additino we store our own data through the process
+        self.client_data['federator'] = []
     def update_clients(self, ratio):
         # Prevent abrupt ending of the client
         self.tb_writer.close()
@@ -198,14 +200,13 @@ class Federator(object):
             if client in self.poisoned_workers:
                 pill = self.attack.get_poison_pill()
             responses.append((client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, pill=pill)))
-        self.epoch_counter += epochs
-
         try:
             # Test the model before waiting for the model.
-            self.test_model()
+            # Append to client data to keep better track of progress
+            self.client_data.get('federator', []).append(self.test_model())
         except Exception as e:
             print(e)
-
+        self.epoch_counter += epochs
         flat_current = None
 
 
@@ -317,9 +318,11 @@ class Federator(object):
             print(self.client_data)
 
             logging.info(f'Saving data')
-            self.save_epoch_data(rat)
             # Perform last test on the current model.
-            self.test_model()
+            self.client_data.get('federator', []).append(self.test_model())
+            save_model(self.test_data.net, 'config', self.epoch_counter, self.config)
+            self.save_epoch_data(rat)
+
             # Reset the model to continue with the next round
             self.client_reset_model()
 
@@ -360,7 +363,7 @@ class Federator(object):
             res[1].wait()
         logging.info('Weights are updated')
 
-    def test_model(self):
+    def test_model(self) -> EpochData:
         """
         Function to test the model on the test dataset.
         @return:
@@ -368,5 +371,15 @@ class Federator(object):
         """
         # Test interleaved to speed up execution, i.e. don't keep the clients waiting.
         accuracy, loss, class_precision, class_recall = self.test_data.test()
+        data = EpochData(epoch_id=self.epoch_counter,
+                         duration_train=0,
+                         duration_test=0,
+                         loss_train=0,
+                         accuracy=accuracy,
+                         loss=loss,
+                         class_precision=class_precision,
+                         class_recall=class_recall,
+                         client_id='federator')
         self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
         self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
+        return data

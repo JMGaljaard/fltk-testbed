@@ -55,3 +55,13 @@ def initialize_default_model(config: BareConfig, model_class) -> torch.nn.Module
     default_model_path = f"{config.get_default_model_folder_path()}/{model_class.__name__}.model"
     model.load_state_dict(torch.load(default_model_path))
     return model
+
+
+def save_model(model: torch.nn.Module, directory: str, epoch, config: BareConfig, ratio):
+    """
+    Saves the model if necessary.
+    """
+    config.get_logger().debug(f"Saving model to flat file storage. Save #{model}")
+
+    full_save_path = f"{directory}/{ratio}_{config.get_net()}_{epoch}.pth"
+    torch.save(model.state_dict(), full_save_path)
