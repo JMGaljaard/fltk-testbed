@@ -97,11 +97,14 @@ class Federator(object):
         logging.info("Creating test client")
         copy_sampler = config.data_sampler
         config.data_sampler = "uniform"
-        self.test_data = Client("test", None, 1, 2, config)
-        self.test_data.init_dataloader()
+        self.test_data = None
+        self.set_data()
         config.data_sampler = copy_sampler
 
 
+    def set_data(self):
+        self.test_data = Client("test", None, 1, 2, self.config)
+        self.test_data.init_dataloader()
 
     def create_clients(self, client_id_triple):
         for id, rank, world_size in client_id_triple:
@@ -280,7 +283,7 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self, ratios = [0.17999, 0.18]):
+    def run(self, ratios = [0.06, 0.12, 0.18, 0.0]):
         """
         Main loop of the Federator
         :return:
@@ -291,9 +294,6 @@ class Federator(object):
         poison_pill = None
         save_path = self.config
         for rat in ratios:
-            self.test_data.net = initialize_default_model(self.config, self.config.get_net())
-            # Update the clients to point to the newer version.
-            self.update_clients(rat)
             if self.attack:
                 self.poisoned_workers: List[ClientRef] = self.attack.select_poisoned_workers(self.clients, rat)
                 print(f"Poisoning workers: {self.poisoned_workers}")
@@ -325,6 +325,8 @@ class Federator(object):
 
             # Reset the model to continue with the next round
             self.client_reset_model()
+            # Reset dataloader, etc. for next experiment
+            self.set_data()
 
         logging.info(f'Federator is stopping')
 

@@ -1,6 +1,9 @@
 import logging
 
 from torch.utils.data import DataLoader
+import logging
+from memory_profiler import profile
+from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision import transforms
 
@@ -50,3 +53,12 @@ class DistCIFAR10Dataset(DistDataset):
                                              transform=transform)
         self.test_sampler = get_sampler(self.test_dataset, self.args)
         self.test_loader = DataLoader(self.test_dataset, batch_size=16, sampler=self.test_sampler)
+
+    @profile
+    def __del__(self):
+        del self.train_dataset
+        del self.train_sampler
+        del self.train_loader
+        del self.test_dataset
+        del self.test_sampler
+        del self.test_loader

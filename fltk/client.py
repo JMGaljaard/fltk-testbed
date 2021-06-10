@@ -19,6 +19,7 @@ from fltk.util.log import FLLogger
 from fltk.util.poison.poisonpill import PoisonPill
 from fltk.util.results import EpochData
 
+from memory_profiler import profile
 logging.basicConfig(level=logging.DEBUG)
 
 
@@ -76,6 +77,7 @@ class Client:
             torch.cuda.is_available = lambda: False
             return torch.device("cpu")
 
+
     def reset_model(self):
         """
         Function to reset the learning process. In addition, reset the loss function and the
@@ -83,30 +85,34 @@ class Client:
         @return: None
         @rtype: None
         """
-        # Reset logger
-        self.args.init_logger(logging)
-        # Reset the epoch counter
-        self.epoch_counter = 0
-        self.finished_init = False
-        # Dataset will be re-initialized so save memory
-        del self.dataset
-        # This will be set afterwards, but we delete possible gradient information.
-        del self.net
-        self.set_net(self.load_default_model())
-        self.net.requires_grad_(True)
+        @profile
+        def reset(self):
+            # Reset logger
+            self.args.init_logger(logging)
+            # Reset the epoch counter
+            self.epoch_counter = 0
+            self.finished_init = False
+            # Dataset will be re-initialized so save memory
+            # Awards, but we delete possible gradient information.
+            del self.dataset, self.net, self.optimizer, self.scheduler
 
-        # Set loss function for gradient calculation
-        self.loss_function = self.args.get_loss_function()()
+            # Force collect garbage after running.
+            gc.collect()
+            self.set_net(self.load_default_model())
 
-        self.optimizer = torch.optim.SGD(self.net.parameters(),
-                                         lr=self.args.get_learning_rate(),
-                                         momentum=self.args.get_momentum())
-        self.scheduler = MinCapableStepLR(self.args.get_logger(), self.optimizer,
-                                          self.args.get_scheduler_step_size(),
-                                          self.args.get_scheduler_gamma(),
-                                          self.args.get_min_lr())
-        # Force collect garbage after running.
-        gc.collect()
+            # Set loss function for gradient calculation
+            self.loss_function = self.args.get_loss_function()()
+
+            self.optimizer = torch.optim.SGD(self.net.parameters(),
+                                             lr=self.args.get_learning_rate(),
+                                             momentum=self.args.get_momentum())
+            self.scheduler = MinCapableStepLR(self.args.get_logger(), self.optimizer,
+                                              self.args.get_scheduler_step_size(),
+                                              self.args.get_scheduler_gamma(),
+                                              self.args.get_min_lr())
+            # Force collect garbage after running.
+            gc.collect()
+        reset(self)
 
     def ping(self):
         """
@@ -136,6 +142,25 @@ class Client:
 
     def init(self):
         pass
+
+    def init_dataloader(self, pill: PoisonPill = None):
+        @profile
+        def init(self, pill):
+            self.args.distributed = True
+            self.args.rank = self.rank
+
+            self.args.world_size = self.world_size
+
+            try:
+                self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args, pill)
+            except Exception as e:
+                tb = traceback.format_exc()
+                print(tb)
+
+            self.finished_init = True
+            print("Done with init")
+            logging.info('Done with init')
+        init(self, pill)
 
     def init_dataloader(self, pill: PoisonPill = None):
         self.args.distributed = True
@@ -211,6 +236,7 @@ class Client:
         """
         return self.client_idx
 
+
     def update_nn_parameters(self, new_params):
         """
         Update the NN's parameters.
@@ -219,10 +245,15 @@ class Client:
         :type new_params: dict
         """
 
-        self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
-        if self.log_rref:
-            self.remote_log(f'Weights of the model are updated')
+        @profile
+        def update(self, new_params):
+            self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
+            del new_params
+            if self.log_rref:
+                self.remote_log(f'Weights of the model are updated')
+        update(self, new_params)
 
+    @profile
     def train(self, epoch, pill: PoisonPill = None):
         """
         :param epoch: Current epoch #
@@ -260,19 +291,20 @@ class Client:
 
             # print statistics
             running_loss += float(loss.detach().item())
+            del loss
             if i % self.args.get_log_interval() == 0:
                 self.args.get_logger().info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / self.args.get_log_interval()))
                 final_running_loss = running_loss / self.args.get_log_interval()
                 running_loss = 0.0
-
+            gc.collect()
         self.scheduler.step()
-
         # save model
         if self.args.should_save_model(epoch):
             self.save_model(epoch, self.args.get_epoch_save_end_suffix())
 
         # Force collect garbage after running.
         gc.collect()
+
         return final_running_loss, self.get_nn_parameters()
 
     def test(self):
@@ -283,21 +315,22 @@ class Client:
         targets_ = []
         pred_ = []
         loss = 0.0
-        self.net.eval()
 
-        for (images, labels) in self.dataset.get_test_loader():
-            images, labels = images.to(self.device), labels.to(self.device)
 
-            outputs = self.net(images)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            # TODO: Log the information regarding the poisoned accuracy
-            correct += (predicted == labels).sum().item()
+        with torch.no_grad():
+            for (images, labels) in self.dataset.get_test_loader():
+                images, labels = images.to(self.device), labels.to(self.device)
 
-            targets_.extend(labels.cpu().view_as(predicted).numpy())
-            pred_.extend(predicted.cpu().numpy())
+                outputs = self.net(images)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                # TODO: Log the information regarding the poisoned accuracy
+                correct += (predicted == labels).sum().item()
 
-            loss += self.loss_function(outputs, labels).item()
+                targets_.extend(labels.cpu().view_as(predicted).numpy())
+                pred_.extend(predicted.cpu().numpy())
+
+                loss += self.loss_function(outputs, labels).item()
 
         accuracy = 100 * correct / total
         confusion_mat = confusion_matrix(targets_, pred_)
@@ -335,6 +368,8 @@ class Client:
         for k, v in weights.items():
             # Detach to remove computational graph.
             weights[k] = v.cpu().detach()
+        # Force collect garbage after running.
+        gc.collect()
         return data, weights
 
     def save_model(self, epoch, suffix):
