@@ -19,7 +19,6 @@ from fltk.util.log import FLLogger
 from fltk.util.poison.poisonpill import PoisonPill
 from fltk.util.results import EpochData
 
-from memory_profiler import profile
 logging.basicConfig(level=logging.DEBUG)
 
 
@@ -85,7 +84,6 @@ class Client:
         @return: None
         @rtype: None
         """
-        @profile
         def reset(self):
             # Reset logger
             self.args.init_logger(logging)
@@ -144,7 +142,7 @@ class Client:
         pass
 
     def init_dataloader(self, pill: PoisonPill = None):
-        @profile
+
         def init(self, pill):
             self.args.distributed = True
             self.args.rank = self.rank
@@ -245,7 +243,7 @@ class Client:
         :type new_params: dict
         """
 
-        @profile
+
         def update(self, new_params):
             self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
             del new_params
@@ -253,7 +251,6 @@ class Client:
                 self.remote_log(f'Weights of the model are updated')
         update(self, new_params)
 
-    @profile
     def train(self, epoch, pill: PoisonPill = None):
         """
         :param epoch: Current epoch #
@@ -288,15 +285,12 @@ class Client:
             loss = self.loss_function(outputs, labels)
             loss.backward()
             self.optimizer.step()
-
-            # print statistics
             running_loss += float(loss.detach().item())
-            del loss
+            del loss, outputs
             if i % self.args.get_log_interval() == 0:
                 self.args.get_logger().info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / self.args.get_log_interval()))
                 final_running_loss = running_loss / self.args.get_log_interval()
                 running_loss = 0.0
-            gc.collect()
         self.scheduler.step()
         # save model
         if self.args.should_save_model(epoch):
@@ -308,8 +302,6 @@ class Client:
         return final_running_loss, self.get_nn_parameters()
 
     def test(self):
-        self.net.eval()
-
         correct = 0
         total = 0
         targets_ = []

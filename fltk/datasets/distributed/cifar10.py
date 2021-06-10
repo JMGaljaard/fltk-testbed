@@ -54,7 +54,6 @@ class DistCIFAR10Dataset(DistDataset):
         self.test_sampler = get_sampler(self.test_dataset, self.args)
         self.test_loader = DataLoader(self.test_dataset, batch_size=16, sampler=self.test_sampler)
 
-    @profile
     def __del__(self):
         del self.train_dataset
         del self.train_sampler

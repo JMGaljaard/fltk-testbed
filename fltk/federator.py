@@ -3,7 +3,6 @@ import pathlib
 import time
 from pathlib import Path
 from typing import List, Callable
-import numpy as np
 
 import torch
 from dataclass_csv import DataclassWriter
@@ -11,12 +10,10 @@ from torch.distributed import rpc
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.client import Client
-from fltk.nets.util.utils import flatten_params, initialize_default_model, save_model
+from fltk.nets.util.utils import flatten_params, save_model
 from fltk.strategy.antidote import Antidote
 from fltk.strategy.attack import Attack
-from fltk.strategy.client_selection import random_selection
 from fltk.util.base_config import BareConfig
-from fltk.util.fed_avg import average_nn_parameters
 from fltk.util.log import FLLogger
 from fltk.util.results import EpochData
 
@@ -81,7 +78,8 @@ class Federator(object):
     poisoned_clients = {}
     healthy_clients = {}
 
-    def __init__(self, client_id_triple, num_epochs=3, config: BareConfig = None, attack: Attack = None, antidote: Antidote = None):
+    def __init__(self, client_id_triple, num_epochs=3, config: BareConfig = None, attack: Attack = None,
+                 antidote: Antidote = None):
         log_rref = rpc.RRef(FLLogger())
         # Poisoning
         self.attack = attack
@@ -105,7 +103,6 @@ class Federator(object):
         self.test_data = None
         self.set_data()
         config.data_sampler = copy_sampler
-
 
     def set_data(self):
         self.test_data = Client("test", None, 1, 2, self.config)
@@ -187,7 +184,7 @@ class Federator(object):
             time.sleep(2)
         logging.info('All clients are ready')
 
-    def remote_run_epoch(self, epochs, ratio = None, store_grad=False):
+    def remote_run_epoch(self, epochs, ratio=None, store_grad=False):
         responses = []
         client_weights = []
         selected_clients = self.select_clients(self.config.clients_per_round)
@@ -210,15 +207,14 @@ class Federator(object):
         self.epoch_counter += epochs
         flat_current = None
 
-
-
         if store_grad:
             flat_current = flatten_params(self.test_data.net.state_dict())
         for res in responses:
             epoch_data, weights = res[1].wait()
             if store_grad:
                 # get flatten
-                self.store_gradient(flatten_params(weights) - flat_current, epoch_data.client_id, self.epoch_counter, ratio)
+                self.store_gradient(flatten_params(weights) - flat_current, epoch_data.client_id, self.epoch_counter,
+                                    ratio)
             self.client_data[epoch_data.client_id].append(epoch_data)
             logging.info(f'{res[0]} had a loss of {epoch_data.loss}')
             logging.info(f'{res[0]} had a epoch data of {epoch_data}')
@@ -265,7 +261,7 @@ class Federator(object):
             accuracy, loss, class_precision, class_recall = res[1].wait()
             logging.info(f'{res[0]} had a result of accuracy={accuracy}')
 
-    def save_epoch_data(self, ratio = None):
+    def save_epoch_data(self, ratio=None):
         file_output = f'./{self.config.output_location}'
         self.ensure_path_exists(file_output)
         for key in self.client_data:
@@ -281,7 +277,7 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self, ratios = [0.06, 0.12, 0.18, 0.0]):
+    def run(self, ratios=[0.12, 0.18, 0.0]):
         """
         Main loop of the Federator
         :return:
@@ -292,6 +288,8 @@ class Federator(object):
         poison_pill = None
         save_path = self.config
         for rat in ratios:
+            # Update writer to logdir
+            self.update_clients(rat)
             if self.attack:
                 self.poisoned_clients: List[ClientRef] = self.attack.select_poisoned_clients(self.clients, rat)
                 self.healthy_clients = list(set(self.clients).symmetric_difference(set(self.poisoned_clients)))
