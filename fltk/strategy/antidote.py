@@ -1,6 +1,8 @@
 from abc import abstractmethod, ABC
 import numpy as np
+import torch
 
+from fltk.nets.util.utils import flatten_params
 from fltk.util.base_config import BareConfig
 from fltk.util.fed_avg import average_nn_parameters
 
@@ -35,33 +37,33 @@ class MultiKrumAntidote(Antidote):
         Function which returns the average of the k gradient with the lowest score.
         """
         # Initialize dict holding all distances.
-        n = len(gradients)
-        dict = {}
-        for i in range(n):
-            dict[i] = []
+        number_gradients = len(gradients)
+        distance_matrix = np.array((number_gradients, number_gradients), dtype=float)
 
-        for i in range(n):
-            for j in range(i + 1, n):
+        # Fill distance matrix for every entry
+        for i in range(number_gradients):
+            for j in range(i + 1, number_gradients):
                 # Calculate sum_squared_distance (ssd) of each pair.
-                ssd = np.linalg.norm(gradients[i] - gradients[j]) ** 2
-                dict[i].append(ssd)
-                dict[j].append(ssd)
+                # Use flattened parameters to allow for simple calculation of SSD
+                ssd = float(torch.sum(torch.pow(flatten_params(gradients[i]) - flatten_params(gradients[j]), 2)))
+                distance_matrix[i][j] = ssd
+                distance_matrix[j][i] = ssd
 
         # Calculate the score of each worker.
-        score = []
-        for i in range(n):
-            dict[i].sort()
-            closests = [x for index, x in enumerate(dict[i]) if index < (n - self.f - 2)]
-            score.append(sum(closests))
+        score = np.zeros(number_gradients)
+        for i in range(number_gradients):
+            # Get the ones that are closeby
+            closest_entries = np.sort(distance_matrix[i])[:(number_gradients - self.f - 2)]
+            # And take the sum according to configuration
+            score[i] = sum(closest_entries)
 
-        score = np.array(score)
-        # Compute n vectors with lowest score
-        idx = np.argpartition(score, self.k)
-        selected = score[idx[:self.k]]
+        # Now take k closest entries
+        sorted_indices = np.argsort(score)[:self.k]
+        top_gradients = [gradients[top_k_index] for top_k_index in sorted_indices]
+        return average_nn_parameters(top_gradients)
 
-        # Return average of selected gradients
-        avg = np.add.reduce(selected) / np.array(float(self.k) + 1)
-        return avg
+
+
 
 def create_antidote(cfg: BareConfig, **kwargs) -> Antidote:
     assert cfg is not None

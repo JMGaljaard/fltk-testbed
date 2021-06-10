@@ -329,7 +329,8 @@ class BareConfig(object):
         return self.antidote['f']
 
     def get_antidote_k_value(self) -> int:
-        return self.antidote['k'] - 1
+        # Not minus one, because something...
+        return self.antidote['k']
 
     def __str__(self):
         return "\nBatch Size: {}\n".format(self.batch_size) + \
