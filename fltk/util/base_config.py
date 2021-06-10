@@ -83,6 +83,8 @@ class BareConfig(object):
 
         # Poison
         self.poison: dict = None
+        # Antidote
+        self.antidote: dict = None
     ###########
     # Methods #
     ###########
@@ -139,7 +141,9 @@ class BareConfig(object):
 
         if 'poison' in cfg:
             self.poison = cfg['poison']
-            
+
+        if 'antidote' in cfg:
+            self.antidote = cfg['antidote']
 
 
     def init_logger(self, logger):
@@ -315,6 +319,17 @@ class BareConfig(object):
     def get_attack_config(self) -> dict:
         return self.poison['attack']
 
+    def get_antidote_type(self) -> str:
+        return self.antidote['type']
+
+    def get_antidote_config(self) -> dict:
+        return self.antidote
+
+    def get_antidote_f_value(self) -> int:
+        return self.antidote['f']
+
+    def get_antidote_k_value(self) -> int:
+        return self.antidote['k'] - 1
 
     def __str__(self):
         return "\nBatch Size: {}\n".format(self.batch_size) + \

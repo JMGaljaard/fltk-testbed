@@ -1,11 +1,14 @@
 import logging
+import numpy as np
+import random
 from abc import abstractmethod, ABC
 from logging import ERROR, WARNING, INFO
 from math import floor, ceil
 from typing import List, Dict
 
-from numpy import random
 from collections import ChainMap
+
+from fltk.strategy.client_selection import random_selection
 from fltk.util.base_config import BareConfig
 from fltk.util.poison.poisonpill import FlipPill, PoisonPill
 
@@ -27,7 +30,7 @@ class Attack(ABC):
             self.logger.log(WARNING, f'Advancing outside of preset number of rounds {self.round} / {self.max_rounds}')
 
     @abstractmethod
-    def select_poisoned_workers(self, workers: List, ratio: float = None) -> List:
+    def select_poisoned_clients(self, workers: List, ratio: float = None) -> List:
         pass
 
     @abstractmethod
@@ -38,8 +41,19 @@ class Attack(ABC):
     def get_poison_pill(self) -> PoisonPill:
         pass
 
+    @abstractmethod
+    def is_active(self, current_round: int = 0) -> bool:
+        pass
+
+    @abstractmethod
+    def select_clients(self, poisoned_clients, healthy_workers, n):
+        pass
+
 
 class LabelFlipAttack(Attack):
+
+    def is_active(self, current_round=0) -> bool:
+        return True
 
     def build_attack(self, flip_description=None) -> PoisonPill:
         """
@@ -77,33 +91,67 @@ class LabelFlipAttack(Attack):
         self.label_shuffle = dict(ChainMap(*cfg.get_attack_config()['config']))
         self.random = random
 
-    def select_poisoned_workers(self, workers: List, ratio: float = None):
+    def select_poisoned_clients(self, workers: List, ratio: float = None):
         """
         Randomly select workers from a list of workers provided by the Federator.
         """
         self.logger.log(INFO, "Selecting workers to gather from")
         if not self.random:
-            random.seed(self.seed)
+            np.random.seed(self.seed)
         cloned_workers = workers.copy()
-        random.shuffle(cloned_workers)
+        np.random.shuffle(cloned_workers)
         return cloned_workers[0:ceil(len(workers) * ratio)]
 
     def get_poison_pill(self):
         return FlipPill(self.label_shuffle)
 
+    def select_clients(self, poisoned_clients, healthy_clients, n):
+        return random_selection(poisoned_clients + healthy_clients, n)
 
-def create_attack(cfg: BareConfig) -> Attack:
+class TimedLabelFlipAttack(LabelFlipAttack):
+
+    def __init__(self, start_round=0, end_round=0, availability=0, max_rounds: int = 0, ratio: float = 0, label_shuffle: Dict = None, seed: int = 42, random=False,
+                 cfg: BareConfig = None, ):
+        LabelFlipAttack.__init__(self, max_rounds, ratio, label_shuffle, seed, random, cfg)
+        self.start_round = start_round
+        self.end_round = end_round
+        self.availability = availability
+
+    def is_active(self, currentRound=0) -> bool:
+        """
+        Timed attack is only active when the current round is in between the start and end rounds of the attack.
+        """
+        return self.start_round <= currentRound <= self.end_round
+
+    def select_clients(self, poisoned_clients: List, healthy_clients: List, n):
+        """
+        Select poisoned workers based on availability.
+        When availability = 0.5, selecting a participant has a 50% chance of being a poisoned one.
+        """
+        poison_counter = 0
+        healthy_counter = 0
+        nr_poisoned_workers = len(poisoned_clients)
+        for i in range(n):
+            if random.random() <= self.availability and poison_counter < nr_poisoned_workers or healthy_counter >= len(healthy_clients):
+                poison_counter += 1
+            else:
+                healthy_counter += 1
+        return random.sample(poisoned_clients, poison_counter) + random.sample(healthy_clients, healthy_counter)
+
+
+def create_attack(cfg: BareConfig, **kwargs) -> Attack:
     """
     Function to create Poison attack based on the configuration that was passed during execution.
     Exception gets thrown when the configuration file is not correct.
+    TODO parse TimedFlipAttack from config
     """
     assert not cfg is None and not cfg.poison is None
-    attack_mapper = {'flip': LabelFlipAttack}
+    attack_mapper = {'flip': LabelFlipAttack, 'timed': TimedLabelFlipAttack}
 
     attack_class = attack_mapper.get(cfg.get_attack_type(), None)
 
     if not attack_class is None:
-        attack = attack_class(cfg=cfg)
+        attack = attack_class(cfg=cfg, **kwargs)
     else:
         raise Exception("Requested attack is not supported...")
     print(f'')

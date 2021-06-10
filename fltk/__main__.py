@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import torch.multiprocessing as mp
 from fltk.federator import Federator
 from fltk.launch import run_single, run_spawn
+from fltk.strategy.antidote import create_antidote
 from fltk.strategy.attack import create_attack
 from fltk.util.base_config import BareConfig
 from fltk.util.poison.poisonpill import FlipPill
@@ -123,6 +124,7 @@ def perform_poison_experiment(args, cfg, parser, yaml_data, ratio=None):
     nic = args.nic
 
     attack = create_attack(cfg)
+    antidote = create_antidote(cfg)
     if not world_size:
         world_size = yaml_data['system']['clients']['amount'] + 1
     if not master_address:
@@ -133,7 +135,7 @@ def perform_poison_experiment(args, cfg, parser, yaml_data, ratio=None):
     if ratio:
         print(f'Setting ratio to {ratio}')
         attack.ratio = ratio
-    run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic, attack=attack)
+    run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic, attack=attack, antidote=antidote)
 
 
 if __name__ == "__main__":
