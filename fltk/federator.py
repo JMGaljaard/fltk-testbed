@@ -315,12 +315,12 @@ class Federator(object):
                 self.remote_run_epoch(epoch_size, rat)
                 addition += 1
             logging.info('Printing client data')
-            print(self.client_data)
 
-            logging.info(f'Saving data')
             # Perform last test on the current model.
             self.client_data.get('federator', []).append(self.test_model())
-            save_model(self.test_data.net, 'config', self.epoch_counter, self.config)
+            logging.info(f'Saving model')
+            save_model(self.test_data.net, './output', self.epoch_counter, self.config, rat)
+            logging.info(f'Saving data')
             self.save_epoch_data(rat)
 
             # Reset the model to continue with the next round
