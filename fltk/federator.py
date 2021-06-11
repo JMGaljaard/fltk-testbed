@@ -236,7 +236,7 @@ class Federator(object):
                                         self.epoch_counter)
 
             client_weights.append(weights)
-        updated_model = self.antidote.process_gradients(client_weights)
+        updated_model = self.antidote.process_gradients(client_weights, epoch = self.epoch_counter)
         self.test_data.net.load_state_dict(updated_model)
         # test global model
         logging.info("Testing on global test set")
