@@ -15,7 +15,7 @@ spec:
         - -m
         - fltk
         - poison
-        - configs/cloud_experiment.yaml
+        - configs/cloud_config.yaml
         - --rank=0
       env:
         - name: MASTER_PORT

@@ -29,3 +29,7 @@ poison:
     type: "flip"
     config:
       - 5: 3
+antidote:
+  type: "clustering"
+  f: 0
+  k: 1

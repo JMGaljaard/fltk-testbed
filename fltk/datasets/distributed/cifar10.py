@@ -2,7 +2,6 @@ import logging
 
 from torch.utils.data import DataLoader
 import logging
-from memory_profiler import profile
 from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision import transforms

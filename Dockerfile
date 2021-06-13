@@ -30,10 +30,13 @@ ADD configs configs
 
 ADD fltk fltk
 
-# Update relevant runtime configuration for experiment
-COPY cloud_configs/cloud_experiment.yaml configs/cloud_config.yaml
+
 # Install newest version of library
 RUN python3 -m setup install
 
 # Expose the container's port to the host OS
 EXPOSE 5000
+
+
+# Update relevant runtime configuration for experiment
+COPY cloud_configs/cloud_experiment.yaml configs/cloud_config.yaml

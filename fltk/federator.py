@@ -85,7 +85,7 @@ class Federator(object):
         self.attack = attack
         logging.info(f'Federator with attack {attack}')
         self.antidote = antidote
-        logging.info(f'Fedetrator with antidote {antidote}')
+        logging.info(f'Federator with antidote {antidote}')
 
         self.log_rref = log_rref
         self.num_epoch = num_epochs
@@ -236,7 +236,10 @@ class Federator(object):
                                         self.epoch_counter)
 
             client_weights.append(weights)
-        updated_model = self.antidote.process_gradients(client_weights, epoch = self.epoch_counter)
+        # TODO: Make sure that we keep track of whose gradient we are dealing with
+        updated_model = self.antidote.process_gradients(client_weights, epoch=self.epoch_counter,
+                                                        clients=selected_clients,
+                                                        model=self.test_data.net.state_dict())
         self.test_data.net.load_state_dict(updated_model)
         # test global model
         logging.info("Testing on global test set")
@@ -277,7 +280,7 @@ class Federator(object):
     def ensure_path_exists(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    def run(self, ratios=[0.12, 0.18, 0.0]):
+    def run(self, ratios=[0.12, 0.18, 0.6, 0.0]):
         """
         Main loop of the Federator
         :return:
@@ -324,6 +327,7 @@ class Federator(object):
             self.client_reset_model()
             # Reset dataloader, etc. for next experiment
             self.set_data()
+            self.antidote.save_data_and_reset(rat)
 
         logging.info(f'Federator is stopping')
 
