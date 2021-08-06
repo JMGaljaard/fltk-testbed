@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kompose.cmd: kompose convert -c -f ../docker-compose-gcloud.yml
+    kompose.version: 1.22.0 (HEAD)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: fl-server
+  name: fl-server
+spec:
+  ports:
+    - name: "5000"
+      port: {{ (.Values.fltk.port | int) }}
+      targetPort: {{ (.Values.fltk.port | int) }}
+  selector:
+    io.kompose.service: fl-server
+status:
+  loadBalancer: {}

@@ -1,0 +1,96 @@
+version: '3.3'
+services:
+  fl_server:
+    container_name: federation-lab-server
+    restart: 'no'
+    image: gcr.io/cs4290-dml/fltk:latest
+    volumes:
+      - /opt/federation-lab/output
+#    command: python3 -m fltk single configs/local_experiment.yaml --rank=0
+    environment:
+      - MASTER_PORT=5000
+      - PYTHONUNBUFFERED=1
+      - RANK=0
+      - WORLD_SIZE=2
+      - GLOO_SOCKET_IFNAME=eth0
+      - TP_SOCKET_IFNAME=eth0
+    ports:
+      - 5000:5000
+
+  client_slow_1:
+    restart: 'no'
+    image: gcr.io/cs4290-dml/fltk:latest
+    command: python3 -m fltk single configs/local_experiment.yaml --rank=1
+    environment:
+      - MASTER_PORT=5000
+      - PYTHONUNBUFFERED=1
+      - RANK=1
+      - WORLD_SIZE=20
+      - GLOO_SOCKET_IFNAME=eth0
+      - TP_SOCKET_IFNAME=eth0
+    depends_on:
+      - fl_server
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1024M
+
+  client_slow_2:
+    restart: 'no'
+    image: gcr.io/cs4290-dml/fltk:latest
+    command: python3 -m fltk single configs/local_experiment.yaml --rank=2
+    environment:
+      - MASTER_PORT=5000
+      - PYTHONUNBUFFERED=1
+      - RANK=2
+      - WORLD_SIZE=20
+      - GLOO_SOCKET_IFNAME=eth0
+      - TP_SOCKET_IFNAME=eth0
+    depends_on:
+      - fl_server
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1024M
+
+  client_slow_3:
+    restart: 'no'
+    image: gcr.io/cs4290-dml/fltk:latest
+    command: python3 -m fltk single configs/local_experiment.yaml --rank=3
+    environment:
+      - MASTER_PORT=5000
+      - PYTHONUNBUFFERED=1
+      - RANK=3
+      - WORLD_SIZE=20
+      - GLOO_SOCKET_IFNAME=eth0
+      - TP_SOCKET_IFNAME=eth0
+    depends_on:
+      - fl_server
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1024M
+
+  client_slow_4:
+    restart: 'no'
+    image: gcr.io/cs4290-dml/fltk:latest
+    command: python3 -m fltk single configs/local_experiment.yaml --rank=3
+    environment:
+      - MASTER_PORT=5000
+      - PYTHONUNBUFFERED=1
+      - RANK=4
+      -
+      - WORLD_SIZE=20
+      - GLOO_SOCKET_IFNAME=eth0
+      - TP_SOCKET_IFNAME=eth0
+    depends_on:
+      - fl_server
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1024M
+
