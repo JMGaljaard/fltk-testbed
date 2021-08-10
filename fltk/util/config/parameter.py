@@ -29,8 +29,8 @@ class Priority:
     """
     Job class priority, indicating the presedence of one arrival over another.
     """
-    priority: int = field(metadata=config(field_name="priority"))
-    probability: float = field(metadata=config(field_name="probability"))
+    priority: int
+    probability: float
 
 
 @dataclass_json
@@ -51,13 +51,25 @@ class SystemParameters:
 
 @dataclass_json
 @dataclass(frozen=True)
+class NetworkConfiguration:
+    """
+    Dataclass describing the network and dataset that is 'trained' for a task.
+    """
+    network: str
+    dataset: str
+
+
+@dataclass_json
+@dataclass(frozen=True)
 class JobClassParameter:
     """
     Dataclass describing the job specific parameters (system and hyper).
     """
+    network_configuration: NetworkConfiguration = field(metadata=config(field_name="networkConfiguration"))
     system_parameters: SystemParameters = field(metadata=config(field_name="systemParameters"))
     hyper_parameters: HyperParameters = field(metadata=config(field_name="hyperParameters"))
     class_probability: float = field(metadata=config(field_name="classProbability"))
+    priorities: List[Priority]
 
 
 @dataclass_json
@@ -66,9 +78,48 @@ class JobDescription:
     """
     Dataclass describing the characteristics of a Job type, as well as the arrival statistics.
     Currently, the arrival statistics is the lambda value used in a Poisson arrival process.
+
+    preemtible_jobs: indicates whether the jobs can be pre-emptively rescheduled by the scheduler.
+    # TODO: Decide whether we want to pull out some of the configurations out of this JSON parser,\
+    # To prevent variable duplication in the experiment descriptino files.
+    runtime: indicates for how long jobs should be generated.
     """
     job_class_parameters: List[JobClassParameter] = field(metadata=config(field_name="jobClassParameters"))
     arrival_statistic: float = field(metadata=config(field_name="lambda"))
+    preemtible_jobs: float = field(metadata=config(field_name="preemptJobs"))
+    runtime: int
+
+
+@dataclass
+class TrainTask:
+    """
+    Training description used by the orchestrator to generate tasks. Contains 'transposed' information of the
+    configuration file to make job generation easier and cleaner by using a 'flat' data class.
+    """
+    network_configuration: NetworkConfiguration
+    system_parameters: SystemParameters
+    hyper_parameters = HyperParameters
+    priority: float
+    probability: float
+    arrival_statistic: float
+
+    def __init__(self, job_parameters: JobClassParameter, job_description: JobDescription, priority: Priority):
+        """
+        Overridden init method for dataclass, to allow for 'exploding' a JobDescription object to a flattened object.
+        @param job_parameters:
+        @type job_parameters:
+        @param job_description:
+        @type job_description:
+        @param priority:
+        @type priority:
+        """
+        self.network_configuration = job_parameters.network_configuration
+        self.system_parameters = job_parameters.system_parameters
+        self.hyper_parameters = job_parameters.hyper_parameters
+        self.arrival_statistic = job_description.arrival_statistic
+        self.priority = priority.priority
+        # Conditional independence, so P(A | B) = P(A), hence multiplicative
+        self.probability = priority.probability * job_parameters.class_probability
 
 
 class ExperimentParser(object):
@@ -76,7 +127,7 @@ class ExperimentParser(object):
     def __init__(self, config_path: Path):
         self.__config_path = config_path
 
-    def parse(self):
+    def parse(self) -> List[JobDescription]:
         """
         Parse function to load JSON config into JobDescription objects. Any changes to the JSON file format
         should be reflected by the classes used. For more information refer to the dataclasses JSON
