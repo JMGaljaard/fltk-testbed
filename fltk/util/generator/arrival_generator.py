@@ -1,9 +1,10 @@
-import abc
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from random import choices
+from typing import List, Union
 
+import numpy as np
 from iteration_utilities import deepflatten
 
 from fltk.util.config.parameter import ExperimentParser, TrainTask
@@ -16,11 +17,11 @@ class ArrivalGenerator(ABC):
     """
     configuration_path: Path
 
-    @abc.abstractmethod
-    def load_config(self, config_path: Path):
+    @abstractmethod
+    def load_config(self):
         pass
 
-    @abc.abstractmethod
+    @abstractmethod
     def generate_arrivals(self):
         pass
 
@@ -29,6 +30,8 @@ class ExperimentGenerator(ArrivalGenerator):
     start_time: int
     stop_time: int
     train_tasks: List[TrainTask]
+    inter_arrival: Union[float]
+
 
     def load_config(self):
         """
@@ -40,13 +43,14 @@ class ExperimentGenerator(ArrivalGenerator):
                  for params in description.job_class_parameters] for description in experiment_descriptions]
         self.train_tasks = list(deepflatten(jobs))
 
-    def generate_arrivals(self):
-        pass
-
+    def generate_arrivals(self, tasks: int = 1) -> List[TrainTask]:
+        self.inter_arrival = np.random.poisson(lam=self.train_tasks[0].arrival_statistic, size=tasks)
+        return choices(population=self.train_tasks, weights=list(map(lambda x: x.probability, self.train_tasks)),
+                       k=tasks)
 
 @dataclass
 class EvaluationGenerator(ArrivalGenerator):
-    def load_config(self, config_path: Path):
+    def load_config(self):
         pass
 
     def generate_arrivals(self):
@@ -60,5 +64,4 @@ if __name__ == '__main__':
     experiment_generator.load_config()
     for train_task in experiment_generator.train_tasks:
         print(train_task)
-
-    print(sum(map(lambda x: x.probability, experiment_generator.train_tasks)))
+    experiment_generator.generate_arrivals(100)
