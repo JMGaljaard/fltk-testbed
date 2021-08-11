@@ -100,10 +100,9 @@ class TrainTask:
     system_parameters: SystemParameters
     hyper_parameters = HyperParameters
     priority: float
-    probability: float
-    arrival_statistic: float
+    arrival_ticks: float
 
-    def __init__(self, job_parameters: JobClassParameter, job_description: JobDescription, priority: Priority):
+    def __init__(self, job_parameters: JobClassParameter, priority: Priority, task_id: str):
         """
         Overridden init method for dataclass, to allow for 'exploding' a JobDescription object to a flattened object.
         @param job_parameters:
@@ -116,10 +115,7 @@ class TrainTask:
         self.network_configuration = job_parameters.network_configuration
         self.system_parameters = job_parameters.system_parameters
         self.hyper_parameters = job_parameters.hyper_parameters
-        self.arrival_statistic = job_description.arrival_statistic
         self.priority = priority.priority
-        # Conditional independence, so P(A | B) = P(A), hence multiplicative
-        self.probability = priority.probability * job_parameters.class_probability
 
 
 class ExperimentParser(object):
