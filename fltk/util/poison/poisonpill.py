@@ -1,7 +1,6 @@
 import logging
 from abc import abstractmethod, ABC
-from logging import ERROR
-from typing import Dict, List, Union, Callable
+from typing import Dict, Union, Callable
 
 import torch
 
@@ -32,6 +31,7 @@ class PoisonPill(ABC):
     def __str__(self):
         pass
 
+
 class FlipPill(PoisonPill):
 
     def poison_targets(self) -> Callable:
@@ -43,9 +43,11 @@ class FlipPill(PoisonPill):
         @return: List of mapped targets according to self.flips.
         @rtype: list
         """
+
         # Apply mapping to the input, default value is the target itself!
         def flipper(y):
-            return  self.flips.get(y, y)
+            return self.flips.get(y, y)
+
         return flipper
 
     def __init__(self, flip_description: Dict[int, int]):
