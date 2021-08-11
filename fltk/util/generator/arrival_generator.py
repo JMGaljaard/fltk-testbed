@@ -3,6 +3,7 @@ from asyncio import sleep
 from dataclasses import dataclass
 from pathlib import Path
 from random import choices
+from time import time
 from typing import Dict, List
 
 import numpy as np
@@ -22,7 +23,14 @@ class ArrivalGenerator(ABC):
         pass
 
     @abstractmethod
-    def generate_arrivals(self):
+    def generate_arrival(self, task_id):
+        """
+        Function to generate arrival based on a Task ID.
+        @param task_id:
+        @type task_id:
+        @return:
+        @rtype:
+        """
         pass
 
 
@@ -36,15 +44,16 @@ class Arrival:
 class ExperimentGenerator(ArrivalGenerator):
     alive: bool = True
     decrement = 1
-    start_time: int
-    stop_time: int
+
+    start_time: float
+    stop_time: float
     job_description: Dict[str, JobDescription]
 
     tick_list: List[Arrival] = []
 
     def populate(self):
         # TODO: logging
-        for key, _ in self.job_description:
+        for key in self.job_description.keys():
             self.generate_arrival(key)
 
     def load_config(self):
@@ -55,13 +64,11 @@ class ExperimentGenerator(ArrivalGenerator):
         experiment_descriptions = parser.parse()
         self.job_description = {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions)}
 
-    def generate_arrival(self, task_id: str) -> TrainTask:
+    def generate_arrival(self, task_id: str) -> None:
         """
         Generate a training task for a JobDescription once the inter-arrival time has been 'deleted'.
-        @param train_id:
-        @type train_id:
-        @return:
-        @rtype:
+        @param train_id: identifier for a training task correspnoding to the JobDescription.
+        @type train_id: String
         """
         # TODO: logging
         job = self.job_description[task_id]
@@ -80,6 +87,7 @@ class ExperimentGenerator(ArrivalGenerator):
         @rtype:
         """
         # TODO: logging
+        self.start_time = time()
         while self.alive:
             arrived = []
             for indx, entry in enumerate(self.tick_list):
@@ -98,13 +106,3 @@ class EvaluationGenerator(ArrivalGenerator):
 
     def generate_arrivals(self):
         pass
-
-
-if __name__ == '__main__':
-    experiment_path = '/home/jeroen/Documents/CSE/MSc/work/fltk/fltk-testbed-gr-30/configs/tasks/example_arrival_config.yaml'
-    conf_path = Path(experiment_path)
-    experiment_generator = ExperimentGenerator(conf_path)
-    experiment_generator.load_config()
-    for train_task in experiment_generator.job_description:
-        print(train_task)
-    experiment_generator.generate_arrivals(100)
