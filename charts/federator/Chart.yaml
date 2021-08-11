@@ -1,5 +1,5 @@
 name: ../docker-compose-gcloud
-description: A generated Helm Chart for ../docker-compose-gcloud from Skippbox Kompose
+description: Helm Chart for running the Federator/Orchestrator for the FLTK framework
 version: 0.0.1
 apiVersion: v1
 appVersion: 1.16.0
