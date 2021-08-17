@@ -18,8 +18,8 @@ WORKDIR /opt/federation-lab
 RUN apt-get update \
   && apt-get install -y vim curl python3 python3-pip net-tools iproute2
 
-COPY data/ ./data
-COPY default_models ./default_models
+#COPY data/ ./data
+#COPY default_models ./default_models
 # Copy the current folder to the working directory
 ADD setup.py requirements.txt ./
 
