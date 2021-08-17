@@ -14,7 +14,7 @@ spec:
         - python3
         - -m
         - fltk
-        - poison
+        - cluster
         - configs/cloud_config.yaml
         - --rank=0
       env:
@@ -22,7 +22,7 @@ spec:
           value: {{ quote (.Values.fltk.port | int) }}
         - name: PYTHONUNBUFFERED
           value: "1"
-      image: gcr.io/cs4290-dml/fltk:latest
+      image: localhost:5000/fltk
       name: federation-lab-server
       ports:
         - containerPort: {{ (.Values.fltk.port)}}
