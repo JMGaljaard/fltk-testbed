@@ -1,11 +1,12 @@
+import logging
 import time
+from multiprocessing.pool import ThreadPool
 from typing import Dict
 
-from kubernetes import client, watch
+from kubernetes import client, watch, config
+from kubernetes.client import V1NodeList
 
 from fltk.util.cluster.conversion import Convert
-
-watch.Watch()
 
 
 class buildDescription:
@@ -14,12 +15,13 @@ class buildDescription:
     template: client.V1PodTemplateSpec
     spec: client.V1JobSpec
 
+
 class ResourceWatchDog:
     """
-    Class to be used t
+    Class to be used to monitor the resources in a cluster.
     """
     _alive: False
-    _time: float
+    _time: float = -1
     resource_lookup: Dict[str, Dict[str, int]] = dict()
 
     def __init__(self):
@@ -27,44 +29,90 @@ class ResourceWatchDog:
         Work should be based on the details listed here:
         https://github.com/scylladb/scylla-cluster-tests/blob/a7b09e69f0152a4d70bfb25ded3d75b7e7328acc/sdcm/cluster_k8s/__init__.py#L216-L223
         """
-        self._v1 = client.CoreV1Api()
-        self._w = watch.Watch()
+        self._v1: client.CoreV1Api
 
-    def start(self):
+    def stop(self) -> None:
+        """
+        Function to stop execution. The runner thread _should_ merge back to the thread pool after calling this function
+        to the thread pool.
+        @return: None
+        @rtype: None
+        """
+        logging.info("[WatchDog] Received request to stop execution")
+        self._alive = False
+
+    def start(self) -> None:
         """
         Function to start the resource watch dog. Currently, it only monitors the per-node memory and cpu availability.
         This does not handle event scheudling.
-        @return:
-        @rtype:
+        @return: None
+        @rtype: None
         """
+        logging.info("Starting resource watchdog")
         self._alive = True
+        self._v1 = client.CoreV1Api()
         self.__monitor_allocatable_resources()
 
-    def __monitor_allocatable_resources(self):
+    def __monitor_allocatable_resources(self) -> None:
         """
-        Watchdog function that streams the node
-        @return:
-        @rtype:
+        Watchdog function that watches the Cluster resources in a K8s cluster. Requires the config to be set and loaded
+        prior to calling.
+        @return: None
+        @rtype: None
         """
-        try:
-            w = watch.Watch()
-        except Exception as e:
-            print(e)
 
-        # TODO: See how fine grained this is. Otherwise, we miss a lot of events.
-        # Alternative is to regularly poll this, or only when is needed. (Alternative).
-        for event in w.stream(self._v1.list_node):
-            print("Gettig")
-            with event.get('object', None) as node_list:
+        try:
+            # TODO: See how fine grained this is. Otherwise, we miss a lot of events.
+            # Alternative is to regularly poll this, or only when is needed. (Alternative).
+            logging.info("[WatchDog] Monitoring resources while alive...")
+            while self._alive:
+                node_list: client.V1NodeList = self._v1.list_node(watch=False)
                 self.resource_lookup = {node.metadata.uid: {
                     "memory": Convert.memory(node.status.allocatable['memory']),
                     "cpu": Convert.cpu(node.status.allocatable['cpu'])} for node in node_list.items}
-            self._time = time.time()
-            if not self._alive:
-                w.stop()
+                logging.debug(f'[WatchDog] {self.resource_lookup}')
+                if not self._alive:
+                    logging.info("Instructed to stop, stopping list_node watch on Kubernetes.")
+                    return
+                time.sleep(1)
+
+        except Exception as e:
+            logging.error(e)
+            raise e
 
 
-    def stale_timestamp(self):
+class ClusterManager:
+    _alive = False
+
+    def __init__(self):
+        # When executing in a pod, load the incluster configuration according to
+        # https://github.com/kubernetes-client/python/blob/master/examples/in_cluster_config.py#L21
+        self._v1 = client.CoreV1Api()
+        self._config = config.load_incluster_config()
+        self._watchdog = ResourceWatchDog()
+        self._client_handler = ClientHandler()
+
+    def start(self):
+        logging.info("[ClusterManager] Spinning up cluster manager...")
+        self._alive = True
+        _thread_pool = ThreadPool(processes=2)
+        _thread_pool.apply(self._watchdog.start)
+        _thread_pool.apply(self._run)
+
+        _thread_pool.join()
+
+    def _stop(self):
+        logging.info("[WatchDog] Stopping execution of ClusterManager")
+        self._watchdog.stop()
+
+    def _run(self):
+        while self._alive:
+            logging.info("Still alive...")
+            time.sleep(10)
+
+        self._stop()
+
+
 class DeploymentBuilder:
 
     # TODO: build deployment configuration compatible with the minimal working example.
@@ -117,9 +165,8 @@ class DeploymentBuilder:
 
 
 class ClientHandler(object):
-
-    def __init__(self, cluster_config):
-        self.config = cluster_config
+    def __init__(self):
+        self._v1 = client.CoreV1Api()
 
     def deploy_client(self, description):
         # API to exec with
