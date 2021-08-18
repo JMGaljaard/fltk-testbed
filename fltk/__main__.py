@@ -1,21 +1,17 @@
-import os
-import sys
+import argparse
+import logging
+from multiprocessing.pool import ThreadPool
 from pathlib import Path
 
-import torch.distributed.rpc as rpc
-import logging
-
 import yaml
-import argparse
 from dotenv import load_dotenv
 
-import torch.multiprocessing as mp
-from fltk.federator import Federator
 from fltk.launch import run_single, run_spawn
 from fltk.strategy.antidote import create_antidote
 from fltk.strategy.attack import create_attack
 from fltk.util.base_config import BareConfig
-from fltk.util.poison.poisonpill import FlipPill
+from fltk.util.cluster.client import ClusterManager
+from fltk.util.generator.arrival_generator import ExperimentGenerator
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -26,6 +22,7 @@ def add_default_arguments(parser):
 
 
 def main():
+    # TODO: Clean up the parsers
     parser = argparse.ArgumentParser(description='Experiment launcher for the Federated Learning Testbed')
 
     subparsers = parser.add_subparsers(dest="mode")
@@ -58,8 +55,32 @@ def main():
     poison_parser.add_argument('--host', type=str, default=None)
     add_default_arguments(poison_parser)
 
+
+    poison_parser = subparsers.add_parser('cluster')
+    poison_parser.add_argument('config', type=str)
+    poison_parser.add_argument('--rank', type=int)
+    poison_parser.add_argument('--nic', type=str, default=None)
+    poison_parser.add_argument('--host', type=str, default=None)
+    add_default_arguments(poison_parser)
+
     args = parser.parse_args()
-    if args.mode == 'remote':
+
+    if args.mode == 'cluster':
+        logging.info("[Fed] Starting in cluster mode.")
+        # TODO: Load configuration path
+        config_path: Path = None
+        cluster_manager = ClusterManager()
+        arrival_generator = ExperimentGenerator(config_path)
+
+        pool = ThreadPool(2)
+        pool.apply(cluster_manager.start)
+        pool.apply(arrival_generator.run)
+
+        pool.join()
+
+        exit(42)
+
+    elif args.mode == 'remote':
         if args.rank is None or args.host is None or args.world_size is None or args.nic is None:
             print('Missing rank, host, world-size, or nic argument when in \'remote\' mode!')
             parser.print_help()
@@ -106,8 +127,6 @@ def perform_single_experiment(args, cfg, parser, yaml_data):
     run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
 
 
-
-
 def perform_poison_experiment(args, cfg, parser, yaml_data, ratio=None):
     """
     Function to start poisoned experiment.
@@ -135,7 +154,8 @@ def perform_poison_experiment(args, cfg, parser, yaml_data, ratio=None):
     if ratio:
         print(f'Setting ratio to {ratio}')
         attack.ratio = ratio
-    run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic, attack=attack, antidote=antidote)
+    run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic, attack=attack,
+               antidote=antidote)
 
 
 if __name__ == "__main__":

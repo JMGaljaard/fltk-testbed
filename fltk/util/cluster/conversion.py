@@ -21,13 +21,26 @@ class Convert:
     }
 
     @staticmethod
+    def __convert(dictionary, value):
+        """
+        Mapping function with corresponding dictionary
+        @param dictionary:
+        @type dictionary:
+        @param value:
+        @type value:
+        @return:
+        @rtype:
+        """
+        for re_expression, mapper in dictionary.items():
+            if re_expression.match(value):
+                return mapper(value)
+
+    @staticmethod
     def cpu(value):
         """
         Return CPU description in terms of milli cores.
         """
-        for re_expression, mapper in Convert._mem_dict:
-            if re_expression.match(value):
-                return mapper(value)
+        return Convert.__convert(Convert._cpu_dict, value)
 
     @staticmethod
     def memory(value: str):
@@ -39,6 +52,4 @@ class Convert:
         @return:
         @rtype:
         """
-        for re_expression, mapper in Convert._mem_dict:
-            if re_expression.match(value):
-                return mapper(value)
+        return Convert.__convert(Convert._mem_dict, value)

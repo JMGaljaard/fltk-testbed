@@ -6,7 +6,7 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-from fltk.strategy.util.antidote import calc_krum_scores
+
 from fltk.util.base_config import BareConfig
 from fltk.util.fed_avg import average_nn_parameters
 
@@ -45,12 +45,7 @@ class MultiKrumAntidote(Antidote):
         """
         Function which returns the average of the k gradient with the lowest score.
         """
-        krum_scores = calc_krum_scores(gradients, self.f)
-
-        # Now take k closest entries
-        sorted_indices = np.argsort(krum_scores)[:self.k]
-        top_gradients = [gradients[top_k_index] for top_k_index in sorted_indices]
-        return average_nn_parameters(top_gradients)
+        return average_nn_parameters(gradients)
 
 class ClusterAntidote(Antidote):
 
