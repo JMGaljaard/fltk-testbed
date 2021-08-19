@@ -1,12 +1,23 @@
 import logging
 import time
+from collections import defaultdict
+from dataclasses import dataclass
 from multiprocessing.pool import ThreadPool
 from typing import Dict
 
-from kubernetes import client, watch, config
-from kubernetes.client import V1NodeList
+from kubernetes import client, config
+from pint import UnitRegistry
 
-from fltk.util.cluster.conversion import Convert
+
+@dataclass
+class Resource:
+    node_name: str
+    cpu_allocatable: int
+    memory_allocatable: int
+    cpu_requested: int
+    memory_requested: int
+    cpu_limit: int
+    memory_limit: int
 
 
 class buildDescription:
@@ -18,18 +29,26 @@ class buildDescription:
 
 class ResourceWatchDog:
     """
-    Class to be used to monitor the resources in a cluster.
+    Class to be used to monitor the resources available within the cluster. For this the resource API is not needed, but
+    can be used to extend/speedup/prettify the implementation. The implementation is based on the work by @gorenje found
+    on GithHub:
+
+    https://gist.github.com/gorenje/dff508489c3c8a460433ad709f14b7db
     """
     _alive: False
     _time: float = -1
-    resource_lookup: Dict[str, Dict[str, int]] = dict()
+    _node_lookup: Dict[str, client.V1Node] = dict()
+    _resource_lookup: Dict[str, Resource]
 
     def __init__(self):
         """
         Work should be based on the details listed here:
         https://github.com/scylladb/scylla-cluster-tests/blob/a7b09e69f0152a4d70bfb25ded3d75b7e7328acc/sdcm/cluster_k8s/__init__.py#L216-L223
         """
-        self._v1: client.CoreV1Api
+        self._v1: client.CoreV1Api = None
+
+        self.__Registry = UnitRegistry(filename='configs/quantities/kubernetes.conf')
+        self._Q = self.__Registry.Quantity
 
     def stop(self) -> None:
         """
@@ -51,34 +70,75 @@ class ResourceWatchDog:
         logging.info("Starting resource watchdog")
         self._alive = True
         self._v1 = client.CoreV1Api()
-        self.__monitor_allocatable_resources()
+        self.__monitor_nodes()
 
-    def __monitor_allocatable_resources(self) -> None:
+        import schedule
+        schedule.every(10).seconds.do(self.__monitor_pods).tag('node-monitoring')
+        schedule.every(1).minutes.do(self.__monitor_pods).tag('pod-monitoring')
+
+        logging.info("Starting with logging")
+        while self._alive:
+            schedule.run_pending()
+            time.sleep(1)
+
+    def __monitor_nodes(self) -> None:
         """
         Watchdog function that watches the Cluster resources in a K8s cluster. Requires the config to be set and loaded
         prior to calling.
         @return: None
         @rtype: None
         """
-
+        logging.info("[WatchDog] Fetching node information of cluster...")
         try:
-            # TODO: See how fine grained this is. Otherwise, we miss a lot of events.
-            # Alternative is to regularly poll this, or only when is needed. (Alternative).
-            logging.info("[WatchDog] Monitoring resources while alive...")
-            while self._alive:
-                node_list: client.V1NodeList = self._v1.list_node(watch=False)
-                self.resource_lookup = {node.metadata.uid: {
-                    "memory": Convert.memory(node.status.allocatable['memory']),
-                    "cpu": Convert.cpu(node.status.allocatable['cpu'])} for node in node_list.items}
-                logging.debug(f'[WatchDog] {self.resource_lookup}')
-                if not self._alive:
-                    logging.info("Instructed to stop, stopping list_node watch on Kubernetes.")
-                    return
-                time.sleep(1)
-
+            node_list: client.V1NodeList = self._v1.list_node(watch=False)
+            self._node_lookup = {node.metadata.name: node for node in node_list.items}
+            if not self._alive:
+                logging.info("[WatchDog] Instructed to stop, stopping list_node watch on Kubernetes.")
+                return
         except Exception as e:
             logging.error(e)
             raise e
+
+    def __monitor_pods(self) -> None:
+        """
+        Function to monitor pod activity of currently listed pods. The available pods themselves are to be fetched
+        prior to calling this function. Stale pod information will result in incomplete update, as pods will be missed.
+        @return: None
+        @rtype: None
+        """
+        node: client.V1Node
+        new_resource_mapper = {}
+
+        logging.info("[WatchDog] Fetching pod information of cluster...")
+        try:
+            for node_name, node in self._node_lookup.items():
+                # Create field selector to only get active pods that 'request' memory
+                selector = f'status.phase!=Succeeded,status.phase!=Failed,spec.nodeName={node_name}'
+                # Select pods from all namespaces on specific Kubernetes node
+                # try:
+                pod_list: client.V1PodList = self._v1.list_pod_for_all_namespaces(watch=False, field_selector=selector)
+                # Retrieve allocatable memory of node
+                alloc_cpu, alloc_mem = (self._Q(node.status.allocatable[item]) for item in ['cpu', 'memory'])
+                core_req, core_lim, mem_req, mem_lim = 0, 0, 0, 0
+                pod: client.V1Pod
+                container: client.V1Container
+                for pod in pod_list.items:
+                    for container in pod.spec.containers:
+                        res: client.V1ResourceRequirements = container.resources
+                        reqs = defaultdict(lambda: 0, res.requests or {})
+                        lmts = defaultdict(lambda: 0, res.limits or {})
+                        core_req += self._Q(reqs["cpu"])
+                        mem_req += self._Q(reqs["memory"])
+                        core_lim += self._Q(lmts["cpu"])
+                        mem_lim += self._Q(lmts["memory"])
+                resource = Resource(node_name, alloc_cpu, alloc_mem, core_req, mem_req, core_lim, mem_lim)
+                new_resource_mapper[node_name] = resource
+        except Exception as e:
+            logging.error(f'[WatchDog] namespace lookup for {node_name} failed...')
+            logging.debug(str(e))
+
+        self._resource_lookup = new_resource_mapper
+        logging.info(self._resource_lookup)
 
 
 class ClusterManager:
