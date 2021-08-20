@@ -7,7 +7,19 @@ from typing import Dict
 
 from kubernetes import client, config
 from pint import UnitRegistry
+from torch.utils.tensorboard import SummaryWriter
 
+from fltk.util.config.parameter import TrainTask
+
+@dataclass
+class ClientRef:
+    name: str
+    ref: str
+    tb_writer: SummaryWriter
+    data_size = 0
+
+    def __repr__(self):
+        return self.name
 
 @dataclass
 class Resource:
@@ -20,7 +32,7 @@ class Resource:
     memory_limit: int
 
 
-class buildDescription:
+class BuildDescription:
     resources = client.V1ResourceRequirements
     container: client.V1Container
     template: client.V1PodTemplateSpec
@@ -46,7 +58,7 @@ class ResourceWatchDog:
         https://github.com/scylladb/scylla-cluster-tests/blob/a7b09e69f0152a4d70bfb25ded3d75b7e7328acc/sdcm/cluster_k8s/__init__.py#L216-L223
         """
         self._v1: client.CoreV1Api = None
-
+        self._logger = logging.getLogger('ResourceWatchDog')
         self.__Registry = UnitRegistry(filename='configs/quantities/kubernetes.conf')
         self._Q = self.__Registry.Quantity
 
@@ -57,7 +69,7 @@ class ResourceWatchDog:
         @return: None
         @rtype: None
         """
-        logging.info("[WatchDog] Received request to stop execution")
+        self._logger.info("[WatchDog] Received request to stop execution")
         self._alive = False
 
     def start(self) -> None:
@@ -67,7 +79,7 @@ class ResourceWatchDog:
         @return: None
         @rtype: None
         """
-        logging.info("Starting resource watchdog")
+        self._logger.info("Starting resource watchdog")
         self._alive = True
         self._v1 = client.CoreV1Api()
         self.__monitor_nodes()
@@ -76,7 +88,7 @@ class ResourceWatchDog:
         schedule.every(10).seconds.do(self.__monitor_pods).tag('node-monitoring')
         schedule.every(1).minutes.do(self.__monitor_pods).tag('pod-monitoring')
 
-        logging.info("Starting with logging")
+        self._logger.info("Starting with watching resources")
         while self._alive:
             schedule.run_pending()
             time.sleep(1)
@@ -88,15 +100,15 @@ class ResourceWatchDog:
         @return: None
         @rtype: None
         """
-        logging.info("[WatchDog] Fetching node information of cluster...")
+        self._logger.info("Fetching node information of cluster...")
         try:
             node_list: client.V1NodeList = self._v1.list_node(watch=False)
             self._node_lookup = {node.metadata.name: node for node in node_list.items}
             if not self._alive:
-                logging.info("[WatchDog] Instructed to stop, stopping list_node watch on Kubernetes.")
+                self._logger.info("Instructed to stop, stopping list_node watch on Kubernetes.")
                 return
         except Exception as e:
-            logging.error(e)
+            self._logger.error(e)
             raise e
 
     def __monitor_pods(self) -> None:
@@ -109,7 +121,7 @@ class ResourceWatchDog:
         node: client.V1Node
         new_resource_mapper = {}
 
-        logging.info("[WatchDog] Fetching pod information of cluster...")
+        self._logger.info("Fetching pod information of cluster...")
         try:
             for node_name, node in self._node_lookup.items():
                 # Create field selector to only get active pods that 'request' memory
@@ -120,13 +132,11 @@ class ResourceWatchDog:
                 # Retrieve allocatable memory of node
                 alloc_cpu, alloc_mem = (self._Q(node.status.allocatable[item]) for item in ['cpu', 'memory'])
                 core_req, core_lim, mem_req, mem_lim = 0, 0, 0, 0
-                pod: client.V1Pod
-                container: client.V1Container
                 for pod in pod_list.items:
                     for container in pod.spec.containers:
-                        res: client.V1ResourceRequirements = container.resources
-                        reqs = defaultdict(lambda: 0, res.requests or {})
-                        lmts = defaultdict(lambda: 0, res.limits or {})
+                        response = container.resources
+                        reqs = defaultdict(lambda: 0, response.requests or {})
+                        lmts = defaultdict(lambda: 0, response.limits or {})
                         core_req += self._Q(reqs["cpu"])
                         mem_req += self._Q(reqs["memory"])
                         core_lim += self._Q(lmts["cpu"])
@@ -134,12 +144,11 @@ class ResourceWatchDog:
                 resource = Resource(node_name, alloc_cpu, alloc_mem, core_req, mem_req, core_lim, mem_lim)
                 new_resource_mapper[node_name] = resource
         except Exception as e:
-            logging.error(f'[WatchDog] namespace lookup for {node_name} failed...')
-            logging.debug(str(e))
+            self._logger.error(f'Namespace lookup for {node_name} failed. Reason: {e}')
 
         self._resource_lookup = new_resource_mapper
-        logging.info(self._resource_lookup)
 
+        self._logger.debug(self._resource_lookup)
 
 class ClusterManager:
     _alive = False
@@ -148,12 +157,15 @@ class ClusterManager:
         # When executing in a pod, load the incluster configuration according to
         # https://github.com/kubernetes-client/python/blob/master/examples/in_cluster_config.py#L21
         self._v1 = client.CoreV1Api()
+        self._logger = logging.getLogger('ClusterManager')
         self._config = config.load_incluster_config()
         self._watchdog = ResourceWatchDog()
         self._client_handler = ClientHandler()
 
     def start(self):
-        logging.info("[ClusterManager] Spinning up cluster manager...")
+        self._logger.info("[ClusterManager] Spinning up cluster manager...")
+        # Set debugging to WARNING only, as otherwise DEBUG statements will flood the logs.
+        client.rest.logger.setLevel(logging.WARNING)
         self._alive = True
         _thread_pool = ThreadPool(processes=2)
         _thread_pool.apply(self._watchdog.start)
@@ -162,25 +174,33 @@ class ClusterManager:
         _thread_pool.join()
 
     def _stop(self):
-        logging.info("[WatchDog] Stopping execution of ClusterManager")
+        self._logger.info("Stopping execution of ClusterManager, halting components...")
         self._watchdog.stop()
 
     def _run(self):
         while self._alive:
-            logging.info("Still alive...")
+            self._logger.info("Still alive...")
             time.sleep(10)
 
         self._stop()
+
+
+    def _schedulable_task(self, train_task: TrainTask):
+        current_resources = self._watchdog._resource_lookup
+    def deploy_task(self):
+
+        train_task: TrainTask = None
+
 
 
 class DeploymentBuilder:
 
     # TODO: build deployment configuration compatible with the minimal working example.
     def __init__(self):
-        self._buildDescription = buildDescription()
+        self._buildDescription = BuildDescription()
 
     def reset(self):
-        self._buildDescription = buildDescription()
+        self._buildDescription = BuildDescription()
 
     def create_identifier(self):
         # TODO: Move, or create identifier here.

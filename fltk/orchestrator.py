@@ -12,10 +12,9 @@ from torch.utils.tensorboard import SummaryWriter
 from fltk.client import Client
 from fltk.nets.util.utils import flatten_params, save_model
 from fltk.util.base_config import BareConfig
+from fltk.util.cluster.client import ClientRef
 from fltk.util.log import FLLogger
 from fltk.util.results import EpochData
-
-logging.basicConfig(level=logging.DEBUG)
 
 
 def _call_method(method, rref, *args, **kwargs):
@@ -41,22 +40,7 @@ def _remote_method_async(method: Callable, rref, *args, **kwargs):
     return rpc.rpc_async(rref.owner(), _call_method, args=arguments, kwargs=kwargs)
 
 
-class ClientRef:
-    ref = None
-    name = ""
-    data_size = 0
-    tb_writer = None
-
-    def __init__(self, name, ref, tensorboard_writer):
-        self.name = name
-        self.ref = ref
-        self.tb_writer = tensorboard_writer
-
-    def __repr__(self):
-        return self.name
-
-
-class Federator(object):
+class Orchestrator(object):
     """
     Central component of the Federated Learning System: The Federator
 
@@ -73,14 +57,9 @@ class Federator(object):
     active_tasks: Dict[str, Dict[str, ClientRef]]
     # List of active clients
     clients: List[ClientRef] = []
-    # epoch_counter = 0
-    # client_data = {}
-    # poisoned_clients = {}
-    # healthy_clients = {}
 
     def __init__(self, client_id_triple, config: BareConfig = None):
         log_rref = rpc.RRef(FLLogger())
-
 
         self.log_rref = log_rref
         self.config = config
@@ -124,8 +103,6 @@ class Federator(object):
             writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_client_{client.name}_{ratio}')
             client.tb_writer.close()
             client.tb_writer = writer
-            # Clear client updates ofteraf
-            self.client_data[client.name] = []
 
     def ping_all(self):
         for client in self.clients:

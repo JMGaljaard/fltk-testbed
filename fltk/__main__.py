@@ -13,7 +13,7 @@ from fltk.util.base_config import BareConfig
 from fltk.util.cluster.client import ClusterManager
 from fltk.util.generator.arrival_generator import ExperimentGenerator
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 def add_default_arguments(parser):
@@ -72,13 +72,13 @@ def main():
         cluster_manager = ClusterManager()
         arrival_generator = ExperimentGenerator(config_path)
 
-        pool = ThreadPool(2)
+        pool = ThreadPool(4)
         pool.apply(cluster_manager.start)
         pool.apply(arrival_generator.run)
 
+
         pool.join()
 
-        exit(42)
 
     elif args.mode == 'remote':
         if args.rank is None or args.host is None or args.world_size is None or args.nic is None:

@@ -8,7 +8,9 @@ from fltk.util.arguments import Arguments
 
 
 class Dataset:
-
+	"""
+	TODO: Look into RPC memory leaks occuring due to https://github.com/pytorch/pytorch/issues/61920
+	"""
 	def __init__(self, args: Arguments):
 		self.args = args
 		self.train_dataset = self.load_train_dataset()

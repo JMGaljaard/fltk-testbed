@@ -16,6 +16,7 @@ class DistDataset:
 	test_dataset = None
 	train_loader = None
 	test_loader = None
+
 	def __init__(self, args: Arguments, pill: PoisonPill = None):
 		self.args = args
 		self.pill = pill
