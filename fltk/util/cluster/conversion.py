@@ -1,8 +1,8 @@
 import re
 
-
 class Convert:
     """
+    @deprecated: This file is up for removal or change.
     Class for conversion of K8s memory and cpu descriptions. Based on teh implementatino by amelbakry
     https://github.com/amelbakry/kube-node-utilization/blob/0afc529eab0199b7746ea0a50aa76ed23cb0ba3f/nodeutilization.py#L18-L46
     """
@@ -53,3 +53,5 @@ class Convert:
         @rtype:
         """
         return Convert.__convert(Convert._mem_dict, value)
+
+
