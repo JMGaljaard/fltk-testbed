@@ -1,7 +1,7 @@
 import abc
 from dataclasses import dataclass
 
-from fltk.util.config.parameter import HyperParameterConfig, SystemParameterConfig
+from fltk.util.cluster.task.config.parameter import SystemParameters, HyperParameters
 
 
 @dataclass
@@ -16,5 +16,5 @@ class Task(abc):
     """
     network: str
     dataset: str
-    system_config: SystemParameterConfig
-    parameter_config: HyperParameterConfig
+    system_config: SystemParameters
+    parameter_config: HyperParameters

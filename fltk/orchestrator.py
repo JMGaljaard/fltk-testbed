@@ -1,7 +1,6 @@
 import logging
 import pathlib
 import time
-from pathlib import Path
 from typing import List, Callable, Dict
 
 import torch
@@ -13,7 +12,8 @@ from fltk.client import Client
 from fltk.nets.util.utils import flatten_params, save_model
 from fltk.util.base_config import BareConfig
 from fltk.util.cluster.client import ClientRef
-from fltk.util.log import FLLogger
+from fltk.util.generator.arrival_generator import ArrivalGenerator
+from fltk.util.log import DistLearningLogger
 from fltk.util.results import EpochData
 
 
@@ -53,13 +53,16 @@ class Orchestrator(object):
     - Keep track of timing
 
     """
+
     # Dictionary containing active (e.g. deployed) tasks.
-    active_tasks: Dict[str, Dict[str, ClientRef]]
+    active_tasks: Dict[str, Dict[str, ClientRef]] = {}
     # List of active clients
     clients: List[ClientRef] = []
 
+    task_generator: ArrivalGenerator
+
     def __init__(self, client_id_triple, config: BareConfig = None):
-        log_rref = rpc.RRef(FLLogger())
+        log_rref = rpc.RRef(DistLearningLogger())
 
         self.log_rref = log_rref
         self.config = config
@@ -69,6 +72,17 @@ class Orchestrator(object):
 
         # TODO: Decide on using a more persitent logging approach
         self.config.init_logger(logging)
+
+    def init_generator(self) -> None:
+        """
+        Function to initialize task generation according to provided config files.
+
+        TODO: Rename function to match description
+        TODO: Find way to provide scheduling characteristcs back to the task generator in case of an experiment runner.
+
+        @return: None
+        @rtype: None
+        """
 
     def create_clients(self, client_id_triple):
         """
@@ -90,6 +104,7 @@ class Orchestrator(object):
 
     def update_clients(self, ratio):
         """
+        :@deprecated Function to be removed in future commit.
         TODO remove functionality, move to new function & clean up
         @param ratio:
         @type ratio:
@@ -248,10 +263,7 @@ class Orchestrator(object):
                 w = DataclassWriter(f, self.client_data[key], EpochData)
                 w.write()
 
-    def ensure_path_exists(self, path):
-        Path(path).mkdir(parents=True, exist_ok=True)
-
-    def run(self, ratios=[0.12, 0.18, 0.6, 0.0]):
+    def run(self):
         """
         Main loop of the Federator
         :return:
@@ -261,44 +273,44 @@ class Orchestrator(object):
         # TODO: get attack type and ratio from config, temp solution now
         poison_pill = None
         save_path = self.config
-        for rat in ratios:
-            # Update writer to logdir
-            self.update_clients(rat)
-            if self.attack:
-                self.poisoned_clients: List[ClientRef] = self.attack.select_poisoned_clients(self.clients, rat)
-                self.healthy_clients = list(set(self.clients).symmetric_difference(set(self.poisoned_clients)))
-                print(f"Poisoning workers: {self.poisoned_clients}")
-                with open(f"{self.tb_path_base}/config_{rat}_poisoned.txt", 'w') as f:
-                    f.writelines(list(map(lambda worker: worker.name, self.poisoned_clients)))
-                poison_pill = self.attack.get_poison_pill()
-            self.client_load_data(poison_pill)
-            self.ping_all()
-            self.clients_ready()
-            self.update_client_data_sizes()
-            addition = 0
-            epoch_to_run = self.config.epochs
-            epoch_size = self.config.epochs_per_cycle
-            print(f"Running a total of {epoch_to_run} epochs...")
-            for epoch in range(epoch_to_run):
-                print(f'Running epoch {epoch}')
-                # Get new model during run, update iteratively. The model is needed to calculate the
-                # gradient by the federator.
-                self.remote_run_epoch(epoch_size, rat)
-                addition += 1
-            logging.info('Printing client data')
 
-            # Perform last test on the current model.
-            self.client_data.get('federator', []).append(self.test_model())
-            logging.info(f'Saving model')
-            save_model(self.test_data.net, './output', self.epoch_counter, self.config, rat)
-            logging.info(f'Saving data')
-            self.save_epoch_data(rat)
+        # Update writer to logdir
+        self.update_clients(rat)
+        if self.attack:
+            self.poisoned_clients: List[ClientRef] = self.attack.select_poisoned_clients(self.clients, rat)
+            self.healthy_clients = list(set(self.clients).symmetric_difference(set(self.poisoned_clients)))
+            print(f"Poisoning workers: {self.poisoned_clients}")
+            with open(f"{self.tb_path_base}/config_{rat}_poisoned.txt", 'w') as f:
+                f.writelines(list(map(lambda worker: worker.name, self.poisoned_clients)))
+            poison_pill = self.attack.get_poison_pill()
+        self.client_load_data(poison_pill)
+        self.ping_all()
+        self.clients_ready()
+        self.update_client_data_sizes()
+        addition = 0
+        epoch_to_run = self.config.epochs
+        epoch_size = self.config.epochs_per_cycle
+        print(f"Running a total of {epoch_to_run} epochs...")
+        for epoch in range(epoch_to_run):
+            print(f'Running epoch {epoch}')
+            # Get new model during run, update iteratively. The model is needed to calculate the
+            # gradient by the federator.
+            self.remote_run_epoch(epoch_size, rat)
+            addition += 1
+        logging.info('Printing client data')
 
-            # Reset the model to continue with the next round
-            self.client_reset_model()
-            # Reset dataloader, etc. for next experiment
-            self.set_data()
-            self.antidote.save_data_and_reset(rat)
+        # Perform last test on the current model.
+        self.client_data.get('federator', []).append(self.test_model())
+        logging.info(f'Saving model')
+        save_model(self.test_data.net, './output', self.epoch_counter, self.config, rat)
+        logging.info(f'Saving data')
+        self.save_epoch_data(rat)
+
+        # Reset the model to continue with the next round
+        self.client_reset_model()
+        # Reset dataloader, etc. for next experiment
+        self.set_data()
+        self.antidote.save_data_and_reset(rat)
 
         logging.info(f'Federator is stopping')
 
@@ -322,9 +334,9 @@ class Orchestrator(object):
         # Save using pytorch.
         torch.save(gradient, f"{directory}/gradient.pt")
 
-    def distribute_new_model(self, updated_model):
+    def distribute_new_model(self, updated_model) -> None:
         """
-        Function to update the model on the clients
+        Function to update the model on the
         @return:
         @rtype:
         """
@@ -336,25 +348,3 @@ class Orchestrator(object):
         for res in responses:
             res[1].wait()
         logging.info('Weights are updated')
-
-    def test_model(self, model, writer) -> EpochData:
-        """
-        TODO: Move this function somewhere else. Maybe even the federator shouldn't be bothered with testing.
-        Function to test the model on the test dataset.
-        @return:
-        @rtype:
-        """
-        # Test interleaved to speed up execution, i.e. don't keep the clients waiting.
-        accuracy, loss, class_precision, class_recall = model.test()
-        data = EpochData(epoch_id=self.epoch_counter,
-                         duration_train=0,
-                         duration_test=0,
-                         loss_train=0,
-                         accuracy=accuracy,
-                         loss=loss,
-                         class_precision=class_precision,
-                         class_recall=class_recall,
-                         client_id='federator')
-        writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
-        writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
-        return data

@@ -2,7 +2,7 @@ import logging
 
 from torch.distributed import rpc
 
-class FLLogger:
+class DistLearningLogger:
     @staticmethod
     @rpc.functions.async_execution
     def log(arg1, node_id, log_line, report_time):

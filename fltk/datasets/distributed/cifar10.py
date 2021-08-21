@@ -1,24 +1,20 @@
 import logging
 
 from torch.utils.data import DataLoader
-import logging
-from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision import transforms
 
 from fltk.datasets.distributed.dataset import DistDataset
 from fltk.strategy.data_samplers import get_sampler
-from fltk.util.poison.poisonpill import PoisonPill
 
 
 class DistCIFAR10Dataset(DistDataset):
 
-    def __init__(self, args, pill: PoisonPill = None):
-        super(DistCIFAR10Dataset, self).__init__(args, pill)
-        self.get_args().get_logger().debug(f"Instantiated CIFAR10 train data, with pill: {pill}")
+    def __init__(self, args):
+        super(DistCIFAR10Dataset, self).__init__(args)
+        self.get_args().get_logger().debug(f"Instantiated CIFAR10 train data.")
         self.init_train_dataset()
         self.init_test_dataset()
-
 
     def init_train_dataset(self):
         dist_loader_text = "distributed" if self.args.get_distributed() else ""
