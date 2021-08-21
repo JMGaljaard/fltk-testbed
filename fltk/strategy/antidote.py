@@ -6,9 +6,9 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-
+from fltk.nets.util.aggregration import average_nn_parameters
 from fltk.util.base_config import BareConfig
-from fltk.util.fed_avg import average_nn_parameters
+
 
 
 class Antidote(ABC):

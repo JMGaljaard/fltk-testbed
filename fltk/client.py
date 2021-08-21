@@ -15,8 +15,7 @@ from torch.distributed import rpc
 
 from fltk.schedulers import MinCapableStepLR
 from fltk.util.base_config import BareConfig
-from fltk.util.log import FLLogger
-from fltk.util.poison.poisonpill import PoisonPill
+from fltk.util.log import DistLearningLogger
 from fltk.util.results import EpochData
 
 logging.basicConfig(level=logging.DEBUG)
@@ -130,7 +129,7 @@ class Client:
         self.remote_log(log_line)
 
     def remote_log(self, message):
-        _remote_method_async(FLLogger.log, self.log_rref, self.id, message, time.time())
+        _remote_method_async(DistLearningLogger.log, self.log_rref, self.id, message, time.time())
 
     def local_log(self, message):
         logging.info(f'[{self.id}: {time.time()}]: {message}')
@@ -141,7 +140,7 @@ class Client:
     def init(self):
         pass
 
-    def init_dataloader(self, pill: PoisonPill = None):
+    def init_dataloader(self):
 
         def init(self, pill):
             self.args.distributed = True
@@ -158,16 +157,16 @@ class Client:
             self.finished_init = True
             print("Done with init")
             logging.info('Done with init')
-        init(self, pill)
+        init(self)
 
-    def init_dataloader(self, pill: PoisonPill = None):
+    def init_dataloader(self):
         self.args.distributed = True
         self.args.rank = self.rank
 
         self.args.world_size = self.world_size
 
         try:
-            self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args, pill)
+            self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args)
         except Exception as e:
             tb = traceback.format_exc()
             print(tb)
@@ -341,6 +340,9 @@ class Client:
 
     def run_epochs(self, num_epoch, pill: PoisonPill = None):
         """
+        TODO: Move function outside Orchestrator
+
+        Function to run epochs wit
         """
         self.finished_init = False
         start_time_train = datetime.datetime.now()

@@ -1,57 +1,32 @@
-import re
+from pathlib import Path
+
+from pint import UnitRegistry
+
 
 class Convert:
     """
-    @deprecated: This file is up for removal or change.
-    Class for conversion of K8s memory and cpu descriptions. Based on teh implementatino by amelbakry
-    https://github.com/amelbakry/kube-node-utilization/blob/0afc529eab0199b7746ea0a50aa76ed23cb0ba3f/nodeutilization.py#L18-L46
+    Conversion class, wrapper around pint UnitRegistry. Assumes that the active path is set to the project root.
+    Otherwise, provide a custom path to the conversion file when called from a different directory.
     """
 
-    _mem_dict = {
-        re.compile(r"[0-9]{1,9}Mi?"): lambda x: int(re.sub("[^0-9]", "", x)),
-        re.compile(r"[0-9]{1,9}Ki?"): lambda x: int(re.sub("[^0-9]", "", x)) // 1024,
-        re.compile(r"[0-9]{1,9}Gi?"): lambda x: int(re.sub("[^0-9]", "", x)) * 1024
-    }
+    CONVERSION_PATH = Path('configs/quantities/kubernetes.conf')
 
-    _cpu_dict = {
-        re.compile(r"[0-9]{1,4}$"): lambda x: int(re.sub("[^0-9]", "", x)) * 1e3,  # cores
-        re.compile(r"[0-9]{1,9}m"): lambda x: int(re.sub("[^0-9]", "", x)),  # milli cores
-        re.compile(r"[0-9]{1,15}u"): lambda x: int(re.sub("[^0-9]", "", x)) // 1e3,  # micro cores
-        re.compile(r"[0-9]{1,15}n"): lambda x: int(re.sub("[^0-9]", "", x)) // 1e6  # nano cores
-    }
+    def __init__(self, path: Path = None):
+        if path:
+            self.__Registry = UnitRegistry(filename=str(path))
+        else:
+            self.__Registry = UnitRegistry(filename=str(self.CONVERSION_PATH))
 
-    @staticmethod
-    def __convert(dictionary, value):
+    def convert(self, value: str) -> int:
         """
-        Mapping function with corresponding dictionary
-        @param dictionary:
-        @type dictionary:
-        @param value:
-        @type value:
-        @return:
-        @rtype:
+        Function to convert str representation of a CPU/memory quantity into an integer representation. For conversion
+        metrics see `<project_root>/configs/quantities/kubernetes.conf`
+        @param value: String representation of CPU/memory to be converted to quantity.
+        @type value: str
+        @return: Integer representation of CPU/memory quantity that was provided by the caller.
+        @rtype: int
         """
-        for re_expression, mapper in dictionary.items():
-            if re_expression.match(value):
-                return mapper(value)
+        return self.__Registry.Quantity(value)
 
-    @staticmethod
-    def cpu(value):
-        """
-        Return CPU description in terms of milli cores.
-        """
-        return Convert.__convert(Convert._cpu_dict, value)
-
-    @staticmethod
-    def memory(value: str):
-        """
-        Convert str representation of memory (e.g. allocatable memory) to integer representation
-        in Mega Bytes (MB).
-        @param value: str representation of memory.
-        @type value:
-        @return:
-        @rtype:
-        """
-        return Convert.__convert(Convert._mem_dict, value)
 
 

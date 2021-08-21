@@ -2,9 +2,11 @@ from collections import OrderedDict
 from typing import Union
 
 import torch
+from torch.utils.tensorboard import SummaryWriter
 
 from fltk.util.base_config import BareConfig
-import os
+from fltk.util.results import EpochData
+
 
 def flatten_params(model_description: Union[torch.nn.Module, OrderedDict]):
     """
@@ -34,12 +36,13 @@ def recover_flattened(flat_params, model):
     s = 0
     for p in model.parameters():
         size = p.shape[0]
-        indices.append((s, s+size))
+        indices.append((s, s + size))
         s += size
     l = [flat_params[s:e] for (s, e) in indices]
     for i, p in enumerate(model.parameters()):
         l[i] = l[i].view(*p.shape)
     return l
+
 
 def initialize_default_model(config: BareConfig, model_class) -> torch.nn.Module:
     """
@@ -65,3 +68,25 @@ def save_model(model: torch.nn.Module, directory: str, epoch, config: BareConfig
 
     full_save_path = f"./{directory}/{ratio}_{config.get_net()}_{epoch}.pth"
     torch.save(model.state_dict(), full_save_path)
+
+def test_model(self, model, writer: SummaryWriter = None) -> EpochData:
+    """
+    Function to test model during training with
+    @return:
+    @rtype:
+    """
+    # Test interleaved to speed up execution, i.e. don't keep the clients waiting.
+    accuracy, loss, class_precision, class_recall = model.test()
+    data = EpochData(epoch_id=self.epoch_counter,
+                     duration_train=0,
+                     duration_test=0,
+                     loss_train=0,
+                     accuracy=accuracy,
+                     loss=loss,
+                     class_precision=class_precision,
+                     class_recall=class_recall,
+                     client_id='federator')
+    if writer:
+        writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
+        writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
+    return data

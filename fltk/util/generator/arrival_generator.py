@@ -83,6 +83,8 @@ class ExperimentGenerator(ArrivalGenerator):
     def run(self):
         """
         Run function to generate arrivals during existence of the Orchestrator. WIP.
+
+        Currently supports for time-drift correctino to account for execution duration of the generator
         @return:
         @rtype:
         """
@@ -90,13 +92,17 @@ class ExperimentGenerator(ArrivalGenerator):
         self.start_time = time()
         while self.alive:
             arrived = []
+            save_time = time()
             for indx, entry in enumerate(self.tick_list):
                 entry.ticks -= self.decrement
                 if entry.ticks <= 0:
                     self.tick_list.pop(indx)
                     arrived.append(entry)
                     self.generate_arrival(entry.task_id)
-            sleep(self.decrement)
+
+            # Correct for time drift between execution, otherwise drift adds up, and arrivals don't line up correctly
+            correction_time = time() - save_time
+            sleep(self.decrement - correction_time)
 
 
 @dataclass

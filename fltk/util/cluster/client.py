@@ -6,10 +6,11 @@ from multiprocessing.pool import ThreadPool
 from typing import Dict
 
 from kubernetes import client, config
-from pint import UnitRegistry
 from torch.utils.tensorboard import SummaryWriter
 
-from fltk.util.config.parameter import TrainTask
+from fltk.util.cluster.conversion import Convert
+from fltk.util.cluster.task.config.parameter import TrainTask
+
 
 @dataclass
 class ClientRef:
@@ -20,6 +21,7 @@ class ClientRef:
 
     def __repr__(self):
         return self.name
+
 
 @dataclass
 class Resource:
@@ -50,7 +52,7 @@ class ResourceWatchDog:
     _alive: False
     _time: float = -1
     _node_lookup: Dict[str, client.V1Node] = dict()
-    _resource_lookup: Dict[str, Resource]
+    _resource_lookup: Dict[str, Resource] = dict()
 
     def __init__(self):
         """
@@ -59,8 +61,7 @@ class ResourceWatchDog:
         """
         self._v1: client.CoreV1Api = None
         self._logger = logging.getLogger('ResourceWatchDog')
-        self.__Registry = UnitRegistry(filename='configs/quantities/kubernetes.conf')
-        self._Q = self.__Registry.Quantity
+        self._Q = Convert().convert
 
     def stop(self) -> None:
         """
@@ -147,8 +148,8 @@ class ResourceWatchDog:
             self._logger.error(f'Namespace lookup for {node_name} failed. Reason: {e}')
 
         self._resource_lookup = new_resource_mapper
-
         self._logger.debug(self._resource_lookup)
+
 
 class ClusterManager:
     _alive = False
@@ -184,13 +185,11 @@ class ClusterManager:
 
         self._stop()
 
-
     def _schedulable_task(self, train_task: TrainTask):
         current_resources = self._watchdog._resource_lookup
+
     def deploy_task(self):
-
         train_task: TrainTask = None
-
 
 
 class DeploymentBuilder:
