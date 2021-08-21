@@ -67,53 +67,26 @@ class Client:
                                           self.args.get_scheduler_gamma(),
                                           self.args.get_min_lr())
 
-    def init_device(self):
+    def init_device(self, cuda_device: torch.device = torch.device('cuda:0')):
+        """
+        Initialize Torch to use available devices. Either prepares CUDA device, or disables CUDA during execution to run
+        with CPU only inference/training.
+        @param cuda_device: Torch device to use, refers to the CUDA device to be used in case there are multiple.
+        Defaults to the first cuda device when CUDA is enabled at index 0.
+        @type cuda_device: torch.device
+        @return:
+        @rtype:
+        """
         if self.args.cuda and torch.cuda.is_available():
-            return torch.device("cuda:0")
+            return torch.device(cuda_device)
         else:
             # Force usage of CPU
             torch.cuda.is_available = lambda: False
             return torch.device("cpu")
 
-
-    def reset_model(self):
-        """
-        Function to reset the learning process. In addition, reset the loss function and the
-        optimizer, in case this uses certain decay according to some internal counter.
-        @return: None
-        @rtype: None
-        """
-        def reset(self):
-            # Reset logger
-            self.args.init_logger(logging)
-            # Reset the epoch counter
-            self.epoch_counter = 0
-            self.finished_init = False
-            # Dataset will be re-initialized so save memory
-            # Awards, but we delete possible gradient information.
-            del self.dataset, self.net, self.optimizer, self.scheduler
-
-            # Force collect garbage after running.
-            gc.collect()
-            self.set_net(self.load_default_model())
-
-            # Set loss function for gradient calculation
-            self.loss_function = self.args.get_loss_function()()
-
-            self.optimizer = torch.optim.SGD(self.net.parameters(),
-                                             lr=self.args.get_learning_rate(),
-                                             momentum=self.args.get_momentum())
-            self.scheduler = MinCapableStepLR(self.args.get_logger(), self.optimizer,
-                                              self.args.get_scheduler_step_size(),
-                                              self.args.get_scheduler_gamma(),
-                                              self.args.get_min_lr())
-            # Force collect garbage after running.
-            gc.collect()
-        reset(self)
-
     def ping(self):
         """
-        Aliveness checker for the federator during initialization.
+        Aliveness checker for the Orchestrator during initialization.
         @return: String to the important question, `ping?', which is pong.
         @rtype: str
         """
@@ -137,28 +110,6 @@ class Client:
     def set_configuration(self, config: str):
         yaml_config = yaml.safe_load(config)
 
-    def init(self):
-        pass
-
-    def init_dataloader(self):
-
-        def init(self, pill):
-            self.args.distributed = True
-            self.args.rank = self.rank
-
-            self.args.world_size = self.world_size
-
-            try:
-                self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args, pill)
-            except Exception as e:
-                tb = traceback.format_exc()
-                print(tb)
-
-            self.finished_init = True
-            print("Done with init")
-            logging.info('Done with init')
-        init(self)
-
     def init_dataloader(self):
         self.args.distributed = True
         self.args.rank = self.rank
@@ -166,7 +117,7 @@ class Client:
         self.args.world_size = self.world_size
 
         try:
-            self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args)
+            self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args, pill)
         except Exception as e:
             tb = traceback.format_exc()
             print(tb)
@@ -205,27 +156,7 @@ class Client:
 
         return self.load_model_from_file(default_model_path)
 
-    def load_model_from_file(self, model_file_path):
-        """
-        Load a model from a file.
 
-        :param model_file_path: string
-        """
-        model_class = self.args.get_net()
-        model = model_class()
-        # TODO undo
-        # model_file_path = '/opt/federation-lab/' + model_file_path
-        if os.path.exists(model_file_path):
-            try:
-                model.load_state_dict(torch.load(model_file_path))
-            except:
-                self.args.get_logger().warning("Couldn't load model. Attempting to map CUDA tensors to CPU to solve error.")
-
-                model.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
-        else:
-            self.args.get_logger().warning("Could not find model: {}".format(model_file_path))
-
-        return model
 
     def get_client_index(self):
         """
@@ -368,6 +299,7 @@ class Client:
 
     def save_model(self, epoch, suffix):
         """
+        Move function to utils directory.
         Saves the model if necessary.
         """
         self.args.get_logger().debug(f"Saving model to flat file storage. Save #{epoch}")
