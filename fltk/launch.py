@@ -16,18 +16,30 @@ def run_ps(rpc_ids_triple, args):
     fed = Orchestrator(rpc_ids_triple, config=args)
     fed.run()
 
+def await_assigned_orchestrator():
+    # TODO: Implement await function for client
+
+    """
+    1. Setup everything correctly according to provided configuration files.
+    2. Register to cleint
+    3. Start working on task description provided by orchestrator
+    4. Send heartbeats? (Alternatively use Kubernetes for this)
+    5. Send completed data
+    6. Terminate/complete pod execution.
+    """
+    pass
 def run_single(rank, world_size, host = None, args = None, nic = None):
     logging.info(f'Starting with rank={rank} and world size={world_size}')
     prepare_environment(host, nic)
 
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
     options = rpc.TensorPipeRpcBackendOptions(
-        num_worker_threads=20, # TODO: Retrieve number of cores from system
-        rpc_timeout=0,  # infinite timeout
+        num_worker_threads=20,
+        rpc_timeout=0,
         init_method=f'tcp://{os.environ["MASTER_ADDR"]}:{os.environ["MASTER_PORT"]}'
     )
-
     if rank != 0:
+
         logging.info(f'Starting worker {rank}')
         rpc.init_rpc(
             f"client{rank}",
@@ -35,7 +47,6 @@ def run_single(rank, world_size, host = None, args = None, nic = None):
             world_size=world_size,
             rpc_backend_options=options,
         )
-        # trainer passively waiting for ps to kick off training iterations
     else:
         logging.info('Starting the ps')
         rpc.init_rpc(
@@ -43,7 +54,6 @@ def run_single(rank, world_size, host = None, args = None, nic = None):
             rank=rank,
             world_size=world_size,
             rpc_backend_options=options
-
         )
         run_ps([(f"client{r}", r, world_size) for r in range(1, world_size)], args)
 

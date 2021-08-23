@@ -6,7 +6,7 @@ from typing import Union
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from fltk.util.base_config import BareConfig
+from fltk.util.config.base_config import BareConfig
 from fltk.util.results import EpochData
 
 

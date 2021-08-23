@@ -10,9 +10,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 from fltk.client import Client
 from fltk.nets.util.utils import flatten_params, save_model
-from fltk.util.base_config import BareConfig
+from fltk.util.config.base_config import BareConfig
 from fltk.util.cluster.client import ClientRef
-from fltk.util.generator.arrival_generator import ArrivalGenerator
+from fltk.util.task.generator.arrival_generator import ArrivalGenerator
 from fltk.util.log import DistLearningLogger
 from fltk.util.results import EpochData
 
