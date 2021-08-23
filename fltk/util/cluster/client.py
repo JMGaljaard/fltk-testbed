@@ -9,7 +9,7 @@ from kubernetes import client, config
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.util.cluster.conversion import Convert
-from fltk.util.cluster.task.config.parameter import TrainTask
+from fltk.util.task.config.parameter import TrainTask
 
 
 @dataclass

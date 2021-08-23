@@ -6,9 +6,8 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-from fltk.launch import run_single, run_spawn
-from fltk.strategy.antidote import create_antidote
-from fltk.strategy.attack import create_attack
+from fltk.launch import run_single
+
 from fltk.util.base_config import BareConfig
 from fltk.util.cluster.client import ClusterManager
 from fltk.util.generator.arrival_generator import ExperimentGenerator
@@ -55,7 +54,6 @@ def main():
     poison_parser.add_argument('--host', type=str, default=None)
     add_default_arguments(poison_parser)
 
-
     poison_parser = subparsers.add_parser('cluster')
     poison_parser.add_argument('config', type=str)
     poison_parser.add_argument('--rank', type=int)
@@ -76,36 +74,14 @@ def main():
         pool.apply(cluster_manager.start)
         pool.apply(arrival_generator.run)
 
-
         pool.join()
-
-
-    elif args.mode == 'remote':
-        if args.rank is None or args.host is None or args.world_size is None or args.nic is None:
-            print('Missing rank, host, world-size, or nic argument when in \'remote\' mode!')
-            parser.print_help()
-            exit(1)
-        world_size = int(args.world_size)
-        master_address = args.host
-        nic = args.nic
-        rank = int(args.rank)
-        if rank == 0:
-            print('Remote mode only supports ranks > 0!')
-            exit(1)
-        print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=None, nic={nic}')
-        run_single(rank=args.rank, world_size=world_size, host=master_address, args=None, nic=nic)
     else:
         with open(args.config) as config_file:
             cfg = BareConfig()
             yaml_data = yaml.load(config_file, Loader=yaml.FullLoader)
             cfg.merge_yaml(yaml_data)
             if args.mode == 'poison':
-                for ratio in [0.0, 0.05, 0.1, 0.15, 0.2]:
-                    perform_poison_experiment(args, cfg, parser, yaml_data, ratio)
-            elif args.mode == 'single':
-                perform_single_experiment(args, cfg, parser, yaml_data)
-            else:
-                run_spawn(cfg)
+                perform_poison_experiment(args, cfg, parser, yaml_data)
 
 
 def perform_single_experiment(args, cfg, parser, yaml_data):
@@ -127,7 +103,7 @@ def perform_single_experiment(args, cfg, parser, yaml_data):
     run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
 
 
-def perform_poison_experiment(args, cfg, parser, yaml_data, ratio=None):
+def perform_poison_experiment(args, cfg, yaml_data):
     """
     Function to start poisoned experiment.
     """
@@ -142,8 +118,6 @@ def perform_poison_experiment(args, cfg, parser, yaml_data, ratio=None):
     master_address = args.host
     nic = args.nic
 
-    attack = create_attack(cfg)
-    antidote = create_antidote(cfg)
     if not world_size:
         world_size = yaml_data['system']['clients']['amount'] + 1
     if not master_address:
@@ -151,11 +125,7 @@ def perform_poison_experiment(args, cfg, parser, yaml_data, ratio=None):
     if not nic:
         nic = yaml_data['system']['federator']['nic']
     print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
-    if ratio:
-        print(f'Setting ratio to {ratio}')
-        attack.ratio = ratio
-    run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic, attack=attack,
-               antidote=antidote)
+    run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
 
 
 if __name__ == "__main__":

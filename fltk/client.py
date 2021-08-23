@@ -1,11 +1,12 @@
 import copy
 import datetime
+import gc
 import logging
 import os
 import random
 import time
 import traceback
-import gc
+
 import numpy as np
 import torch
 import yaml
@@ -21,19 +22,20 @@ from fltk.util.results import EpochData
 logging.basicConfig(level=logging.DEBUG)
 
 
-
 def _call_method(method, rref, *args, **kwargs):
     """helper for _remote_method()"""
     return method(rref.local_value(), *args, **kwargs)
 
+
 def _remote_method(method, rref, *args, **kwargs):
     """
-    executes method(*args, **kwargs) on the from the machine that owns rref
+    executes method(*args, **kwargs) on the from the machine that owns the remote reference `rref`.
 
     very similar to rref.remote().method(*args, **kwargs), but method() doesn't have to be in the remote scope
     """
     args = [method, rref] + list(args)
     return rpc.rpc_sync(rref.owner(), _call_method, args=args, kwargs=kwargs)
+
 
 def _remote_method_async(method, rref, *args, **kwargs):
     args = [method, rref] + list(args)
@@ -44,7 +46,6 @@ class Client:
     finished_init = False
     dataset = None
     epoch_counter = 0
-
 
     def __init__(self, id, log_rref, rank, world_size, config: BareConfig = None):
         logging.info(f'Welcome to client {id}')
@@ -117,7 +118,7 @@ class Client:
         self.args.world_size = self.world_size
 
         try:
-            self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args, pill)
+            self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args)
         except Exception as e:
             tb = traceback.format_exc()
             print(tb)
@@ -156,14 +157,11 @@ class Client:
 
         return self.load_model_from_file(default_model_path)
 
-
-
     def get_client_index(self):
         """
         Returns the client index.
         """
         return self.client_idx
-
 
     def update_nn_parameters(self, new_params):
         """
@@ -173,15 +171,15 @@ class Client:
         :type new_params: dict
         """
 
-
         def update(self, new_params):
             self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
             del new_params
             if self.log_rref:
                 self.remote_log(f'Weights of the model are updated')
+
         update(self, new_params)
 
-    def train(self, epoch, pill: PoisonPill = None):
+    def train(self, epoch):
         """
         :param epoch: Current epoch #
         :type epoch: int
@@ -200,10 +198,6 @@ class Client:
         self.net.train()
         for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
             inputs, labels = inputs.to(self.device), labels.to(self.device)
-            # TODO: check if these parameters are correct, labels or ouputs?
-            if pill is not None:
-                inputs = pill.poison_input(inputs)
-                inputs, labels = pill.poison_output(inputs, labels)
 
             # zero the parameter gradients
             self.optimizer.zero_grad()
@@ -218,7 +212,8 @@ class Client:
             running_loss += float(loss.detach().item())
             del loss, outputs
             if i % self.args.get_log_interval() == 0:
-                self.args.get_logger().info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / self.args.get_log_interval()))
+                self.args.get_logger().info(
+                    '[%d, %5d] loss: %.3f' % (epoch, i, running_loss / self.args.get_log_interval()))
                 final_running_loss = running_loss / self.args.get_log_interval()
                 running_loss = 0.0
         self.scheduler.step()
@@ -237,8 +232,7 @@ class Client:
         targets_ = []
         pred_ = []
         loss = 0.0
-
-
+        # Dissable gradient calculation, as we are only interested in the 'performance'
         with torch.no_grad():
             for (images, labels) in self.dataset.get_test_loader():
                 images, labels = images.to(self.device), labels.to(self.device)
@@ -246,7 +240,6 @@ class Client:
                 outputs = self.net(images)
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
-                # TODO: Log the information regarding the poisoned accuracy
                 correct += (predicted == labels).sum().item()
 
                 targets_.extend(labels.cpu().view_as(predicted).numpy())
@@ -269,7 +262,7 @@ class Client:
 
         return accuracy, loss, class_precision, class_recall
 
-    def run_epochs(self, num_epoch, pill: PoisonPill = None):
+    def run_epochs(self, num_epoch):
         """
         TODO: Move function outside Orchestrator
 
@@ -278,17 +271,18 @@ class Client:
         self.finished_init = False
         start_time_train = datetime.datetime.now()
         self.dataset.get_train_sampler().set_epoch_size(num_epoch)
-        loss, weights = self.train(self.epoch_counter, pill)
+        loss, weights = self.train(self.epoch_counter)
         self.epoch_counter += num_epoch
         elapsed_time_train = datetime.datetime.now() - start_time_train
-        train_time_ms = int(elapsed_time_train.total_seconds()*1000)
+        train_time_ms = int(elapsed_time_train.total_seconds() * 1000)
 
         start_time_test = datetime.datetime.now()
         accuracy, test_loss, class_precision, class_recall = self.test()
         elapsed_time_test = datetime.datetime.now() - start_time_test
-        test_time_ms = int(elapsed_time_test.total_seconds()*1000)
+        test_time_ms = int(elapsed_time_test.total_seconds() * 1000)
 
-        data = EpochData(self.epoch_counter, train_time_ms, test_time_ms, loss, accuracy, test_loss, class_precision, class_recall, client_id=self.id)
+        data = EpochData(self.epoch_counter, train_time_ms, test_time_ms, loss, accuracy, test_loss, class_precision,
+                         class_recall, client_id=self.id)
         # Copy GPU tensors to CPU
         for k, v in weights.items():
             # Detach to remove computational graph.
