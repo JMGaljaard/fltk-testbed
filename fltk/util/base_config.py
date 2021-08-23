@@ -1,71 +1,35 @@
-from typing import Dict, Type
+from dataclasses import dataclass
+from typing import Dict
 
 import torch
-import json
-
-from torch.nn.modules.loss import _Loss
-
-from fltk.datasets.distributed import DistCIFAR10Dataset, DistCIFAR100Dataset, DistFashionMNISTDataset
-from fltk.nets import Cifar10CNN, FashionMNISTCNN, Cifar100ResNet, FashionMNISTResNet, Cifar10ResNet, Cifar100VGG
+from dataclasses_json import dataclass_json
 
 SEED = 1
 torch.manual_seed(SEED)
 
+@dataclass
+@dataclass_json
+class ExecutionConfig():
+    cuda: bool = False
+    save_model: bool = False
+    save_temp_model: bool = False
+    save_epoch_interval: int = 1
+    save_model_path: str = "models"
+    epoch_save_start_suffix: str = "start"
+    epoch_save_end_suffix = "end"
+
+@dataclass
+@dataclass_json
 class BareConfig(object):
+    # Configuration parameters for PyTorch and models that are generated.
+    execution_config = ExecutionConfig()
 
     def __init__(self):
-        self.batch_size = 10
-        self.test_batch_size = 1000
-        self.epochs = 1
-        self.lr = 0.001
-        self.momentum = 0.9
-        self.cuda = False
-        self.shuffle = False
-        self.log_interval = 10
-        self.kwargs = {}
-        self.contribution_measurement_round = 1
-        self.contribution_measurement_metric = 'Influence'
 
-        self.scheduler_step_size = 50
-        self.scheduler_gamma = 0.5
-        self.min_lr = 1e-10
-
-        self.round_worker_selection_strategy = None
-        self.round_worker_selection_strategy_kwargs = None
-
-        self.save_model = False
-        self.save_temp_model = False
-        self.save_epoch_interval = 1
-        self.save_model_path = "models"
-        self.epoch_save_start_suffix = "start"
-        self.epoch_save_end_suffix = "end"
-        self.get_poison_effort = 'half'
-        self.num_workers = 50
-        self.num_poisoned_workers = 10
-
+        # TODO: Check whether this is still needed in Kubernetes
         self.federator_host = '0.0.0.0'
-        self.rank = 0
-        self.world_size = 0
-        self.data_sampler = "uniform"
-        self.data_sampler_args = None
-        self.distributed = False
-        self.available_nets = {
-            "Cifar100ResNet": Cifar100ResNet,
-            "Cifar100VGG": Cifar100VGG,
-            "Cifar10CNN": Cifar10CNN,
-            "Cifar10ResNet": Cifar10ResNet,
-            "FashionMNISTCNN": FashionMNISTCNN,
-            "FashionMNISTResNet": FashionMNISTResNet
-        }
-        self.net = None
-        self.set_net_by_name('Cifar10CNN')
-        self.dataset_name = 'cifar10'
 
-        self.DistDatasets = {
-            'cifar10': DistCIFAR10Dataset,
-            'cifar100': DistCIFAR100Dataset,
-            'fashion-mnist': DistFashionMNISTDataset,
-        }
+        # TODO: Move to external class/object
         self.train_data_loader_pickle_path = {
             'cifar10': 'data_loaders/cifar10/train_data_loader.pickle',
             'fashion-mnist': 'data_loaders/fashion-mnist/train_data_loader.pickle',
@@ -77,17 +41,12 @@ class BareConfig(object):
             'fashion-mnist': 'data_loaders/fashion-mnist/test_data_loader.pickle',
             'cifar100': 'data_loaders/cifar100/test_data_loader.pickle',
         }
-        self.loss_function: Type[_Loss] = torch.nn.CrossEntropyLoss
+
+        # TODO: Make part of different configuration
+        self.loss_function = torch.nn.CrossEntropyLoss
+
         self.default_model_folder_path = "default_models"
         self.data_path = "data"
-
-        # Poison
-        self.poison: dict = None
-        # Antidote
-        self.antidote: dict = None
-    ###########
-    # Methods #
-    ###########
 
     def merge_yaml(self, cfg: Dict[str, str] = {}):
         """
@@ -145,7 +104,6 @@ class BareConfig(object):
         if 'antidote' in cfg:
             self.antidote = cfg['antidote']
 
-
     def init_logger(self, logger):
         self.logger = logger
 
@@ -163,7 +121,7 @@ class BareConfig(object):
 
     def get_sampler(self):
         return self.data_sampler
-    
+
     def get_sampler_args(self):
         return tuple(self.data_sampler_args)
 
@@ -287,7 +245,6 @@ class BareConfig(object):
 
         return lr
 
-
     def get_contribution_measurement_round(self):
         return self.contribution_measurement_round
 
@@ -332,32 +289,4 @@ class BareConfig(object):
         # Not minus one, because something...
         return self.antidote['k']
 
-    def __str__(self):
-        return "\nBatch Size: {}\n".format(self.batch_size) + \
-               "Test Batch Size: {}\n".format(self.test_batch_size) + \
-               "Epochs: {}\n".format(self.epochs) + \
-               "Learning Rate: {}\n".format(self.lr) + \
-               "Momentum: {}\n".format(self.momentum) + \
-               "CUDA Enabled: {}\n".format(self.cuda) + \
-               "Shuffle Enabled: {}\n".format(self.shuffle) + \
-               "Log Interval: {}\n".format(self.log_interval) + \
-               "Scheduler Step Size: {}\n".format(self.scheduler_step_size) + \
-               "Scheduler Gamma: {}\n".format(self.scheduler_gamma) + \
-               "Scheduler Minimum Learning Rate: {}\n".format(self.min_lr) + \
-               "Client Selection Strategy: {}\n".format(self.round_worker_selection_strategy) + \
-               "Client Selection Strategy Arguments: {}\n".format(
-                   json.dumps(self.round_worker_selection_strategy_kwargs, indent=4, sort_keys=True)) + \
-               "Model Saving Enabled: {}\n".format(self.save_model) + \
-               "Model Saving Interval: {}\n".format(self.save_epoch_interval) + \
-               "Model Saving Path (Relative): {}\n".format(self.save_model_path) + \
-               "Epoch Save Start Prefix: {}\n".format(self.epoch_save_start_suffix) + \
-               "Epoch Save End Suffix: {}\n".format(self.epoch_save_end_suffix) + \
-               "Number of Clients: {}\n".format(self.num_workers) + \
-               "Number of Poisoned Clients: {}\n".format(self.num_poisoned_workers) + \
-               "NN: {}\n".format(self.net) + \
-               "Train Data Loader Path: {}\n".format(self.train_data_loader_pickle_path) + \
-               "Test Data Loader Path: {}\n".format(self.test_data_loader_pickle_path) + \
-               "Loss Function: {}\n".format(self.loss_function) + \
-               "Default Model Folder Path: {}\n".format(self.default_model_folder_path) + \
-               "Data Path: {}\n".format(self.data_path) + \
-               "Dataset Name: {}\n".format(self.dataset_name)
+

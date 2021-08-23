@@ -22,10 +22,3 @@ system:
     nic: 'eth0'
   clients:
     amount: 50
-poison:
-  seed: 420
-  ratio: 0.2
-  attack:
-    type: "flip"
-    config:
-      - 5: 3

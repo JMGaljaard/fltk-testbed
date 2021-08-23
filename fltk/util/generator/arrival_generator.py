@@ -1,3 +1,5 @@
+import logging
+import random
 from abc import ABC, abstractmethod
 from asyncio import sleep
 from dataclasses import dataclass
@@ -8,7 +10,7 @@ from typing import Dict, List
 
 import numpy as np
 
-from fltk.util.config.parameter import ExperimentParser, TrainTask, JobDescription
+from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser
 
 
 @dataclass
@@ -17,10 +19,11 @@ class ArrivalGenerator(ABC):
     Abstract Base Class for generating arrivals in the system. These tasks must be run
     """
     configuration_path: Path
+    logger: logging.Logger = None
 
     @abstractmethod
     def load_config(self):
-        pass
+        raise NotImplementedError("Cannot call abstract function")
 
     @abstractmethod
     def generate_arrival(self, task_id):
@@ -31,7 +34,7 @@ class ArrivalGenerator(ABC):
         @return:
         @rtype:
         """
-        pass
+        raise NotImplementedError("Cannot call abstract function")
 
 
 @dataclass
@@ -42,19 +45,35 @@ class Arrival:
 
 
 class ExperimentGenerator(ArrivalGenerator):
-    alive: bool = True
-    decrement = 1
+    start_time: float = -1
+    stop_time: float = -1
+    job_description: Dict[str, JobDescription] = None
 
-    start_time: float
-    stop_time: float
-    job_description: Dict[str, JobDescription]
+    _tick_list: List[Arrival] = []
+    _alive: bool = False
+    _decrement = 1
 
-    tick_list: List[Arrival] = []
+    def set_logger(self, name: str = None):
+        """
+        Set logging name to make debugging easier.
+        @param name:
+        @type name:
+        @return:
+        @rtype:
+        """
+        logging_name = name or self.__class__.__name__
+        self.logger = logging.getLogger(logging_name)
 
-    def populate(self):
-        # TODO: logging
-        for key in self.job_description.keys():
-            self.generate_arrival(key)
+    def set_seed(self, seed: int = 42):
+        """
+        Function to pre-set the seed used by the Experiment generator, this allows for better reproducability of the
+        experiments.
+        @param seed: Seed to be used by the `random` library for experiment generation
+        @type seed: int
+        @return:
+        @rtype:
+        """
+        random.seed(seed)
 
     def load_config(self):
         """
@@ -78,37 +97,45 @@ class ExperimentGenerator(ArrivalGenerator):
         inter_arrival_ticks = np.random.poisson(lam=job.arrival_statistic)
         train_task = TrainTask(parameters, priority, task_id)
 
-        self.tick_list.append(Arrival(inter_arrival_ticks, train_task, task_id))
+        self._tick_list.append(Arrival(inter_arrival_ticks, train_task, task_id))
+
+    def start(self):
+        """
+        Function to start arrival generator, requires to
+        @return:
+        @rtype:
+        """
+        if not self.logger:
+            self.set_logger()
+        self.logger.info("Starting execution of arrival generator...")
+        self._alive = True
+        self.run()
+
+    def stop(self) -> None:
+        self.logger.info("Received stopping signal")
+        self._alive = False
 
     def run(self):
         """
         Run function to generate arrivals during existence of the Orchestrator. WIP.
 
-        Currently supports for time-drift correctino to account for execution duration of the generator
+        Currently supports for time-drift correction to account for execution duration of the generator.
         @return:
         @rtype:
         """
-        # TODO: logging
         self.start_time = time()
-        while self.alive:
+        while self._alive:
             arrived = []
             save_time = time()
-            for indx, entry in enumerate(self.tick_list):
-                entry.ticks -= self.decrement
+            for indx, entry in enumerate(self._tick_list):
+                entry.ticks -= self._decrement
                 if entry.ticks <= 0:
-                    self.tick_list.pop(indx)
+                    self._tick_list.pop(indx)
                     arrived.append(entry)
                     self.generate_arrival(entry.task_id)
 
-            # Correct for time drift between execution, otherwise drift adds up, and arrivals don't line up correctly
+            # Correct for time drift between execution, otherwise drift adds up, and arrivals don't generate correctly
             correction_time = time() - save_time
-            sleep(self.decrement - correction_time)
-
-
-@dataclass
-class EvaluationGenerator(ArrivalGenerator):
-    def load_config(self):
-        pass
-
-    def generate_arrivals(self):
-        pass
+            sleep(self._decrement - correction_time)
+        self.stop_time = time()
+        self.logger.info(f"Stopped execution at: {self.stop_time}, duration: {self.stop_time - self.start_time}")

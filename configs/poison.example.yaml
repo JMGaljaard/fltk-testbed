@@ -1,6 +1,0 @@
-# For a simple config is provided in configs/poison.example.yaml
-poison:
-  ratio: 0.2
-  attack:
-    scenario: "fraction"
-    type: "LABEL_FLIP"

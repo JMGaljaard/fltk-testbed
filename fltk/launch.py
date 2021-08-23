@@ -1,17 +1,11 @@
 import os
-import sys
 import torch.distributed.rpc as rpc
 import logging
 
-import yaml
-import argparse
 
 import torch.multiprocessing as mp
 
 from fltk.orchestrator import Orchestrator
-from fltk.strategy.antidote import Antidote
-from fltk.strategy.attack import Attack
-from fltk.util.base_config import BareConfig
 from fltk.util.env.learner_environment import prepare_environment
 
 logging.basicConfig(level=logging.INFO)

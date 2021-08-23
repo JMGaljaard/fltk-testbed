@@ -1,10 +1,12 @@
-from torchvision import datasets, transforms
 import random
 import logging
-from torch.utils.data import DistributedSampler, Dataset
-from typing import Iterator
+import random
 from collections import Counter
+from typing import Iterator
+
 import numpy as np
+from torch.utils.data import DistributedSampler, Dataset
+
 
 class DistributedSamplerWrapper(DistributedSampler):
     indices = []
