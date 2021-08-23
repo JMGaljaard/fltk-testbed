@@ -1,6 +1,15 @@
 import os
 
 def prepare_environment(host: str, nic: str):
+    """
+    Function to prepare system environment to use correct settings for the productivity.
+    @param host:
+    @type host:
+    @param nic:
+    @type nic:
+    @return:
+    @rtype:
+    """
     if host:
         os.environ['MASTER_ADDR'] = host
     else:

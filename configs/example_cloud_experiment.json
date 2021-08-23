@@ -1,0 +1,30 @@
+{
+   "cluster": {
+      "orchestrator": {
+         "wait_for_clients": true,
+         "service": "fl-server.test.svc.cluster.local",
+         "nic": "eth0"
+      },
+      "client": {
+         "prefix": "client",
+         "tensorboard_active": true
+      }
+   },
+   "execution_config": {
+      "experiment_prefix": "cloud_experiment",
+      "tensorboard_active": true,
+      "cuda": false,
+      "net": {
+         "save_model": false,
+         "save_temp_model": false,
+         "save_epoch_interval": 1,
+         "save_model_path": "models",
+         "epoch_save_start_suffix": "start",
+         "epoch_save_end_suffix": "end"
+      },
+      "reproducibility": {
+         "torch_seed": 42,
+         "arrival_seed": 123
+      }
+   }
+}

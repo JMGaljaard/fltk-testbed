@@ -15,7 +15,7 @@ from sklearn.metrics import confusion_matrix
 from torch.distributed import rpc
 
 from fltk.schedulers import MinCapableStepLR
-from fltk.util.base_config import BareConfig
+from fltk.util.config.base_config import BareConfig
 from fltk.util.log import DistLearningLogger
 from fltk.util.results import EpochData
 
