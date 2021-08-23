@@ -44,7 +44,7 @@ def main():
             exit(-1)
 
     if arguments.mode == 'orchestrator':
-        start_clusterized(arguments, config)
+        cluster_start(arguments, config)
     elif arguments.mode == 'client':
         run_single()
 
@@ -68,7 +68,7 @@ def perform_single_experiment(args, cfg, parser, yaml_data):
     run_single(rank=args.rank, world_size=world_size, host=master_address, args=cfg, nic=nic)
 
 
-def start_clusterized(args: dict, config: BareConfig):
+def cluster_start(args: dict, config: BareConfig):
     """
     Function to start poisoned experiment.
     """
@@ -83,8 +83,6 @@ def start_clusterized(args: dict, config: BareConfig):
     pool.apply(arrival_generator.run)
 
     pool.join()
-
-
 
     print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
     run_single(rank=args.rank, args=config, nic=nic)

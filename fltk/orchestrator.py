@@ -348,3 +348,9 @@ class Orchestrator(object):
         for res in responses:
             res[1].wait()
         logging.info('Weights are updated')
+
+
+def run_ps(rpc_ids_triple, args):
+    print(f'Starting the federator...')
+    fed = Orchestrator(rpc_ids_triple, config=args)
+    fed.run()

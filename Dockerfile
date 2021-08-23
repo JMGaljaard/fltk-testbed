@@ -1,42 +1,32 @@
-# Base image to start with
 FROM ubuntu:20.04
- 
+
 # Who maintains this DockerFile
-MAINTAINER Bart Cox <b.a.cox@tudelft.nl>
+MAINTAINER Jeroen Galjaard <J.M.Galjaard-1@student.tudelft.nl>
 
 # Run build without interactive dialogue
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Set required environmental variables for the working setup.
+# Set environment variables for GLOO and TP (needed for RPC calls)
 ENV GLOO_SOCKET_IFNAME=eth0
 ENV TP_SOCKET_IFNAME=eth0
 
 # Define the working directory of the current Docker container
 WORKDIR /opt/federation-lab
 
-# Update the Ubuntu software repository
+# Update the Ubuntu software repository and fetch packages
 RUN apt-get update \
   && apt-get install -y vim curl python3 python3-pip net-tools iproute2
 
-#COPY data/ ./data
-#COPY default_models ./default_models
-# Copy the current folder to the working directory
-ADD setup.py requirements.txt ./
-
 # Use cache for pip, otherwise we repeatedly pull from repository
+ADD setup.py requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip python3 -m pip install -r requirements.txt
 
 ADD configs configs
-
 ADD fltk fltk
+ADD scripts scripts
 
-
-# Install newest version of library
-RUN python3 -m setup install
-
-# Expose the container's port to the host OS
+# Expose default port 5000 to the host OS.
 EXPOSE 5000
-
 
 # Update relevant runtime configuration for experiment
 COPY cloud_configs/cloud_experiment.yaml configs/cloud_config.yaml

@@ -1,5 +1,3 @@
-import torch
-
 def distribute_batches_equally(train_data_loader, num_workers):
     """
     Gives each worker the same number of batches of training data.
@@ -9,7 +7,7 @@ def distribute_batches_equally(train_data_loader, num_workers):
     :param num_workers: number of workers
     :type num_workers: int
     """
-    distributed_dataset = [[] for i in range(num_workers)]
+    distributed_dataset = [[] for _ in range(num_workers)]
 
     for batch_idx, (data, target) in enumerate(train_data_loader):
         worker_idx = batch_idx % num_workers

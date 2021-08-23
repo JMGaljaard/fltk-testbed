@@ -2,6 +2,7 @@ import logging
 
 from torch.distributed import rpc
 
+
 class DistLearningLogger:
     @staticmethod
     @rpc.functions.async_execution

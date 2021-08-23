@@ -1,5 +1,6 @@
 import numpy
 
+
 def convert_distributed_data_into_numpy(distributed_dataset):
     """
     Converts a distributed dataset (returned by a data distribution method) from Tensors into numpy arrays.

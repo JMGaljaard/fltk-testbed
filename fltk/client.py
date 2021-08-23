@@ -3,7 +3,6 @@ import datetime
 import gc
 import logging
 import os
-import random
 import time
 import traceback
 
@@ -41,19 +40,18 @@ def _remote_method_async(method, rref, *args, **kwargs):
     args = [method, rref] + list(args)
     return rpc.rpc_async(rref.owner(), _call_method, args=args, kwargs=kwargs)
 
+
 class Client:
-    counter = 0
     finished_init = False
     dataset = None
     epoch_counter = 0
+    net: torch.nn.Module
 
-    def __init__(self, id, log_rref, rank, world_size, config: BareConfig = None):
+    def __init__(self, id, log_rref, config: BareConfig = None):
         logging.info(f'Welcome to client {id}')
-        self.net: torch.nn.Module = None
+
         self.id = id
         self.log_rref = log_rref
-        self.rank = rank
-        self.world_size = world_size
 
         self.args = config
         self.args.init_logger(logging)
@@ -92,15 +90,6 @@ class Client:
         @rtype: str
         """
         return 'pong'
-
-    def rpc_test(self):
-        sleep_time = random.randint(1, 5)
-        time.sleep(sleep_time)
-        self.local_log(f'sleep for {sleep_time} seconds')
-        self.counter += 1
-        log_line = f'Number of times called: {self.counter}'
-        self.local_log(log_line)
-        self.remote_log(log_line)
 
     def remote_log(self, message):
         _remote_method_async(DistLearningLogger.log, self.log_rref, self.id, message, time.time())

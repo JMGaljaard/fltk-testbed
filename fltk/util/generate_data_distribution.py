@@ -2,7 +2,7 @@ import pathlib
 import os
 import logging
 
-from fltk.datasets import CIFAR10Dataset, FashionMNISTDataset, CIFAR100Dataset
+from fltk.datasets.cifar10 import CIFAR10Dataset
 from fltk.util.arguments import Arguments
 from fltk.util.data_loader_utils import generate_train_loader, generate_test_loader, save_data_loader_to_file
 

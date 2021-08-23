@@ -1,8 +1,8 @@
-
-import os
-import torch
 import logging
-logging.basicConfig(level=logging.DEBUG)
+import os
+
+import torch
+
 from fltk.nets import Cifar10CNN, FashionMNISTCNN, Cifar100ResNet, FashionMNISTResNet, Cifar10ResNet, Cifar100VGG
 from fltk.util.arguments import Arguments
 
