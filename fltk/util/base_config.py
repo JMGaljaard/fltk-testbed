@@ -26,9 +26,6 @@ class BareConfig(object):
 
     def __init__(self):
 
-        # TODO: Check whether this is still needed in Kubernetes
-        self.federator_host = '0.0.0.0'
-
         # TODO: Move to external class/object
         self.train_data_loader_pickle_path = {
             'cifar10': 'data_loaders/cifar10/train_data_loader.pickle',
@@ -50,6 +47,8 @@ class BareConfig(object):
 
     def merge_yaml(self, cfg: Dict[str, str] = {}):
         """
+        @deprecated This function will become redundant after using dataclasses_json to load the values into the object.
+
         total_epochs: 20
         epochs_per_cycle: 2
         wait_for_clients: true
@@ -245,11 +244,6 @@ class BareConfig(object):
 
         return lr
 
-    def get_contribution_measurement_round(self):
-        return self.contribution_measurement_round
-
-    def get_contribution_measurement_metric(self):
-        return self.contribution_measurement_metric
 
     def should_save_model(self, epoch_idx):
         """
@@ -258,35 +252,11 @@ class BareConfig(object):
         :param epoch_idx: current training epoch index
         :type epoch_idx: int
         """
-        if not self.save_model:
-            return False
-
-        if epoch_idx == 1 or epoch_idx % self.save_epoch_interval == 0:
-            return True
+        return self.save_model and (epoch_idx == 1 or epoch_idx % self.save_epoch_interval == 0)
 
     def log(self):
         """
         Log this arguments object to the logger.
         """
         self.logger.debug("Arguments: {}", str(self))
-
-    def get_attack_type(self) -> str:
-        return self.poison['attack']['type']
-
-    def get_attack_config(self) -> dict:
-        return self.poison['attack']
-
-    def get_antidote_type(self) -> str:
-        return self.antidote['type']
-
-    def get_antidote_config(self) -> dict:
-        return self.antidote
-
-    def get_antidote_f_value(self) -> int:
-        return self.antidote['f']
-
-    def get_antidote_k_value(self) -> int:
-        # Not minus one, because something...
-        return self.antidote['k']
-
 
