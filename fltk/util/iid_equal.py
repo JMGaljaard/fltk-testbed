@@ -1,5 +1,3 @@
-import torch
-
 def distribute_batches_equally(train_data_loader, num_workers):
     """
     Gives each worker the same number of batches of training data.

@@ -7,13 +7,16 @@
       },
       "client": {
          "prefix": "client",
-         "tensorboard_active": true
+         "tensorboard_active": false
       }
    },
    "execution_config": {
       "experiment_prefix": "cloud_experiment",
-      "tensorboard_active": true,
       "cuda": false,
+      "tensorboard": {
+         "active": true,
+         "record_dir": true
+      },
       "net": {
          "save_model": false,
          "save_temp_model": false,

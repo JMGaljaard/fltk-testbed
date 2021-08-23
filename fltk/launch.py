@@ -1,20 +1,14 @@
-import os
-import torch.distributed.rpc as rpc
 import logging
+import os
 
-
+import torch.distributed.rpc as rpc
 import torch.multiprocessing as mp
 
-from fltk.orchestrator import Orchestrator
+from fltk.orchestrator import run_ps
 from fltk.util.env.learner_environment import prepare_environment
 
 logging.basicConfig(level=logging.INFO)
 
-
-def run_ps(rpc_ids_triple, args):
-    print(f'Starting the federator...')
-    fed = Orchestrator(rpc_ids_triple, config=args)
-    fed.run()
 
 def await_assigned_orchestrator():
     # TODO: Implement await function for client
@@ -28,7 +22,9 @@ def await_assigned_orchestrator():
     6. Terminate/complete pod execution.
     """
     pass
-def run_single(rank, world_size, host = None, args = None, nic = None):
+
+
+def run_single(rank, world_size, host=None, args=None, nic=None):
     logging.info(f'Starting with rank={rank} and world size={world_size}')
     prepare_environment(host, nic)
 
@@ -59,6 +55,7 @@ def run_single(rank, world_size, host = None, args = None, nic = None):
 
     # block until all rpc finish
     rpc.shutdown()
+
 
 # def run_single(rank, world_size, host = None, args = None, nic = None):
 
