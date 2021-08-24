@@ -15,7 +15,7 @@
       "cuda": false,
       "tensorboard": {
          "active": true,
-         "record_dir": true
+         "record_dir": "logging"
       },
       "net": {
          "save_model": false,

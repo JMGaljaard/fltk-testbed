@@ -15,7 +15,7 @@ spec:
         - -m
         - fltk
         - cluster
-        - configs/cloud_config.yaml
+        - configs/example_cloud_experiment.json
         - --rank=0
       env:
         - name: MASTER_PORT

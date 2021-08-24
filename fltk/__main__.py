@@ -74,15 +74,7 @@ def cluster_start(args: dict, config: BareConfig):
     """
     logging.info("[Fed] Starting in cluster mode.")
     # TODO: Load configuration path
-    config_path: Path = None
-    cluster_manager = ClusterManager()
-    arrival_generator = ExperimentGenerator(config_path)
 
-    pool = ThreadPool(4)
-    pool.apply(cluster_manager.start)
-    pool.apply(arrival_generator.run)
-
-    pool.join()
 
     print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
     run_single(rank=args.rank, args=config, nic=nic)

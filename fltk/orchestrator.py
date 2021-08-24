@@ -1,6 +1,7 @@
 import logging
-import pathlib
 import time
+from multiprocessing.pool import ThreadPool
+from pathlib import Path
 from typing import List, Callable, Dict
 
 import torch
@@ -10,11 +11,11 @@ from torch.utils.tensorboard import SummaryWriter
 
 from fltk.client import Client
 from fltk.nets.util.utils import flatten_params, save_model
+from fltk.util.cluster.client import ClientRef, ClusterManager
 from fltk.util.config.base_config import BareConfig
-from fltk.util.cluster.client import ClientRef
-from fltk.util.task.generator.arrival_generator import ArrivalGenerator
 from fltk.util.log import DistLearningLogger
 from fltk.util.results import EpochData
+from fltk.util.task.generator.arrival_generator import ArrivalGenerator, ExperimentGenerator
 
 
 def _call_method(method, rref, *args, **kwargs):
@@ -144,12 +145,22 @@ class Orchestrator(object):
         for client in self.clients:
             _remote_method_async(Client.reset_model, client.ref)
 
-    def client_load_data(self, poison_pill):
+    def client_load_data(self):
+        """
+        TODO: Make this compatible with job registration...
+        @return:
+        @rtype:
+        """
         for client in self.clients:
-            _remote_method_async(Client.init_dataloader, client.ref,
-                                 pill=None if poison_pill and client not in self.poisoned_clients else poison_pill)
+            _remote_method_async(Client.init_dataloader, client.ref)
 
     def clients_ready(self):
+        """
+        TODO: Make compatible with Job registration
+        TODO: Make push based instead of pull based.
+        @return:
+        @rtype:
+        """
         all_ready = False
         ready_clients = []
         while not all_ready:
@@ -271,19 +282,11 @@ class Orchestrator(object):
 
         # # Select clients which will be poisened
         # TODO: get attack type and ratio from config, temp solution now
-        poison_pill = None
-        save_path = self.config
+        save_path = Path(self.config.execution_config.general_net.save_model_path)
+        logging_dir = self.config.execution_config.tensorboard.record_dir
 
-        # Update writer to logdir
-        self.update_clients(rat)
-        if self.attack:
-            self.poisoned_clients: List[ClientRef] = self.attack.select_poisoned_clients(self.clients, rat)
-            self.healthy_clients = list(set(self.clients).symmetric_difference(set(self.poisoned_clients)))
-            print(f"Poisoning workers: {self.poisoned_clients}")
-            with open(f"{self.tb_path_base}/config_{rat}_poisoned.txt", 'w') as f:
-                f.writelines(list(map(lambda worker: worker.name, self.poisoned_clients)))
-            poison_pill = self.attack.get_poison_pill()
-        self.client_load_data(poison_pill)
+        # self.update_clients()
+        self.client_load_data()
         self.ping_all()
         self.clients_ready()
         self.update_client_data_sizes()
@@ -330,7 +333,7 @@ class Orchestrator(object):
         """
         directory: str = f"{self.tb_path_base}/gradient/{ratio}/{epoch}/{client_id}"
         # Ensure path exists (mkdir -p)
-        pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+        Path(directory).mkdir(parents=True, exist_ok=True)
         # Save using pytorch.
         torch.save(gradient, f"{directory}/gradient.pt")
 
@@ -350,7 +353,15 @@ class Orchestrator(object):
         logging.info('Weights are updated')
 
 
-def run_ps(rpc_ids_triple, args):
-    print(f'Starting the federator...')
-    fed = Orchestrator(rpc_ids_triple, config=args)
-    fed.run()
+def run_orchestrator(rpc_ids_triple, configuration: BareConfig, config_path: Path):
+    logging.info("Starting Orchestrator, initializing resources....")
+    orchestrator = Orchestrator(rpc_ids_triple, config=configuration)
+    cluster_manager = ClusterManager()
+    arrival_generator = ExperimentGenerator(config_path)
+
+    pool = ThreadPool(3)
+    pool.apply(cluster_manager.start)
+
+    pool.apply(arrival_generator.run, {'orchestrator': orchestrator})
+    pool.apply(orchestrator.run, {'cluster_manager': cluster_manager})
+    pool.join()

@@ -4,16 +4,15 @@ import os
 import torch.distributed.rpc as rpc
 import torch.multiprocessing as mp
 
-from fltk.orchestrator import run_ps
+from fltk.orchestrator import run_orchestrator
 from fltk.util.env.learner_environment import prepare_environment
 
 logging.basicConfig(level=logging.INFO)
 
 
 def await_assigned_orchestrator():
-    # TODO: Implement await function for client
-
     """
+    TODO:
     1. Setup everything correctly according to provided configuration files.
     2. Register to cleint
     3. Start working on task description provided by orchestrator
@@ -51,7 +50,7 @@ def run_single(rank, world_size, host=None, args=None, nic=None):
             world_size=world_size,
             rpc_backend_options=options
         )
-        run_ps([(f"client{r}", r, world_size) for r in range(1, world_size)], args)
+        run_orchestrator([(f"client{r}", r, world_size) for r in range(1, world_size)], args)
 
     # block until all rpc finish
     rpc.shutdown()

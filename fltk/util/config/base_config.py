@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from dataclasses_json import config, dataclass_json
 
@@ -22,12 +23,36 @@ class ReproducibilityConfig:
 
 
 @dataclass_json
+@dataclass(frozen=True)
+class TensorboardConfig:
+    active: bool
+    record_dir: str
+
+    def prepare_log_dir(self, working_dir: Path = None):
+        """
+        Function to create logging directory used by TensorBoard. When running in a cluster, this function should not be
+        used, as the TensorBoard instance that is started simultaneously with the Orchestrator.
+        @param working_dir: Current working directory, by default PWD is assumed at which the Python interpreter is
+        started.
+        @type working_dir: pathlib.Path
+        @return: None
+        @rtype: None
+        """
+        dir_to_check = Path(self.record_dir)
+        if working_dir:
+            dir_to_check = working_dir.joinpath(dir_to_check)
+        if not dir_to_check.exists() and dir_to_check.parent.is_dir():
+            dir_to_check.mkdir()
+
+
+@dataclass_json
 @dataclass
 class ExecutionConfig:
     general_net: GeneralNetConfig = field(metadata=config(field_name="net"))
     reproducibility: ReproducibilityConfig
+    tensorboard: TensorboardConfig
+
     experiment_prefix: str = "experiment"
-    tensorboard_active: bool = True
     cuda: bool = False
 
 
@@ -99,7 +124,6 @@ class BareConfig(object):
     def get_test_data_loader_pickle_path(self):
         return self.test_data_loader_pickle_path[self.dataset_name]
 
-
     def should_save_model(self, epoch_idx):
         """
         Returns true/false models should be saved.
@@ -108,4 +132,4 @@ class BareConfig(object):
         :type epoch_idx: int
         """
         return self.execution_config.general_net.save_model and (
-                    epoch_idx == 1 or epoch_idx % self.execution_config.general_net.save_epoch_interval == 0)
+                epoch_idx == 1 or epoch_idx % self.execution_config.general_net.save_epoch_interval == 0)
