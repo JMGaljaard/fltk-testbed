@@ -1,4 +1,3 @@
-import random
 import logging
 import random
 from collections import Counter
@@ -11,15 +10,15 @@ from torch.utils.data import DistributedSampler, Dataset
 class DistributedSamplerWrapper(DistributedSampler):
     indices = []
     epoch_size = 1.0
-    def __init__(self, dataset: Dataset, num_replicas = None,
-                 rank = None, seed = 0) -> None:
+
+    def __init__(self, dataset: Dataset, num_replicas=None,
+                 rank=None, seed=0) -> None:
         super().__init__(dataset, num_replicas=num_replicas, rank=rank)
 
         self.client_id = rank - 1
         self.n_clients = num_replicas - 1
         self.n_labels = len(dataset.classes)
         self.seed = seed
-
 
     def order_by_label(self, dataset):
         # order the indices by label
@@ -40,20 +39,20 @@ class DistributedSamplerWrapper(DistributedSampler):
         self.epoch_size = epoch_size
 
     def __iter__(self) -> Iterator[int]:
-        random.seed(self.rank+self.epoch)
+        random.seed(self.rank + self.epoch)
         epochs_todo = self.epoch_size
         indices = []
-        while(epochs_todo > 0.0):
+        while (epochs_todo > 0.0):
             random.shuffle(self.indices)
             if epochs_todo >= 1.0:
                 indices.extend(self.indices)
             else:
-                end_index = int(round(len(self.indices)*epochs_todo))
+                end_index = int(round(len(self.indices) * epochs_todo))
                 indices.extend(self.indices[:end_index])
 
             epochs_todo = epochs_todo - 1
 
-        ratio = len(indices)/float(len(self.indices))
+        ratio = len(indices) / float(len(self.indices))
         np.testing.assert_almost_equal(ratio, self.epoch_size, decimal=2)
 
         return iter(indices)
@@ -61,14 +60,16 @@ class DistributedSamplerWrapper(DistributedSampler):
     def __len__(self) -> int:
         return len(self.indices)
 
+
 class LimitLabelsSampler(DistributedSamplerWrapper):
     """
     A sampler that limits the number of labels per client
     """
+
     def __init__(self, dataset, num_replicas, rank, args=(5, 42)):
         limit, seed = args
         super().__init__(dataset, num_replicas, rank, seed)
-        
+
         if self.n_clients % self.n_labels != 0:
             logging.error(
                 "multiples of {} clients are needed for the 'limiting-labels' data distribution method, {} does not work".format(
@@ -145,6 +146,7 @@ class LimitLabelsSampler(DistributedSamplerWrapper):
 
         self.indices = indices
 
+
 class Probability_q_Sampler(DistributedSamplerWrapper):
     """
     Clients are divided among M groups, with M being the number of labels.
@@ -157,11 +159,11 @@ class Probability_q_Sampler(DistributedSamplerWrapper):
     def __init__(self, dataset, num_replicas, rank, args=(0.5, 42)):
         q, seed = args
         super().__init__(dataset, num_replicas, rank, seed)
-        
+
         if self.n_clients % self.n_labels != 0:
             logging.error(
                 "multiples of {} clients are needed for the 'probability-q-sampler' data distribution method, {} does not work".format(
-                    self.n_labels,self.n_clients))
+                    self.n_labels, self.n_clients))
             return
 
         # divide data among groups
@@ -195,13 +197,15 @@ class Probability_q_Sampler(DistributedSamplerWrapper):
 
         self.indices = indices
 
+
 class DirichletSampler(DistributedSamplerWrapper):
     """ Generates a (non-iid) data distribution by sampling the dirichlet distribution. Dirichlet constructs a
     vector of length num_clients, that sums to one. Decreasing alpha results in a more non-iid data set. 
     This distribution method results in both label and quantity skew. 
     """
-    def __init__(self, dataset: Dataset, num_replicas = None,
-                 rank = None, args = (0.5, 42)) -> None:
+
+    def __init__(self, dataset: Dataset, num_replicas=None,
+                 rank=None, args=(0.5, 42)) -> None:
         alpha, seed = args
         super().__init__(dataset, num_replicas=num_replicas, rank=rank, seed=seed)
 
@@ -211,7 +215,7 @@ class DirichletSampler(DistributedSamplerWrapper):
         for labels in ordered_by_label:
             n_samples = len(labels)
             # generate an allocation by sampling dirichlet, which results in how many samples each client gets
-            allocation = np.random.dirichlet([alpha] * self.n_clients) * n_samples 
+            allocation = np.random.dirichlet([alpha] * self.n_clients) * n_samples
             allocation = allocation.astype(int)
             start_index = allocation[0:self.client_id].sum()
             end_index = 0
@@ -232,11 +236,13 @@ class DirichletSampler(DistributedSamplerWrapper):
 
         self.indices = indices
 
+
 class UniformSampler(DistributedSamplerWrapper):
     def __init__(self, dataset, num_replicas=None, rank=None, seed=0):
         super().__init__(dataset, num_replicas=num_replicas, rank=rank, seed=seed)
         indices = list(range(len(self.dataset)))
         self.indices = indices[self.rank:self.total_size:self.num_replicas]
+
 
 def get_sampler(dataset, args):
     sampler = None
@@ -244,7 +250,7 @@ def get_sampler(dataset, args):
         method = args.get_sampler()
         args.get_logger().info(
             "Using {} sampler method, with args: {}".format(method, args.get_sampler_args()))
-        
+
         if method == "uniform":
             sampler = UniformSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank())
         elif method == "q sampler":

@@ -115,7 +115,7 @@ class ExperimentGenerator(ArrivalGenerator):
         self.logger.info("Received stopping signal")
         self._alive = False
 
-    def run(self):
+    def run(self, **kwargs):
         """
         Run function to generate arrivals during existence of the Orchestrator. WIP.
 

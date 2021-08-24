@@ -171,7 +171,6 @@ class ClusterManager:
         _thread_pool = ThreadPool(processes=2)
         _thread_pool.apply(self._watchdog.start)
         _thread_pool.apply(self._run)
-
         _thread_pool.join()
 
     def _stop(self):

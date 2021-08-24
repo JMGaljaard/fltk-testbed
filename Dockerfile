@@ -29,4 +29,4 @@ ADD scripts scripts
 EXPOSE 5000
 
 # Update relevant runtime configuration for experiment
-COPY cloud_configs/cloud_experiment.yaml configs/cloud_config.yaml
+COPY configs/example_cloud_experiment.json configs/example_cloud_experiment.json
