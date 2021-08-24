@@ -1,4 +1,5 @@
 import logging
+import queue
 import time
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
@@ -6,14 +7,14 @@ from typing import List, Callable, Dict
 
 import torch
 from dataclass_csv import DataclassWriter
+from kubernetes import client
 from torch.distributed import rpc
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.client import Client
 from fltk.nets.util.utils import flatten_params, save_model
-from fltk.util.cluster.client import ClientRef, ClusterManager
+from fltk.util.cluster.client import ClientRef, ClusterManager, DeploymentBuilder
 from fltk.util.config.base_config import BareConfig
-from fltk.util.log import DistLearningLogger
 from fltk.util.results import EpochData
 from fltk.util.task.generator.arrival_generator import ArrivalGenerator, ExperimentGenerator
 
@@ -54,25 +55,19 @@ class Orchestrator(object):
     - Keep track of timing
 
     """
-
-    # Dictionary containing active (e.g. deployed) tasks.
+    pending_tasks: queue.Queue = queue.Queue()
+    completed_tasks: List[str] = []
     active_tasks: Dict[str, Dict[str, ClientRef]] = {}
-    # List of active clients
     clients: List[ClientRef] = []
 
     task_generator: ArrivalGenerator
 
-    def __init__(self, client_id_triple, config: BareConfig = None):
-
+    def __init__(self, config: BareConfig = None):
 
         self.log_rref = None
         self.config = config
-
-        # TODO: Change to Kubernetes spawning
-        # self.create_clients(client_id_triple)
-
-        # TODO: Decide on using a more persitent logging approach
-        # self.config.init_logger(logging)
+        self._v1 = client.CoreV1Api()
+        self._batch_api = client.BatchV1Api()
 
     def init_generator(self) -> None:
         """
@@ -84,6 +79,7 @@ class Orchestrator(object):
         @return: None
         @rtype: None
         """
+        pass
 
     def create_clients(self, client_id_triple):
         """
@@ -256,19 +252,15 @@ class Orchestrator(object):
         responses = []
         for client in self.clients:
             responses.append((client, _remote_method_async(Client.test, client.ref)))
-
         for res in responses:
             accuracy, loss, class_precision, class_recall = res[1].wait()
             logging.info(f'{res[0]} had a result of accuracy={accuracy}')
 
-    def save_epoch_data(self, ratio=None):
+    def save_epoch_data(self):
         file_output = f'./{self.config.output_location}'
-        self.ensure_path_exists(file_output)
+        # self.ensure_path_exists(file_output)
         for key in self.client_data:
-            if ratio:
-                filename = f'{file_output}/{key}_epochs_{ratio}.csv'
-            else:
-                filename = f'{file_output}/{key}_{ratio}.csv'
+            filename = f'{file_output}/{key}.csv'
             logging.info(f'Saving data at {filename}')
             with open(filename, "w") as f:
                 w = DataclassWriter(f, self.client_data[key], EpochData)
@@ -279,16 +271,20 @@ class Orchestrator(object):
         Main loop of the Orchestrator
         :return:
         """
-        save_path = Path(self.config.execution_config.general_net.save_model_path)
-        logging_dir = self.config.execution_config.tensorboard.record_dir
-
-        cluster_manager: ClusterManager = ClusterManager()
-        arrival_generator = ExperimentGenerator()
-
         logger = logging.getLogger('Orchestrator')
+
+        dp_builder = DeploymentBuilder()
+        dp_builder.create_identifier("client_example")
+        dp_builder.build_resources("1024Mi", '1000m', "1024Mi", "1000m")
+        dp_builder.build_container()
+        dp_builder.build_template()
+        dp_builder.build_spec()
+        job = dp_builder.construct()
+        time.sleep(10)
+        self._batch_api.create_namespaced_job('test', job)
         while True:
-            logger.info(cluster_manager._watchdog._resource_lookup)
-            time.sleep(10)
+            logger.info("Still alive...")
+            time.sleep(5)
 
         self.client_load_data()
         self.ping_all()
@@ -321,7 +317,7 @@ class Orchestrator(object):
 
         logging.info(f'Federator is stopping')
 
-    def store_gradient(self, gradient, client_id, epoch, ratio):
+    def store_gradient(self, gradient, task_reference: str, client_id, epoch: int):
         """
         Function to save the gradient of a client in a specific directory.
         @param gradient:
@@ -335,13 +331,11 @@ class Orchestrator(object):
         @return:
         @rtype:
         """
-        directory: str = f"{self.tb_path_base}/gradient/{ratio}/{epoch}/{client_id}"
-        # Ensure path exists (mkdir -p)
+        directory: str = f"{self.tb_path_base}/gradient/{epoch}/{client_id}"
         Path(directory).mkdir(parents=True, exist_ok=True)
-        # Save using pytorch.
         torch.save(gradient, f"{directory}/gradient.pt")
 
-    def distribute_new_model(self, updated_model) -> None:
+    def distribute_new_model(self, task_reference: str, updated_model) -> None:
         """
         Function to update the model on the
         @return:

@@ -17,7 +17,7 @@ class Convert:
         else:
             self.__Registry = UnitRegistry(filename=str(self.CONVERSION_PATH))
 
-    def convert(self, value: str) -> int:
+    def __call__(self, value: str) -> int:
         """
         Function to convert str representation of a CPU/memory quantity into an integer representation. For conversion
         metrics see `<project_root>/configs/quantities/kubernetes.conf`
