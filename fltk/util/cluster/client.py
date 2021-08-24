@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from multiprocessing.pool import ThreadPool
 from typing import Dict
 
+import schedule
 from kubernetes import client, config
 from torch.utils.tensorboard import SummaryWriter
 
@@ -36,7 +37,8 @@ class Resource:
 
 
 class BuildDescription:
-    resources = client.V1ResourceRequirements
+    resources: client.V1ResourceRequirements
+    identifier: str
     container: client.V1Container
     template: client.V1PodTemplateSpec
     spec: client.V1JobSpec
@@ -86,8 +88,9 @@ class ResourceWatchDog:
         self._v1 = client.CoreV1Api()
         self.__monitor_nodes()
 
-        import schedule
+        # Every 10 seconds we check the nodes with all the pods.
         schedule.every(10).seconds.do(self.__monitor_pods).tag('node-monitoring')
+        # Every 1 minutes we check all the pods (in case the topology changes).
         schedule.every(1).minutes.do(self.__monitor_pods).tag('pod-monitoring')
 
         self._logger.info("Starting with watching resources")
@@ -174,13 +177,11 @@ class ClusterManager(metaclass=Singleton):
         self.__thread_pool.apply_async(self._watchdog.start)
         self.__thread_pool.apply_async(self._run)
 
-
     def _stop(self):
         self._logger.info("Stopping execution of ClusterManager, halting components...")
         self._watchdog.stop()
         self.__thread_pool.join()
         self._logger.info("Successfully stopped execution of ClusterManager")
-
 
     def _run(self):
         while self._alive:
@@ -197,26 +198,28 @@ class ClusterManager(metaclass=Singleton):
 
 
 class DeploymentBuilder:
+    _buildDescription = BuildDescription()
 
-    # TODO: build deployment configuration compatible with the minimal working example.
-    def __init__(self):
+    def reset(self) -> None:
         self._buildDescription = BuildDescription()
 
-    def reset(self):
-        self._buildDescription = BuildDescription()
-
-    def create_identifier(self):
+    def create_identifier(self, identifier) -> None:
         # TODO: Move, or create identifier here.
-        self._buildDescription.identifier = None
+        self._buildDescription.identifier = identifier
 
-    def build_resources(self):
-        self._buildDescription.container = client.V1ResourceRequirements(requests={},
-                                                                         limits={})
+    def build_resources(self, mem_req, cpu_req, mem_lim, cpu_lim) -> None:
+        def builder(memory, cpu) -> Dict[str, str]:
+            return {'memory': memory, 'cpu': cpu}
 
-    def build_container(self, identifier):
+        req_dict = builder(mem_req, cpu_req)
+        lim_dict = builder(mem_lim, cpu_lim)
+        self._buildDescription.container = client.V1ResourceRequirements(requests=req_dict,
+                                                                         limits=lim_dict)
+
+    def build_container(self, identifier: str = None) -> None:
         self._buildDescription.container = client.V1Container(
-            name=f'client-{identifier}',
-            image='fltk',
+            name=f'client-{identifier or self._buildDescription.identifier}',
+            image='localhost:5000/fltk',
             # TODO: Generate a means to start-up a
             command=["python3", "fltk/launch.py", "single",
                      "configs/cloud_experiment.yaml"],
@@ -225,19 +228,19 @@ class DeploymentBuilder:
             image_pull_policy='Always',
         )
 
-    def build_template(self, restart_policy='Never'):
+    def build_template(self, restart_policy='Never') -> None:
         self._buildDescription.template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(labels={"app": "fltk-client"}),
             spec=client.V1PodSpec(restart_policy=restart_policy,
                                   containers=[self._buildDescription.container]))
 
-    def build_spec(self, back_off_limit=3):
+    def build_spec(self, back_off_limit: int = 3, ttl_seconds: int = 30) -> None:
         self._buildDescription.spec = client.V1JobSpec(
             template=self._buildDescription.template,
             backoff_limit=back_off_limit,
-            ttl_seconds_after_finished=60)
+            ttl_seconds_after_finished=ttl_seconds)
 
-    def construct(self):
+    def construct(self) -> client.V1Job:
         job = client.V1Job(
             api_version="batch/v1",
             kind="Job",
