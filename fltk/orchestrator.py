@@ -63,16 +63,16 @@ class Orchestrator(object):
     task_generator: ArrivalGenerator
 
     def __init__(self, client_id_triple, config: BareConfig = None):
-        log_rref = rpc.RRef(DistLearningLogger())
 
-        self.log_rref = log_rref
+
+        self.log_rref = None
         self.config = config
 
         # TODO: Change to Kubernetes spawning
-        self.create_clients(client_id_triple)
+        # self.create_clients(client_id_triple)
 
         # TODO: Decide on using a more persitent logging approach
-        self.config.init_logger(logging)
+        # self.config.init_logger(logging)
 
     def init_generator(self) -> None:
         """
@@ -274,18 +274,22 @@ class Orchestrator(object):
                 w = DataclassWriter(f, self.client_data[key], EpochData)
                 w.write()
 
-    def run(self):
+    def run(self) -> None:
         """
-        Main loop of the Federator
+        Main loop of the Orchestrator
         :return:
         """
-
-        # # Select clients which will be poisened
-        # TODO: get attack type and ratio from config, temp solution now
         save_path = Path(self.config.execution_config.general_net.save_model_path)
         logging_dir = self.config.execution_config.tensorboard.record_dir
 
-        # self.update_clients()
+        cluster_manager: ClusterManager = ClusterManager()
+        arrival_generator = ExperimentGenerator()
+
+        logger = logging.getLogger('Orchestrator')
+        while True:
+            logger.info(cluster_manager._watchdog._resource_lookup)
+            time.sleep(10)
+
         self.client_load_data()
         self.ping_all()
         self.clients_ready()
@@ -298,22 +302,22 @@ class Orchestrator(object):
             print(f'Running epoch {epoch}')
             # Get new model during run, update iteratively. The model is needed to calculate the
             # gradient by the federator.
-            self.remote_run_epoch(epoch_size, rat)
+            self.remote_run_epoch(epoch_size)
             addition += 1
         logging.info('Printing client data')
 
         # Perform last test on the current model.
         self.client_data.get('federator', []).append(self.test_model())
         logging.info(f'Saving model')
-        save_model(self.test_data.net, './output', self.epoch_counter, self.config, rat)
+        save_model(self.test_data.net, './output', self.epoch_counter, self.config)
         logging.info(f'Saving data')
-        self.save_epoch_data(rat)
+        self.save_epoch_data()
 
         # Reset the model to continue with the next round
         self.client_reset_model()
         # Reset dataloader, etc. for next experiment
         self.set_data()
-        self.antidote.save_data_and_reset(rat)
+        self.antidote.save_data_and_reset()
 
         logging.info(f'Federator is stopping')
 
@@ -353,15 +357,28 @@ class Orchestrator(object):
         logging.info('Weights are updated')
 
 
-def run_orchestrator(rpc_ids_triple, configuration: BareConfig, config_path: Path):
+def run_orchestrator(rpc_ids_triple, configuration: BareConfig):
+    """
+    Function to run as 'orchestrator', this will
+    @param rpc_ids_triple:
+    @type rpc_ids_triple:
+    @param configuration:
+    @type configuration:
+    @param config_path:
+    @type config_path:
+    @return:
+    @rtype:
+    """
     logging.info("Starting Orchestrator, initializing resources....")
     orchestrator = Orchestrator(rpc_ids_triple, config=configuration)
     cluster_manager = ClusterManager()
-    arrival_generator = ExperimentGenerator(config_path)
+    arrival_generator = ExperimentGenerator()
 
     pool = ThreadPool(3)
-    pool.apply(cluster_manager.start)
-
-    pool.apply(arrival_generator.run, {'orchestrator': orchestrator})
-    pool.apply(orchestrator.run, {'cluster_manager': cluster_manager})
+    logging.info("Starting cluster manager")
+    pool.apply_async(cluster_manager.start)
+    logging.info("Starting arrival generator")
+    pool.apply_async(arrival_generator.run)
+    logging.info("Starting orchestrator")
+    pool.apply(orchestrator.run)
     pool.join()

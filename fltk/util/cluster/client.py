@@ -9,6 +9,7 @@ from kubernetes import client, config
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.util.cluster.conversion import Convert
+from fltk.util.singleton import Singleton
 from fltk.util.task.config.parameter import TrainTask
 
 
@@ -151,8 +152,9 @@ class ResourceWatchDog:
         self._logger.debug(self._resource_lookup)
 
 
-class ClusterManager:
+class ClusterManager(metaclass=Singleton):
     _alive = False
+    __threadpool: ThreadPool = None
 
     def __init__(self):
         # When executing in a pod, load the incluster configuration according to
@@ -164,18 +166,21 @@ class ClusterManager:
         self._client_handler = ClientHandler()
 
     def start(self):
-        self._logger.info("[ClusterManager] Spinning up cluster manager...")
+        self._logger.info("Spinning up cluster manager...")
         # Set debugging to WARNING only, as otherwise DEBUG statements will flood the logs.
         client.rest.logger.setLevel(logging.WARNING)
         self._alive = True
-        _thread_pool = ThreadPool(processes=2)
-        _thread_pool.apply(self._watchdog.start)
-        _thread_pool.apply(self._run)
-        _thread_pool.join()
+        self.__thread_pool = ThreadPool(processes=2)
+        self.__thread_pool.apply_async(self._watchdog.start)
+        self.__thread_pool.apply_async(self._run)
+
 
     def _stop(self):
         self._logger.info("Stopping execution of ClusterManager, halting components...")
         self._watchdog.stop()
+        self.__thread_pool.join()
+        self._logger.info("Successfully stopped execution of ClusterManager")
+
 
     def _run(self):
         while self._alive:
