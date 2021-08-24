@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
@@ -38,12 +39,13 @@ def main():
 
     with open(arguments.config) as config_file:
         try:
-            config = BareConfig.from_json(config_file)
+            config = BareConfig.from_dict(json.load(config_file))
         except Exception as e:
-            print("Cannot load provided configuration, exiting...")
+            print(e)
+            print(f"Cannot load provided configuration {config_file}, exiting...")
             exit(-1)
 
-    if arguments.mode == 'orchestrator':
+    if arguments.mode == 'cluster':
         cluster_start(arguments, config)
     elif arguments.mode == 'client':
         run_single()
@@ -76,8 +78,7 @@ def cluster_start(args: dict, config: BareConfig):
     # TODO: Load configuration path
 
 
-    print(f'rank={args.rank}, world_size={world_size}, host={master_address}, args=cfg, nic={nic}')
-    run_single(rank=args.rank, args=config, nic=nic)
+    run_single(rank=args.rank, args=config)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 import logging
 import random
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from asyncio import sleep
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,11 +10,12 @@ from typing import Dict, List
 
 import numpy as np
 
+from fltk.util.singleton import Singleton
 from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser
 
 
 @dataclass
-class ArrivalGenerator(ABC):
+class ArrivalGenerator(metaclass=Singleton):
     """
     Abstract Base Class for generating arrivals in the system. These tasks must be run
     """
@@ -52,6 +53,11 @@ class ExperimentGenerator(ArrivalGenerator):
     _tick_list: List[Arrival] = []
     _alive: bool = False
     _decrement = 1
+
+    __default_config: Path = Path('configs/example_cloud_experiment.json')
+
+    def __init__(self, custom_config: Path = None):
+        super(ExperimentGenerator, self).__init__(custom_config or self.__default_config)
 
     def set_logger(self, name: str = None):
         """

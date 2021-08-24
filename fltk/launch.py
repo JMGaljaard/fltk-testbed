@@ -23,8 +23,8 @@ def await_assigned_orchestrator():
     pass
 
 
-def run_single(rank, world_size, host=None, args=None, nic=None):
-    logging.info(f'Starting with rank={rank} and world size={world_size}')
+def run_single(rank, host=None, args=None, nic=None):
+    # logging.info(f'Starting with rank={rank} and world size={world_size}')
     prepare_environment(host, nic)
 
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
@@ -39,18 +39,12 @@ def run_single(rank, world_size, host=None, args=None, nic=None):
         rpc.init_rpc(
             f"client{rank}",
             rank=rank,
-            world_size=world_size,
+            world_size=2,
             rpc_backend_options=options,
         )
     else:
-        logging.info('Starting the ps')
-        rpc.init_rpc(
-            "ps",
-            rank=rank,
-            world_size=world_size,
-            rpc_backend_options=options
-        )
-        run_orchestrator([(f"client{r}", r, world_size) for r in range(1, world_size)], args)
+        logging.info('Starting as Orchestrator')
+        run_orchestrator([(f"client{r}", r, 2) for r in range(1, 2)], args)
 
     # block until all rpc finish
     rpc.shutdown()
