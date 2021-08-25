@@ -2,44 +2,18 @@ import logging
 import queue
 import time
 from multiprocessing.pool import ThreadPool
-from pathlib import Path
-from typing import List, Callable, Dict
+from typing import List
 
-import torch
+import kubernetes.config
 from dataclass_csv import DataclassWriter
 from kubernetes import client
-from torch.distributed import rpc
-from torch.utils.tensorboard import SummaryWriter
 
 from fltk.client import Client
 from fltk.nets.util.utils import flatten_params, save_model
-from fltk.util.cluster.client import ClientRef, ClusterManager, DeploymentBuilder
+from fltk.util.cluster.client import ClusterManager, deploy_job
 from fltk.util.config.base_config import BareConfig
 from fltk.util.results import EpochData
-from fltk.util.task.generator.arrival_generator import ArrivalGenerator, ExperimentGenerator
-
-
-def _call_method(method, rref, *args, **kwargs):
-    return method(rref.local_value(), *args, **kwargs)
-
-
-def _remote_method(method: Callable, rref, *args, **kwargs):
-    """
-    Wrapper function for executing remote code. This will launch an inference job at the federator learning side.
-    """
-    arguments = [method, rref] + list(args)
-    # Send marshalled request to the child process
-    return rpc.rpc_sync(rref.owner(), _call_method, args=arguments, kwargs=kwargs)
-
-
-def _remote_method_async(method: Callable, rref, *args, **kwargs):
-    """
-    Wrapper function for executing remote code in asynchronous manner.
-    This will launch an inference job at the federator learning side, without a blocking request. A a callback must be pro
-    """
-    arguments = [method, rref] + list(args)
-    # Send marshalled request to the child process
-    return rpc.rpc_async(rref.owner(), _call_method, args=arguments, kwargs=kwargs)
+from fltk.util.task.generator.arrival_generator import ExperimentGenerator
 
 
 class Orchestrator(object):
@@ -57,125 +31,15 @@ class Orchestrator(object):
     """
     pending_tasks: queue.Queue = queue.Queue()
     completed_tasks: List[str] = []
-    active_tasks: Dict[str, Dict[str, ClientRef]] = {}
-    clients: List[ClientRef] = []
 
-    task_generator: ArrivalGenerator
 
     def __init__(self, config: BareConfig = None):
 
         self.log_rref = None
         self.config = config
+        kubernetes.config.load_incluster_config()
         self._v1 = client.CoreV1Api()
         self._batch_api = client.BatchV1Api()
-
-    def init_generator(self) -> None:
-        """
-        Function to initialize task generation according to provided config files.
-
-        TODO: Rename function to match description
-        TODO: Find way to provide scheduling characteristcs back to the task generator in case of an experiment runner.
-
-        @return: None
-        @rtype: None
-        """
-        pass
-
-    def create_clients(self, client_id_triple):
-        """
-        Function to spin up worker clients for a task.
-        @param client_id_triple:
-        @type client_id_triple:
-        @return:
-        @rtype:
-        """
-        # TODO: Change to spinning up different clients.
-        for id, rank, world_size in client_id_triple:
-            client = rpc.remote(id, Client, kwargs=dict(id=id, log_rref=self.log_rref, rank=rank, world_size=world_size,
-                                                        config=self.config))
-            writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_client_{id}')
-            self.clients.append(ClientRef(id, client, tensorboard_writer=writer))
-            self.client_data[id] = []
-        # In additino we store our own data through the process
-        self.client_data['federator'] = []
-
-    def update_clients(self, ratio):
-        """
-        :@deprecated Function to be removed in future commit.
-        TODO remove functionality, move to new function & clean up
-        @param ratio:
-        @type ratio:
-        @return:
-        @rtype:
-        """
-        # Prevent abrupt ending of the client
-        self.tb_writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_federator_{ratio}')
-        for client in self.clients:
-            # Create new writer and close old writer
-            writer = SummaryWriter(f'{self.tb_path_base}/{self.config.experiment_prefix}_client_{client.name}_{ratio}')
-            client.tb_writer.close()
-            client.tb_writer = writer
-
-    def ping_all(self):
-        for client in self.clients:
-            logging.info(f'Sending ping to {client}')
-            t_start = time.time()
-            answer = _remote_method(Client.ping, client.ref)
-            t_end = time.time()
-            duration = (t_end - t_start) * 1000
-            logging.info(f'Ping to {client} is {duration:.3}ms')
-
-    def rpc_test_all(self):
-        for client in self.clients:
-            res = _remote_method_async(Client.rpc_test, client.ref)
-            while not res.done():
-                pass
-
-    def client_reset_model(self):
-        """
-        Function to reset the model at all learners
-        @return:
-        @rtype:
-        """
-        self.epoch_counter = 0
-        for client in self.clients:
-            _remote_method_async(Client.reset_model, client.ref)
-
-    def client_load_data(self):
-        """
-        TODO: Make this compatible with job registration...
-        @return:
-        @rtype:
-        """
-        for client in self.clients:
-            _remote_method_async(Client.init_dataloader, client.ref)
-
-    def clients_ready(self):
-        """
-        TODO: Make compatible with Job registration
-        TODO: Make push based instead of pull based.
-        @return:
-        @rtype:
-        """
-        all_ready = False
-        ready_clients = []
-        while not all_ready:
-            responses = []
-            for client in self.clients:
-                if client.name not in ready_clients:
-                    responses.append((client, _remote_method_async(Client.is_ready, client.ref)))
-            all_ready = True
-            for res in responses:
-                result = res[1].wait()
-                if result:
-                    logging.info(f'{res[0]} is ready')
-                    ready_clients.append(res[0])
-                else:
-                    logging.info(f'Waiting for {res[0]}')
-                    all_ready = False
-
-            time.sleep(2)
-        logging.info('All clients are ready')
 
     def remote_run_epoch(self, epochs, ratio=None, store_grad=False):
         responses = []
@@ -240,21 +104,6 @@ class Orchestrator(object):
         self.distribute_new_model(updated_model)
         return updated_model
 
-    def update_client_data_sizes(self):
-        responses = []
-        for client in self.clients:
-            responses.append((client, _remote_method_async(Client.get_client_datasize, client.ref)))
-        for res in responses:
-            res[0].data_size = res[1].wait()
-            logging.info(f'{res[0]} had a result of datasize={res[0].data_size}')
-
-    def remote_test_sync(self):
-        responses = []
-        for client in self.clients:
-            responses.append((client, _remote_method_async(Client.test, client.ref)))
-        for res in responses:
-            accuracy, loss, class_precision, class_recall = res[1].wait()
-            logging.info(f'{res[0]} had a result of accuracy={accuracy}')
 
     def save_epoch_data(self):
         file_output = f'./{self.config.output_location}'
@@ -273,15 +122,10 @@ class Orchestrator(object):
         """
         logger = logging.getLogger('Orchestrator')
 
-        dp_builder = DeploymentBuilder()
-        dp_builder.create_identifier("client_example")
-        dp_builder.build_resources("1024Mi", '1000m', "1024Mi", "1000m")
-        dp_builder.build_container()
-        dp_builder.build_template()
-        dp_builder.build_spec()
-        job = dp_builder.construct()
         time.sleep(10)
-        self._batch_api.create_namespaced_job('test', job)
+
+        job =
+        deploy_job(self._batch_api, job)
         while True:
             logger.info("Still alive...")
             time.sleep(5)
@@ -317,54 +161,17 @@ class Orchestrator(object):
 
         logging.info(f'Federator is stopping')
 
-    def store_gradient(self, gradient, task_reference: str, client_id, epoch: int):
-        """
-        Function to save the gradient of a client in a specific directory.
-        @param gradient:
-        @type gradient:
-        @param client_id:
-        @type client_id:
-        @param epoch:
-        @type epoch:
-        @param ratio:
-        @type ratio:
-        @return:
-        @rtype:
-        """
-        directory: str = f"{self.tb_path_base}/gradient/{epoch}/{client_id}"
-        Path(directory).mkdir(parents=True, exist_ok=True)
-        torch.save(gradient, f"{directory}/gradient.pt")
 
-    def distribute_new_model(self, task_reference: str, updated_model) -> None:
-        """
-        Function to update the model on the
-        @return:
-        @rtype:
-        """
-        responses = []
-        for client in self.clients:
-            responses.append(
-                (client, _remote_method_async(Client.update_nn_parameters, client.ref, new_params=updated_model)))
-
-        for res in responses:
-            res[1].wait()
-        logging.info('Weights are updated')
-
-
-def run_orchestrator(rpc_ids_triple, configuration: BareConfig):
+def run_orchestrator(configuration: BareConfig) -> None:
     """
-    Function to run as 'orchestrator', this will
-    @param rpc_ids_triple:
-    @type rpc_ids_triple:
-    @param configuration:
-    @type configuration:
-    @param config_path:
-    @type config_path:
-    @return:
-    @rtype:
+    Function to start the different components of the orchestrator.
+    @param configuration: Configuration for components, needed for spinning up components of the Orchestrator.
+    @type configuration: BareConfig
+    @return: None
+    @rtype: None
     """
     logging.info("Starting Orchestrator, initializing resources....")
-    orchestrator = Orchestrator(rpc_ids_triple, config=configuration)
+    orchestrator = Orchestrator(configuration)
     cluster_manager = ClusterManager()
     arrival_generator = ExperimentGenerator()
 
@@ -376,3 +183,4 @@ def run_orchestrator(rpc_ids_triple, configuration: BareConfig):
     logging.info("Starting orchestrator")
     pool.apply(orchestrator.run)
     pool.join()
+    logging.info("Stopped execution of Orchestrator...")

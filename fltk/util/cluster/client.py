@@ -6,7 +6,9 @@ from multiprocessing.pool import ThreadPool
 from typing import Dict
 
 import schedule
+from kubeflow.pytorchjob import V1PyTorchJob, V1ReplicaSpec
 from kubernetes import client, config
+from kubernetes.client import BatchV1Api, V1Job, V1ObjectMeta, V1ResourceRequirements
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.util.cluster.conversion import Convert
@@ -37,7 +39,7 @@ class Resource:
 
 
 class BuildDescription:
-    resources: client.V1ResourceRequirements
+    resources: V1ResourceRequirements
     identifier: str
     container: client.V1Container
     template: client.V1PodTemplateSpec
@@ -64,7 +66,7 @@ class ResourceWatchDog:
         """
         self._v1: client.CoreV1Api = None
         self._logger = logging.getLogger('ResourceWatchDog')
-        self._Q = Convert().convert
+        self._Q = Convert()
 
     def stop(self) -> None:
         """
@@ -213,41 +215,72 @@ class DeploymentBuilder:
 
         req_dict = builder(mem_req, cpu_req)
         lim_dict = builder(mem_lim, cpu_lim)
-        self._buildDescription.container = client.V1ResourceRequirements(requests=req_dict,
+        self._buildDescription.resources = client.V1ResourceRequirements(requests=req_dict,
                                                                          limits=lim_dict)
 
     def build_container(self, identifier: str = None) -> None:
         self._buildDescription.container = client.V1Container(
-            name=f'client-{identifier or self._buildDescription.identifier}',
+            name=f'client-test',
             image='localhost:5000/fltk',
-            # TODO: Generate a means to start-up a
             command=["python3", "fltk/launch.py", "single",
                      "configs/cloud_experiment.yaml"],
             # TODO: Decide how to give client identifier.
             args=['hello world'],
             image_pull_policy='Always',
+            # Set the resources to the pre-generated resources
+            resources=self._buildDescription.resources
         )
 
     def build_template(self, restart_policy='Never') -> None:
         self._buildDescription.template = client.V1PodTemplateSpec(
-            metadata=client.V1ObjectMeta(labels={"app": "fltk-client"}),
+            metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
             spec=client.V1PodSpec(restart_policy=restart_policy,
                                   containers=[self._buildDescription.container]))
 
-    def build_spec(self, back_off_limit: int = 3, ttl_seconds: int = 30) -> None:
-        self._buildDescription.spec = client.V1JobSpec(
-            template=self._buildDescription.template,
-            backoff_limit=back_off_limit,
-            ttl_seconds_after_finished=ttl_seconds)
+    def build_spec(self, worker_num: int = 0) -> None:
+        replica_spec = {"Master": V1ReplicaSpec(
+            replicas=1,
+            restart_policy="OnFailure",
+            template=self._buildDescription.template
+        )
+        }
 
-    def construct(self) -> client.V1Job:
-        job = client.V1Job(
-            api_version="batch/v1",
-            kind="Job",
-            # TODO: Decide whether to use this part of the functionality.
-            metadata=client.V1ObjectMeta(name='helloworld'),
+        if worker_num > 0:
+            replica_spec['Worker'] = V1ReplicaSpec(
+                replicas=worker_num,
+                restart_policy="OnFailure",
+                template=self._buildDescription.template
+            )
+
+    def construct(self) -> V1PyTorchJob:
+        """
+        Contruct V1PyTorch object following the description of the building process. Note that V1PyTorchJob differs
+        slightly from a V1Job object in Kubernetes. Refer to the kubeflow documentation for more information on the
+        PV1PyTorchJob object.
+        @return: V1PyTorchJob object that was dynamically constructed.
+        @rtype: V1PyTorchJob
+        """
+        job = V1PyTorchJob(
+            api_version="kubeflow.org/v1",
+            kind="PyTorchJob",
+            metadata=V1ObjectMeta(name=self._buildDescription.identifier, namespace='kubeflow'),
             spec=self._buildDescription.spec)
         return job
+
+
+def construct_job():
+    dp_builder = DeploymentBuilder()
+
+    dp_builder.create_identifier("client_example")
+    dp_builder.build_resources("1024Mi", '1000m', "1024Mi", "1000m")
+    dp_builder.build_container()
+    dp_builder.build_template()
+    dp_builder.build_spec()
+    job = dp_builder.construct()
+
+
+def deploy_job(api_instance: BatchV1Api, job: V1Job):
+    api_instance.create_namespaced_job(body=job, namespace="test")
 
 
 class ClientHandler(object):

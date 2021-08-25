@@ -9,6 +9,8 @@ The goal if this project is to launch Federated Learning nodes in truly distribu
 
 This project is tested with Ubuntu 20.04 and python {3.7, 3.8}.
 
+
+
 ### Building locally
 
 To build locally, run the following command in the project root directory.
@@ -145,6 +147,79 @@ See Manual on brightspace
 </p>
 </details>
 
+
+### Deploying on Kubernetes
+
+
+#### Setting up environment
+
+ * Kustomize 3.9.0
+ * Helm
+ * Kubectl
+ * gcloud sdk
+
+#### Setting up cluster
+
+
+#### MiniKube
+
+#### GKE
+
+### Installing KubeFlow
+Kubeflow is a ML toolkit that allows to perform a multitude of machine and deep learning operations no 
+Kubernetes clusters. For this we will make use of the 1.3 release.
+
+
+```bash
+git clone ... --branch=v1.3-branch
+cd manifitesst
+```
+
+You might want to read the `README` file for more information. We will make use of the Kustomize files provided
+by KubeFlow to install a basic KubeFlow instance on the cluster. If you have already worked with KubeFlow on GKE
+you might want to follow the GKE deployment on the official KubeFlow documentation.
+
+```bash
+kustomize build common/cert-manager/cert-manager/base | kubectl apply -f -
+# Wait before executing the following command, as 
+kustomize build common/cert-manager/kubeflow-issuer/base | kubectl apply -f -
+```
+
+
+```bash
+kustomize build common/istio-1-9/istio-crds/base | kubectl apply -f -
+kustomize build common/istio-1-9/istio-namespace/base | kubectl apply -f -
+kustomize build common/istio-1-9/istio-install/base | kubectl apply -f -
+```
+
+```bash
+kustomize build common/dex/overlays/istio | kubectl apply -f -
+```
+
+```bash
+kustomize build common/oidc-authservice/base | kubectl apply -f -
+```
+
+```bash
+
+kustomize build common/knative/knative-serving/base | kubectl apply -f -
+kustomize build common/istio-1-9/cluster-local-gateway/base | kubectl apply -f -
+```
+
+
+```bash
+kustomize build common/kubeflow-namespace/base | kubectl apply -f -
+```
+
+```bash
+kustomize build common/kubeflow-roles/base | kubectl apply -f -
+kustomize build common/istio-1-9/kubeflow-istio-resources/base | kubectl apply -f -
+```
+
+```bash
+kustomize build apps/pytorch-job/upstream/overlays/kubeflow | kubectl apply -f -
+```
+#### 
 ## Known issues
 
 * Currently, there is no GPU support docker containers (or docker compose)
