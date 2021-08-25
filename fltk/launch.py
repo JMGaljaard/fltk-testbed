@@ -44,7 +44,7 @@ def run_single(rank, host=None, args=None, nic=None):
         )
     else:
         logging.info('Starting as Orchestrator')
-        run_orchestrator([(f"client{r}", r, 2) for r in range(1, 2)], args)
+        run_orchestrator(args)
 
     # block until all rpc finish
     rpc.shutdown()
