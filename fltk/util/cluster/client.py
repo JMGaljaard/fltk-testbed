@@ -209,12 +209,24 @@ class DeploymentBuilder:
         # TODO: Move, or create identifier here.
         self._buildDescription.identifier = identifier
 
-    def build_resources(self, mem_req, cpu_req, mem_lim, cpu_lim) -> None:
-        def builder(memory, cpu) -> Dict[str, str]:
-            return {'memory': memory, 'cpu': cpu}
+    @staticmethod
+    def __resource_dict(mem: str, cpu: str) -> Dict[str, str]:
+        """
+        Private helper function to create a resource dictionary for deployments. Currently only supports the creation
+        of the requests/limits directory that is needed for a V1ResoruceRequirements object.
+        @param mem: Memory Request/Limit for a Container's ResoruceRequirement
+        @type mem:
+        @param cpu: CPU Request/Limit for a Container's ResoruceRequirement
+        @type cpu:
 
-        req_dict = builder(mem_req, cpu_req)
-        lim_dict = builder(mem_lim, cpu_lim)
+        @return:
+        @rtype:
+        """
+        return {'memory': mem, 'cpu': cpu}
+
+    def build_resources(self, mem_req, cpu_req, mem_lim, cpu_lim) -> None:
+        req_dict = self.__resource_dict(mem_req, cpu_req)
+        lim_dict = self.__resource_dict(mem_lim, cpu_lim)
         self._buildDescription.resources = client.V1ResourceRequirements(requests=req_dict,
                                                                          limits=lim_dict)
 
@@ -238,12 +250,12 @@ class DeploymentBuilder:
                                   containers=[self._buildDescription.container]))
 
     def build_spec(self, worker_num: int = 0) -> None:
+        # TODO: Ensure ReadWriteMany PVC is mounted to the Master node.
         replica_spec = {"Master": V1ReplicaSpec(
             replicas=1,
             restart_policy="OnFailure",
             template=self._buildDescription.template
-        )
-        }
+        )}
 
         if worker_num > 0:
             replica_spec['Worker'] = V1ReplicaSpec(
