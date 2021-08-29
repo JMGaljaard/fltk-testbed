@@ -1,6 +1,7 @@
 import torch.nn as nn
-from fltk.nets.simple import SimpleNet
 from torch.autograd import Variable
+
+from fltk.nets.simple import SimpleNet
 
 
 class RNNModel(SimpleNet):
@@ -16,7 +17,7 @@ class RNNModel(SimpleNet):
             try:
                 nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
             except KeyError:
-                raise ValueError( """An invalid option for `--model` was supplied,
+                raise ValueError("""An invalid option for `--model` was supplied,
                                  options are ['LSTM', 'GRU', 'RNN_TANH' or 'RNN_RELU']""")
             self.rnn = nn.RNN(ninp, nhid, nlayers, nonlinearity=nonlinearity, dropout=dropout)
         self.decoder = nn.Linear(nhid, ntoken)
@@ -49,7 +50,7 @@ class RNNModel(SimpleNet):
         emb = self.drop(self.encoder(input))
         output, hidden = self.rnn(emb, hidden)
         output = self.drop(output)
-        decoded = self.decoder(output.view(output.size(0)*output.size(1), output.size(2)))
+        decoded = self.decoder(output.view(output.size(0) * output.size(1), output.size(2)))
         return decoded.view(output.size(0), output.size(1), decoded.size(1)), hidden
 
     def init_hidden(self, bsz):

@@ -86,13 +86,13 @@ def load_model_from_file(model: torch.nn.Module, model_file_path: Path) -> None:
         raise FileExistsError(f"Cannot load model file {model_file_path} into {model}...")
 
 
-def save_model(model: torch.nn.Module, directory: str, epoch, config: BareConfig, ratio):
+def save_model(model: torch.nn.Module, directory: str, epoch, config: BareConfig):
     """
     Saves the model if necessary.
     """
     config.get_logger().debug(f"Saving model to flat file storage. Save #{model.__class__}")
 
-    full_save_path = f"./{directory}/{ratio}_{config.get_net()}_{epoch}.pth"
+    full_save_path = f"./{directory}/{config.net}_{epoch}.pth"
     torch.save(model.state_dict(), full_save_path)
 
 

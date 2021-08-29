@@ -90,17 +90,19 @@ class JobDescription:
     runtime: int
 
 
-@dataclass
+@dataclass(order=True)
 class TrainTask:
     """
     Training description used by the orchestrator to generate tasks. Contains 'transposed' information of the
     configuration file to make job generation easier and cleaner by using a 'flat' data class.
+
+    Dataclass is ordered, to allow for ordering of arrived tasks in a PriorityQueue (for scheduling).
     """
-    network_configuration: NetworkConfiguration
-    system_parameters: SystemParameters
-    hyper_parameters = HyperParameters
-    priority: float
-    arrival_ticks: float
+    priority: int
+    network_configuration: NetworkConfiguration = field(compare=False)
+    system_parameters: SystemParameters = field(compare=False)
+    hyper_parameters: HyperParameters = field(compare=False)
+    arrival_ticks: float = field(compare=False)
 
     def __init__(self, job_parameters: JobClassParameter, priority: Priority, task_id: str):
         """
