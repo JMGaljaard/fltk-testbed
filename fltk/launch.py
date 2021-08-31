@@ -6,67 +6,59 @@ from multiprocessing.pool import ThreadPool
 import torch.distributed as dist
 
 from fltk.client import Client
-from fltk.orchestrator import run_orchestrator, Orchestrator
+from fltk.orchestrator import Orchestrator
 from fltk.util.cluster.client import ClusterManager
+from fltk.util.config.arguments import LearningParameters
 from fltk.util.config.base_config import BareConfig
 from fltk.util.task.generator.arrival_generator import ExperimentGenerator
 
 logging.basicConfig(level=logging.INFO)
 
 
-def is_distributed():
-    return dist.is_available() and dist.is_initialized()
-
-
-def launch_client(task_id=None, rank=None, options=None, args: Namespace = None, config: BareConfig = None):
+def is_distributed() -> bool:
     """
+    Function to check whether distributed execution is needed.
 
-    @param host:
-    @type host:
-    @param rank:
-    @type rank:
-    @param options:
-    @type options:
-    @param args:
-    @type args:
+    Note: the WORLD_SIZE environmental variable needs to be set for this to work (larger than 1).
+    PytorchJobs launched from KubeFlow automatically set this property.
+    @return: Indicator for distributed execution.
+    @rtype: bool
+    """
+    world_size = int(os.environ.get('WORLD_SIZE', 1))
+    leader_port = int(os.environ.get('MASTER_PORT', 5000))
+    leader_address = os.environ.get('MASTER_ADDR', 'localhost')
+    logging.info(f"Training with WS: {world_size} connecting to: {leader_address}:{leader_port}")
+    return dist.is_available() and world_size > 1
+
+
+def launch_client(task_id, config: BareConfig = None, learning_params: LearningParameters = None):
+    """
+    @param task_id:
+    @type task_id:
     @param config: Configuration for components, needed for spinning up components of the Orchestrator.
     @type config: BareConfig
+    @param learning_params:
+    @type: LearningParameters
     @return:
     @rtype:
     """
-
-    # prepare_environment(host, nic)
-
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
+    rank, world_size, backend = 0, None, None
     distributed = is_distributed()
     if distributed:
-        rank, world_size = dist.get_rank(), dist.get_world_size()
-        logging.info(f'Starting with rank={rank} and world size={world_size}')
-
-        client = Client(rank, task_id, config)
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
         backend = dist.get_backend()
-        client.prepare_learner(distributed, backend)
-        client.run_epochs()
-    else:
-        """
-        Currently on only DistributedDataParallel is supported. If you want, you can implement a different 
-        approach, although it is advised to tinker with the DistributedDataParallel execution, as this 
-        greatly simplifies the forward and backward computations using AllReduce under the hood.
-        
-        For more information, refer to the Kubeflow PyTorch-Operator and PyTorch Distributed documentation.
-        """
-        print("Non DistributedDataParallel execution is not (yet) supported!")
+    logging.info(f'Starting Creating client with {rank}')
+    client = Client(rank, task_id, world_size, config, learning_params)
+    client.prepare_learner(distributed, backend)
+    epoch_data = client.run_epochs()
+    print(epoch_data)
 
 
-def launch_orchestrator(host=None, rank=None, options=None, args: Namespace = None, config: BareConfig = None):
+def launch_orchestrator(args: Namespace = None, config: BareConfig = None):
     """
     Default runner for the Orchestrator that is based on KubeFlow
-    @param host:
-    @type host:
-    @param rank:
-    @type rank:
-    @param options:
-    @type options:
     @param args:
     @type args:
     @param config: Configuration for components, needed for spinning up components of the Orchestrator.
