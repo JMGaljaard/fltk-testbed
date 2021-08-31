@@ -3,10 +3,13 @@ from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data import DataLoader
 
+from ..util.config.base_config import BareConfig
+
+
 class CIFAR100Dataset(Dataset):
 
-    def __init__(self, args):
-        super(CIFAR100Dataset, self).__init__(args)
+    def __init__(self, config: BareConfig, rank: int = 0, world_size: int = None):
+        super(CIFAR100Dataset, self).__init__(config, rank, world_size)
 
     def load_train_dataset(self):
         self.get_args().get_logger().debug("Loading CIFAR100 train data")

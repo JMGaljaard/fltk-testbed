@@ -12,10 +12,11 @@
         "action": "train"
       },
       "hyperParameters": {
-        "batchSize": "128",
-        "maxEpoch": "5",
-        "learningRate": "0.01",
-        "learningrateDecay": "0.0002"
+        "batchSize": 128,
+        "maxEpoch": 10,
+        "learningRate": 0.01,
+        "learningrateDecay": 0.0002,
+        "decayStepSize": 50
       },
       "classProbability": 0.1,
       "priorities": [

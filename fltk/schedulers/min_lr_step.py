@@ -1,6 +1,9 @@
+import logging
+
+
 class MinCapableStepLR:
 
-    def __init__(self, logger, optimizer, step_size, gamma, min_lr):
+    def __init__(self, optimizer, step_size, gamma, min_lr):
         """
         :param logger: logger
         :type logger: loguru.logger
@@ -13,7 +16,7 @@ class MinCapableStepLR:
         :param min_lr: minimum learning rate
         :type min_lr: float
         """
-        self.logger = logger
+        self.logger = logging.getLogger('MinCapableStepLR')
 
         self.optimizer = optimizer
         self.step_size = step_size

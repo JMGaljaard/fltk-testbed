@@ -14,6 +14,10 @@ class GeneralNetConfig:
     epoch_save_start_suffix: str = 'cloud_experiment'
     epoch_save_end_suffix: str = 'cloud_experiment'
 
+    scheduler_step_size = 50
+    scheduler_gamma = 0.5
+    min_lr = 1e-10
+
 
 @dataclass_json
 @dataclass(frozen=True)
@@ -54,6 +58,10 @@ class ExecutionConfig:
 
     experiment_prefix: str = "experiment"
     cuda: bool = False
+    default_model_folder_path = "default_models"
+    epoch_save_end_suffix = "epoch_end"
+    save_model_path = "models"
+    data_path = "data"
 
 
 @dataclass_json
@@ -85,44 +93,28 @@ class BareConfig(object):
     execution_config: ExecutionConfig
     cluster_config: ClusterConfig = field(metadata=config(field_name="cluster"))
 
-    #     # TODO: Move to external class/object
-    #     self.train_data_loader_pickle_path = {
-    #         'cifar10': 'data_loaders/cifar10/train_data_loader.pickle',
-    #         'fashion-mnist': 'data_loaders/fashion-mnist/train_data_loader.pickle',
-    #         'cifar100': 'data_loaders/cifar100/train_data_loader.pickle',
-    #     }
-    #
-    #     self.test_data_loader_pickle_path = {
-    #         'cifar10': 'data_loaders/cifar10/test_data_loader.pickle',
-    #         'fashion-mnist': 'data_loaders/fashion-mnist/test_data_loader.pickle',
-    #         'cifar100': 'data_loaders/cifar100/test_data_loader.pickle',
-    #     }
-    #
-    #     # TODO: Make part of different configuration
-    #     self.loss_function = torch.nn.CrossEntropyLoss
-    #
-    #     self.default_model_folder_path = "default_models"
-    #     self.data_path = "data"
+    def get_scheduler_step_size(self) -> int:
+        return self.execution_config.general_net.scheduler_step_size
 
-    def get_dataloader_list(self):
+    def get_scheduler_gamma(self):
+        return self.execution_config.general_net.scheduler_gamma
+
+    def get_min_lr(self):
+        return self.execution_config.general_net.min_lr
+
+    def get_data_path(self):
+        return self.execution_config.data_path
+
+    def get_default_model_folder_path(self):
+        return self.execution_config.default_model_folder_path
+
+    def cuda_enabled(self) -> bool:
         """
-        @deprecated
+        Function to check CUDA availability independent of BareConfig structure.
         @return:
         @rtype:
         """
-        return list(self.train_data_loader_pickle_path.keys())
-
-    def set_train_data_loader_pickle_path(self, path, name='cifar10'):
-        self.train_data_loader_pickle_path[name] = path
-
-    def get_train_data_loader_pickle_path(self):
-        return self.train_data_loader_pickle_path[self.dataset_name]
-
-    def set_test_data_loader_pickle_path(self, path, name='cifar10'):
-        self.test_data_loader_pickle_path[name] = path
-
-    def get_test_data_loader_pickle_path(self):
-        return self.test_data_loader_pickle_path[self.dataset_name]
+        return self.execution_config.cuda
 
     def should_save_model(self, epoch_idx):
         """
@@ -133,3 +125,9 @@ class BareConfig(object):
         """
         return self.execution_config.general_net.save_model and (
                 epoch_idx == 1 or epoch_idx % self.execution_config.general_net.save_epoch_interval == 0)
+
+    def get_epoch_save_end_suffix(self) -> bool:
+        return self.execution_config.epoch_save_suffix
+
+    def get_save_model_folder_path(self):
+        return self.execution_config.save_model_path
