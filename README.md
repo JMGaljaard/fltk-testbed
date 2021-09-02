@@ -219,7 +219,48 @@ kustomize build common/istio-1-9/kubeflow-istio-resources/base | kubectl apply -
 ```bash
 kustomize build apps/pytorch-job/upstream/overlays/kubeflow | kubectl apply -f -
 ```
-#### 
+### Installing NFS
+During the execution a `ReadWriteMany` persistent volume is needed. This is because each master worker node uses a 
+`SummaryWriter` to log the training progress. As such, multiple container on potentially different machines require 
+read-write access to this logging persistent volume. One way to resolve this, is to make use of Google Firestore (or 
+equivalent on your service provider of choice). However, using this incurs significant operating costs, as operation 
+starts at 1 TiB. As such, we setup a NFS on our cluster, which will provide this service to the cluster.
+
+
+For this, we will make use of the `nfs-server-provisioner` Helm chart, that neatly wraps this functionality in an easy
+to deploy chart. Make sure to install the NFS server in the same *namespace* as where you want to run your experiments.
+```bash
+helm install repo raphael https://raphaelmonrouzeau.github.io/charts/repository/
+helm update
+helm install nfs-server raphael/nfs-server-provisioner --set persistence.enabled=true,persistence.storageClass=do-block-storage,persistence.size=20Gi
+```
+
+**N.B.** If you wish to use a volume as both **ReadWriteOnce** and **ReadOnlyMany**, GCE does not provide this service
+You'll need to either create a **ReadWriteMany** PV with read only claims, or ensure that the writer completes before 
+the readers are spawned.
+
+### Setting up the Extractor
+
+This section only needs to be run once, as this will setup the TensorBoard service, as well as populate the data volume
+that contains the DataSets. Including another will require you to either create a pod, or update the code and re-install
+the Extractor chart/upgrade the chart. 
+
+** N.B. ** Note that removing the Extractor chart will result in the deletion of the Persistent Volume Claims, i.e. this
+will remove the data that is stored on these volumes. Make sure to COPY the contents of these directories to your local
+file system before doing so.
+
+```bash
+cd charts
+helm install extractor -f values.yaml
+```
+
+Wait for it to deploy.
+
+
+### Launching an experiment
+We have now completed the setup of the project, and can continue by running actual experiments. If no errors occur, this
+should. You may also skip this step and work on your own code, but it might be good to test your deployment
+before running into trouble later.
 ## Known issues
 
 * Currently, there is no GPU support docker containers (or docker compose)

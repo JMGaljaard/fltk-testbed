@@ -1,9 +1,9 @@
 import logging
-import random
 from abc import abstractmethod
 from asyncio import sleep
 from dataclasses import dataclass
 from pathlib import Path
+from queue import Queue
 from random import choices
 from time import time
 from typing import Dict, List
@@ -21,6 +21,7 @@ class ArrivalGenerator(metaclass=Singleton):
     """
     configuration_path: Path
     logger: logging.Logger = None
+    arrivals = Queue()
 
     @abstractmethod
     def load_config(self):
@@ -53,7 +54,6 @@ class ExperimentGenerator(ArrivalGenerator):
     _tick_list: List[Arrival] = []
     _alive: bool = False
     _decrement = 1
-
     __default_config: Path = Path('configs/example_cloud_experiment.json')
 
     def __init__(self, custom_config: Path = None):
@@ -70,17 +70,6 @@ class ExperimentGenerator(ArrivalGenerator):
         logging_name = name or self.__class__.__name__
         self.logger = logging.getLogger(logging_name)
 
-    def set_seed(self, seed: int = 42):
-        """
-        Function to pre-set the seed used by the Experiment generator, this allows for better reproducability of the
-        experiments.
-        @param seed: Seed to be used by the `random` library for experiment generation
-        @type seed: int
-        @return:
-        @rtype:
-        """
-        random.seed(seed)
-
     def load_config(self):
         """
         Generate
@@ -92,20 +81,20 @@ class ExperimentGenerator(ArrivalGenerator):
     def generate_arrival(self, task_id: str) -> None:
         """
         Generate a training task for a JobDescription once the inter-arrival time has been 'deleted'.
-        @param train_id: identifier for a training task correspnoding to the JobDescription.
+        @param train_id: id for a training task correspnoding to the JobDescription.
         @type train_id: String
         """
-        # TODO: logging
+        self.logger.info(f"Creating task for {task_id}")
         job = self.job_description[task_id]
         parameters = choices(job.job_class_parameters, [param.probability for param in job.job_class_parameters])[0]
         priority = choices(parameters.priorities, [prio.probabilities for prio in parameters.priorities], k=1)[0]
 
         inter_arrival_ticks = np.random.poisson(lam=job.arrival_statistic)
-        train_task = TrainTask(parameters, priority, task_id)
+        train_task = TrainTask(task_id, parameters, priority)
 
         self._tick_list.append(Arrival(inter_arrival_ticks, train_task, task_id))
 
-    def start(self):
+    def start(self, duration: float):
         """
         Function to start arrival generator, requires to
         @return:
@@ -115,13 +104,13 @@ class ExperimentGenerator(ArrivalGenerator):
             self.set_logger()
         self.logger.info("Starting execution of arrival generator...")
         self._alive = True
-        self.run()
+        self.run(duration)
 
     def stop(self) -> None:
         self.logger.info("Received stopping signal")
         self._alive = False
 
-    def run(self, **kwargs):
+    def run(self, duration: float):
         """
         Run function to generate arrivals during existence of the Orchestrator. WIP.
 
@@ -130,18 +119,16 @@ class ExperimentGenerator(ArrivalGenerator):
         @rtype:
         """
         self.start_time = time()
-        while self._alive:
-            arrived = []
+        while self._alive and time() - self.start_time < duration:
             save_time = time()
             for indx, entry in enumerate(self._tick_list):
                 entry.ticks -= self._decrement
                 if entry.ticks <= 0:
                     self._tick_list.pop(indx)
-                    arrived.append(entry)
+                    self.arrivals.put(entry)
                     self.generate_arrival(entry.task_id)
-
             # Correct for time drift between execution, otherwise drift adds up, and arrivals don't generate correctly
             correction_time = time() - save_time
             sleep(self._decrement - correction_time)
         self.stop_time = time()
-        self.logger.info(f"Stopped execution at: {self.stop_time}, duration: {self.stop_time - self.start_time}")
+        self.logger.info(f"Stopped execution at: {self.stop_time}, duration: {self.stop_time - self.start_time}/{duration}")

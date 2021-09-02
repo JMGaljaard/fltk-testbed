@@ -17,16 +17,20 @@ WORKDIR /opt/federation-lab
 RUN apt-get update \
   && apt-get install -y vim curl python3 python3-pip net-tools iproute2
 
+# Add Pre-downloaded models (otherwise needs be run every-time)
+ADD data/ data/
+
 # Use cache for pip, otherwise we repeatedly pull from repository
 ADD setup.py requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip python3 -m pip install -r requirements.txt
 
-ADD configs configs
+# Add FLTK and configurations
 ADD fltk fltk
-ADD scripts scripts
+ADD configs configs
 
 # Expose default port 5000 to the host OS.
 EXPOSE 5000
 
 # Update relevant runtime configuration for experiment
-COPY configs/example_cloud_experiment.json configs/example_cloud_experiment.json
+COPY configs/ configs/
+

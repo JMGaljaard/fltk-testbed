@@ -12,15 +12,15 @@ class HyperParameters:
     """
     Learning HyperParameters.
 
-    batch_size: Number of images that are used during each forward/backward phase.
+    bs: Number of images that are used during each forward/backward phase.
     max_epoch: Number of times epochs are executed.
-    learning_rate: Learning rate parameter, limiting the step size in the gradient update.
-    learning_rate_decay: How fast the learning rate 'shrinks'.
+    lr: Learning rate parameter, limiting the step size in the gradient update.
+    lr_decay: How fast the learning rate 'shrinks'.
     """
-    batch_size: int = field(metadata=config(field_name="batchSize"))
+    bs: int = field(metadata=config(field_name="batchSize"))
     max_epoch: int = field(metadata=config(field_name="maxEpoch"))
-    learning_rate: str = field(metadata=config(field_name="learningRate"))
-    learning_rate_decay: str = field(metadata=config(field_name="learningrateDecay"))
+    lr: str = field(metadata=config(field_name="learningRate"))
+    lr_decay: str = field(metadata=config(field_name="learningrateDecay"))
 
 
 @dataclass_json
@@ -80,14 +80,10 @@ class JobDescription:
     Currently, the arrival statistics is the lambda value used in a Poisson arrival process.
 
     preemtible_jobs: indicates whether the jobs can be pre-emptively rescheduled by the scheduler.
-    # TODO: Decide whether we want to pull out some of the configurations out of this JSON parser,\
-    # To prevent variable duplication in the experiment descriptino files.
-    runtime: indicates for how long jobs should be generated.
     """
     job_class_parameters: List[JobClassParameter] = field(metadata=config(field_name="jobClassParameters"))
     arrival_statistic: float = field(metadata=config(field_name="lambda"))
     preemtible_jobs: float = field(metadata=config(field_name="preemptJobs"))
-    runtime: int
 
 
 @dataclass(order=True)
@@ -103,8 +99,9 @@ class TrainTask:
     system_parameters: SystemParameters = field(compare=False)
     hyper_parameters: HyperParameters = field(compare=False)
     arrival_ticks: float = field(compare=False)
+    identifier: str = field(compare=False)
 
-    def __init__(self, job_parameters: JobClassParameter, priority: Priority, task_id: str):
+    def __init__(self, identity: str, job_parameters: JobClassParameter, priority: Priority):
         """
         Overridden init method for dataclass, to allow for 'exploding' a JobDescription object to a flattened object.
         @param job_parameters:
@@ -114,6 +111,7 @@ class TrainTask:
         @param priority:
         @type priority:
         """
+        self.identifier = identity
         self.network_configuration = job_parameters.network_configuration
         self.system_parameters = job_parameters.system_parameters
         self.hyper_parameters = job_parameters.hyper_parameters
@@ -127,7 +125,7 @@ class ExperimentParser(object):
 
     def parse(self) -> List[JobDescription]:
         """
-        Parse function to load JSON config into JobDescription objects. Any changes to the JSON file format
+        Parse function to load JSON conf into JobDescription objects. Any changes to the JSON file format
         should be reflected by the classes used. For more information refer to the dataclasses JSON
         documentation https://pypi.org/project/dataclasses-json/.
         """

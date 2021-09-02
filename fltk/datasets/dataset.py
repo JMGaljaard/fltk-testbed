@@ -6,9 +6,6 @@ from torch.utils.data import TensorDataset
 
 
 class Dataset:
-    """
-    TODO: Look into RPC memory leaks occuring due to https://github.com/pytorch/pytorch/issues/61920
-    """
 
     def __init__(self, config, learning_params, rank: int, world_size: int):
         self.config = config

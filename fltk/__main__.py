@@ -1,20 +1,20 @@
 import json
 import logging
 from argparse import Namespace, ArgumentParser
+from pathlib import Path
 
-from dotenv import load_dotenv
-
-from fltk.launch import launch_client, launch_orchestrator
-from fltk.util.config.arguments import create_client_parser, create_cluster_parser, extract_learning_parameters
+from fltk.launch import launch_client, launch_orchestrator, launch_extractor
+from fltk.util.config.arguments import create_client_parser, create_cluster_parser, extract_learning_parameters, \
+    create_extractor_parser
 from fltk.util.config.base_config import BareConfig
 
 
-def main():
+def __main__():
     parser = ArgumentParser(description='Experiment launcher for the Federated Learning Testbed')
     subparsers = parser.add_subparsers(dest="mode")
     create_client_parser(subparsers)
     create_cluster_parser(subparsers)
-
+    create_extractor_parser(subparsers)
     """
     To create your own parser mirror the construction in the 'client_parser' object.
     Or refer to the ArgumentParser library documentation.
@@ -23,7 +23,8 @@ def main():
     arguments = parser.parse_args()
 
     with open(arguments.config, 'r') as config_file:
-        config = BareConfig.from_dict(json.load(config_file))
+        config: BareConfig = BareConfig.from_dict(json.load(config_file))
+        config.config_path = Path(arguments.config)
 
     if arguments.mode == 'cluster':
         logging.info("Starting in cluster mode.")
@@ -33,6 +34,8 @@ def main():
         client_start(arguments, config)
         logging.info("Stopping client...")
         exit(0)
+    elif arguments.mode == 'extractor':
+        launch_extractor(arguments, config)
     else:
         print("Provided mode is not supported...")
         exit(1)
@@ -53,7 +56,4 @@ def client_start(args: Namespace, configuration: BareConfig):
 
 
 if __name__ == "__main__":
-    # Load dotenv with default values. However, the Pytorch-Operator should set the necessary
-    # environmental variables to get started.
-    load_dotenv()
-    main()
+    __main__()

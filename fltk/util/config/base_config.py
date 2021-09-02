@@ -38,7 +38,7 @@ class TensorboardConfig:
         used, as the TensorBoard instance that is started simultaneously with the Orchestrator.
         @param working_dir: Current working directory, by default PWD is assumed at which the Python interpreter is
         started.
-        @type working_dir: pathlib.Path
+        @type working_dir: Path
         @return: None
         @rtype: None
         """
@@ -56,12 +56,14 @@ class ExecutionConfig:
     reproducibility: ReproducibilityConfig
     tensorboard: TensorboardConfig
 
+    duration: int
     experiment_prefix: str = "experiment"
     cuda: bool = False
     default_model_folder_path = "default_models"
     epoch_save_end_suffix = "epoch_end"
     save_model_path = "models"
     data_path = "data"
+    log_path = "log"
 
 
 @dataclass_json
@@ -84,14 +86,26 @@ class ClusterConfig:
     orchestrator: OrchestratorConfig
     client: ClientConfig
     wait_for_clients: bool = True
+    namespace: str = 'test'
 
 
 @dataclass_json
 @dataclass
 class BareConfig(object):
-    # Configuration parameters for PyTorch and models that are generated.
     execution_config: ExecutionConfig
     cluster_config: ClusterConfig = field(metadata=config(field_name="cluster"))
+    config_path: Path = None
+
+    def get_duration(self) -> int:
+        return self.execution_config.duration
+
+    def get_log_dir(self):
+        return self.execution_config.log_path
+
+    def get_log_path(self, experiment_id: str, client_id: int, network_name: str) -> Path:
+        base_log = Path(self.execution_config.tensorboard.record_dir)
+        experiment_dir = Path(f"{self.execution_config.experiment_prefix}_{client_id}_{network_name}_{experiment_id}")
+        return base_log.joinpath(experiment_dir)
 
     def get_scheduler_step_size(self) -> int:
         return self.execution_config.general_net.scheduler_step_size

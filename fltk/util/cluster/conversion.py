@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Union
 
 from pint import UnitRegistry
 
@@ -17,7 +18,7 @@ class Convert:
         else:
             self.__Registry = UnitRegistry(filename=str(self.CONVERSION_PATH))
 
-    def __call__(self, value: str) -> int:
+    def __call__(self, value: Union[str, int]) -> int:
         """
         Function to convert str representation of a CPU/memory quantity into an integer representation. For conversion
         metrics see `<project_root>/configs/quantities/kubernetes.conf`

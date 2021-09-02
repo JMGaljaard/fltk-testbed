@@ -24,14 +24,10 @@ spec:
         - configs/cloud_experiment.yaml
         - --rank={{ . }}
       env:
-        - name: MASTER_PORT
-          value: "5000"
         - name: GLOO_SOCKET_IFNAME
           value: eth0
         - name: PYTHONUNBUFFERED
           value: "1"
-        - name: RANK
-          value: {{ quote $rank }}
         - name: TP_SOCKET_IFNAME
           value: eth0
         - name: WORLD_SIZE
