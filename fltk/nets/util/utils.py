@@ -9,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from fltk.util.config.base_config import BareConfig
 from fltk.util.results import EpochData
 
+
 def flatten_params(model_description: Union[torch.nn.Module, OrderedDict]):
     """
     flattens all parameters into a single column vector. Returns the dictionary to recover them
@@ -93,7 +94,7 @@ def save_model(model: torch.nn.Module, directory: str, epoch: int):
     torch.save(model.state_dict(), full_save_path)
 
 
-def test_model(self, model, writer: SummaryWriter = None) -> EpochData:
+def test_model(model, epoch, writer: SummaryWriter = None) -> EpochData:
     """
     Function to test model during training with
     @return:
@@ -101,7 +102,7 @@ def test_model(self, model, writer: SummaryWriter = None) -> EpochData:
     """
     # Test interleaved to speed up execution, i.e. don't keep the clients waiting.
     accuracy, loss, class_precision, class_recall = model.test()
-    data = EpochData(epoch_id=self.epoch_counter,
+    data = EpochData(epoch_id=epoch,
                      duration_train=0,
                      duration_test=0,
                      loss_train=0,
@@ -111,6 +112,5 @@ def test_model(self, model, writer: SummaryWriter = None) -> EpochData:
                      class_recall=class_recall,
                      client_id='federator')
     if writer:
-        writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
-        writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
+        writer.add_scalar('accuracy per epoch', accuracy, epoch)
     return data

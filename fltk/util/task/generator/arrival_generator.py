@@ -1,12 +1,12 @@
 import logging
+import time
 from abc import abstractmethod
 from asyncio import sleep
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
 from random import choices
-from time import time
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import numpy as np
 
@@ -49,7 +49,7 @@ class Arrival:
 class ExperimentGenerator(ArrivalGenerator):
     start_time: float = -1
     stop_time: float = -1
-    job_description: Dict[str, JobDescription] = None
+    job_dict: Dict[str, JobDescription] = None
 
     _tick_list: List[Arrival] = []
     _alive: bool = False
@@ -82,7 +82,7 @@ class ExperimentGenerator(ArrivalGenerator):
         """
         Generate a training task for a JobDescription once the inter-arrival time has been 'deleted'.
         @param train_id: id for a training task correspnoding to the JobDescription.
-        @type train_id: String
+        @type train_id: str
         """
         self.logger.info(f"Creating task for {task_id}")
         job = self.job_description[task_id]
@@ -94,11 +94,11 @@ class ExperimentGenerator(ArrivalGenerator):
 
         self._tick_list.append(Arrival(inter_arrival_ticks, train_task, task_id))
 
-    def start(self, duration: float):
+    def start(self, duration: Union[float, int]):
         """
         Function to start arrival generator, requires to
         @return:
-        @rtype:
+        @rtype: int, float
         """
         if not self.logger:
             self.set_logger()
@@ -118,9 +118,14 @@ class ExperimentGenerator(ArrivalGenerator):
         @return:
         @rtype:
         """
-        self.start_time = time()
-        while self._alive and time() - self.start_time < duration:
-            save_time = time()
+        self.start_time = time.time()
+        self.logger.info("Populating tick lists with initial arrivals")
+        for task_id, job_description in self.job_dict.keys():
+            self.generate_arrival(task_id)
+            self.logger.debug(f"Arrival {task_id} arrives at {self._tick_list[-1].ticks} seconds")
+
+        while self._alive and time.time() - self.start_time < duration:
+            save_time = time.time()
             for indx, entry in enumerate(self._tick_list):
                 entry.ticks -= self._decrement
                 if entry.ticks <= 0:
@@ -128,7 +133,7 @@ class ExperimentGenerator(ArrivalGenerator):
                     self.arrivals.put(entry)
                     self.generate_arrival(entry.task_id)
             # Correct for time drift between execution, otherwise drift adds up, and arrivals don't generate correctly
-            correction_time = time() - save_time
+            correction_time = time.time() - save_time
             sleep(self._decrement - correction_time)
-        self.stop_time = time()
+        self.stop_time = time.time()
         self.logger.info(f"Stopped execution at: {self.stop_time}, duration: {self.stop_time - self.start_time}/{duration}")
