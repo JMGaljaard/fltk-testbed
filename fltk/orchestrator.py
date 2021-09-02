@@ -37,11 +37,11 @@ class Orchestrator(object):
     completed_tasks: List[str] = []
 
     def __init__(self, cluster_mgr: ClusterManager, arv_gen: ArrivalGenerator, config: BareConfig):
-        self._logger = logging.getLogger('Orchestrator')
-        self._logger.debug("Loading in-cluster configuration")
+        self.__logger = logging.getLogger('Orchestrator')
+        self.__logger.debug("Loading in-cluster configuration")
         kubernetes.config.load_incluster_config()
 
-        self._cluster_mgr = cluster_mgr
+        self.__cluster_mgr = cluster_mgr
         self.__arrival_generator = arv_gen
         self._config = config
 
@@ -54,7 +54,7 @@ class Orchestrator(object):
         @return:
         @rtype:
         """
-        self._logger.info("Received stop signal for the Orchestrator.")
+        self.__logger.info("Received stop signal for the Orchestrator.")
         self._alive = False
 
     def run(self) -> None:
@@ -76,19 +76,19 @@ class Orchestrator(object):
                                    sys_conf=arrival.system_parameters,
                                    param_conf=arrival.hyper_parameters)
 
-                self._logger.info(f"Arrival of: {task}")
+                self.__logger.info(f"Arrival of: {task}")
                 self.pending_tasks.put(task)
             while not self.pending_tasks.empty():
                 # Do blocking request to priority queue
                 curr_task = self.pending_tasks.get()
-                self._logger.info(f"Scheduling arrival of Arrival: {curr_task}")
+                self.__logger.info(f"Scheduling arrival of Arrival: {curr_task}")
                 job_to_start = construct_job(self._config, curr_task)
 
                 self.__client.create(job_to_start, namespace=self._config.cluster_config.namespace)
                 self.deployed_tasks.append(curr_task)
             # TODO: Keep track of Jobs that were started, but may have completed....
             # That would conclude the MVP.
-            self._logger.debug("Still alive...")
+            self.__logger.debug("Still alive...")
             time.sleep(5)
 
         logging.info(f'Experiment completed, currently does not support waiting.')

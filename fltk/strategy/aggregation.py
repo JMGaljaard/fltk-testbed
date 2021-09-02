@@ -1,11 +1,8 @@
-
-
-
 def average_nn_parameters(parameters):
     """
-    Averages passed parameters.
-    :param parameters: nn model named parameters
-    :type parameters: list
+    @deprecated Average passed parameters.
+    @param parameters: nn model named parameters
+    @type parameters: list
     """
     new_params = {}
     for name in parameters[0].keys():
@@ -13,14 +10,22 @@ def average_nn_parameters(parameters):
 
     return new_params
 
+
 def fed_average_nn_parameters(parameters, sizes):
+    """
+    @deprecated Federated Average passed parameters.
+    @param parameters: nn model named parameters
+    @type parameters: list
+    @param sizes:
+    @type sizes:
+    """
     new_params = {}
     sum_size = 0
     for client in parameters:
         for name in parameters[client].keys():
             try:
                 new_params[name].data += (parameters[client][name].data * sizes[client])
-            except:
+            except Exception as e:
                 new_params[name] = (parameters[client][name].data * sizes[client])
         sum_size += sizes[client]
 

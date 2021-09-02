@@ -110,17 +110,17 @@ class BareConfig(object):
     def get_scheduler_step_size(self) -> int:
         return self.execution_config.general_net.scheduler_step_size
 
-    def get_scheduler_gamma(self):
+    def get_scheduler_gamma(self) -> float:
         return self.execution_config.general_net.scheduler_gamma
 
-    def get_min_lr(self):
+    def get_min_lr(self) -> float:
         return self.execution_config.general_net.min_lr
 
-    def get_data_path(self):
-        return self.execution_config.data_path
+    def get_data_path(self) -> Path:
+        return Path(self.execution_config.data_path)
 
-    def get_default_model_folder_path(self):
-        return self.execution_config.default_model_folder_path
+    def get_default_model_folder_path(self) -> Path:
+        return Path(self.execution_config.default_model_folder_path)
 
     def cuda_enabled(self) -> bool:
         """
@@ -143,5 +143,5 @@ class BareConfig(object):
     def get_epoch_save_end_suffix(self) -> bool:
         return self.execution_config.epoch_save_suffix
 
-    def get_save_model_folder_path(self):
-        return self.execution_config.save_model_path
+    def get_save_model_folder_path(self) -> Path:
+        return Path(self.execution_config.save_model_path)

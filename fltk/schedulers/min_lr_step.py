@@ -1,6 +1,8 @@
 import abc
 import logging
 
+import torch
+
 
 class LearningScheduler(abc.ABC):
 
@@ -11,10 +13,10 @@ class LearningScheduler(abc.ABC):
 
 class MinCapableStepLR(LearningScheduler):
 
-    def __init__(self, optimizer, step_size, gamma, min_lr):
+    def __init__(self, optimizer: torch.nn.Optimizer, step_size, gamma, min_lr):
         """
         :param logger: logger
-        :type logger: loguru.logger
+        :type logger: logger
         :param optimizer:
         :type optimizer: torch.optim
         :param step_size: # of epochs between LR updates

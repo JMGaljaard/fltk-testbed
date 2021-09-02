@@ -189,11 +189,11 @@ class Client(object):
         class_precision: np.array = calculate_class_precision(confusion_mat)
         class_recall: np.array = calculate_class_recall(confusion_mat)
 
-        # self._logger.debug('Test set: Accuracy: {}/{} ({:.0f}%)'.format(correct, total, accuracy))
-        # self._logger.debug('Test set: Loss: {}'.format(loss))
-        # self._logger.debug("Confusion Matrix:\n" + str(confusion_mat))
-        # self._logger.debug("Class precision: {}".format(str(class_precision)))
-        # self._logger.debug("Class recall: {}".format(str(class_recall)))
+        self._logger.debug('Test set: Accuracy: {}/{} ({:.0f}%)'.format(correct, total, accuracy))
+        self._logger.debug('Test set: Loss: {}'.format(loss))
+        self._logger.debug("Confusion Matrix:\n" + str(confusion_mat))
+        self._logger.debug("Class precision: {}".format(str(class_precision)))
+        self._logger.debug("Class recall: {}".format(str(class_recall)))
 
         return accuracy, loss, class_precision, class_recall, confusion_mat
 
@@ -221,8 +221,16 @@ class Client(object):
                 elapsed_time_test = datetime.datetime.now() - start_time_test
                 test_time_ms = int(elapsed_time_test.total_seconds() * 1000)
 
-                data = EpochData(train_time_ms, test_time_ms, train_loss, accuracy, test_loss, class_precision,
-                                 confusion_mat, class_recall)
+                data = EpochData(epoch_id=epoch,
+                                 duration_train=train_time_ms,
+                                 duration_test=test_time_ms,
+                                 loss_train=train_loss,
+                                 accuracy=accuracy,
+                                 loss=test_loss,
+                                 class_precision=class_precision,
+                                 class_recall=class_recall,
+                                 confusion_mat=confusion_mat)
+
                 epoch_results.append(data)
                 self.log_progress(data, epoch)
         return epoch_results

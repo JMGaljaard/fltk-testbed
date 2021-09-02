@@ -12,7 +12,6 @@ spec:
         - fltk
         - cluster
         - configs/example_cloud_experiment.json
-        - --rank=0
       env:
         - name: PYTHONUNBUFFERED
           value: "1"

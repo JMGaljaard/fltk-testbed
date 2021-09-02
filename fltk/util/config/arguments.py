@@ -19,7 +19,7 @@ CLIENT_ARGS: List[Tuple[str, str, str, type]] = \
      ("decay", 'dc',
       "Rate at which the learning rate decreases (i.e. the optimization takes smaller steps", float),
      ("loss", 'ls', "Loss function to use for optimization steps", str),
-     ("optimizer", 'op', "Which optimizer to use during the trainign process", str)
+     ("optimizer", 'op', "Which optimizer to use during the training process", str)
      ]
 
 

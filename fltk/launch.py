@@ -40,8 +40,8 @@ def launch_client(task_id: str, config: BareConfig = None, learning_params: Lear
     @type config: BareConfig
     @param learning_params:
     @type: LearningParameters
-    @return:
-    @rtype:
+    @return: None
+    @rtype: None
     """
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
     rank, world_size, backend = 0, None, None
@@ -74,6 +74,7 @@ def launch_orchestrator(args: Namespace = None, config: BareConfig = None):
     cluster_manager = ClusterManager()
 
     orchestrator = Orchestrator(cluster_manager, arrival_generator, config)
+
     pool = ThreadPool(3)
     logging.info("Starting cluster manager")
     pool.apply_async(cluster_manager.start)

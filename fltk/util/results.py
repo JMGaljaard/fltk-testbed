@@ -5,6 +5,7 @@ import numpy as np
 
 @dataclass
 class EpochData:
+    epoch_id: int
     duration_train: int
     duration_test: int
     loss_train: float
