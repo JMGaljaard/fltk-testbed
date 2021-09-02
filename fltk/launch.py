@@ -6,6 +6,7 @@ from multiprocessing.pool import ThreadPool
 import torch.distributed as dist
 
 from fltk.client import Client
+from fltk.extractor import download_datasets
 from fltk.orchestrator import Orchestrator
 from fltk.util.cluster.client import ClusterManager
 from fltk.util.config.arguments import LearningParameters
@@ -31,7 +32,7 @@ def is_distributed() -> bool:
     return dist.is_available() and world_size > 1
 
 
-def launch_client(task_id, config: BareConfig = None, learning_params: LearningParameters = None):
+def launch_client(task_id: str, config: BareConfig = None, learning_params: LearningParameters = None):
     """
     @param task_id:
     @type task_id:
@@ -59,26 +60,31 @@ def launch_client(task_id, config: BareConfig = None, learning_params: LearningP
 def launch_orchestrator(args: Namespace = None, config: BareConfig = None):
     """
     Default runner for the Orchestrator that is based on KubeFlow
-    @param args:
-    @type args:
+    @param args: Commandline arguments passed to the execution. Might be removed in a future commit.
+    @type args: Namespace
     @param config: Configuration for components, needed for spinning up components of the Orchestrator.
     @type config: BareConfig
-    @return:
-    @rtype:
+    @return: None
+    @rtype: None
     """
     logging.info('Starting as Orchestrator')
     logging.info("Starting Orchestrator, initializing resources....")
-    orchestrator = Orchestrator(config)
-    cluster_manager = ClusterManager()
-    arrival_generator = ExperimentGenerator()
 
+    arrival_generator = ExperimentGenerator()
+    cluster_manager = ClusterManager()
+
+    orchestrator = Orchestrator(cluster_manager, arrival_generator, config)
     pool = ThreadPool(3)
     logging.info("Starting cluster manager")
     pool.apply_async(cluster_manager.start)
     logging.info("Starting arrival generator")
-    pool.apply_async(arrival_generator.run)
+    pool.apply_async(arrival_generator.start(config.get_duration()))
     logging.info("Starting orchestrator")
     pool.apply(orchestrator.run)
     pool.join()
 
     logging.info("Stopped execution of Orchestrator...")
+
+
+def launch_extractor(args: Namespace, config: BareConfig):
+    download_datasets(args, config)

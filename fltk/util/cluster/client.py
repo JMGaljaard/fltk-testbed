@@ -3,17 +3,20 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from multiprocessing.pool import ThreadPool
-from typing import Dict
+from typing import Dict, List
+from uuid import UUID
 
 import schedule
-from kubeflow.pytorchjob import V1PyTorchJob, V1ReplicaSpec
+from kubeflow.pytorchjob import V1PyTorchJob, V1ReplicaSpec, V1PyTorchJobSpec
 from kubernetes import client, config
-from kubernetes.client import BatchV1Api, V1Job, V1ObjectMeta, V1ResourceRequirements
+from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container, V1PodTemplateSpec, \
+    V1VolumeMount, V1Toleration
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.util.cluster.conversion import Convert
+from fltk.util.config import BareConfig
 from fltk.util.singleton import Singleton
-from fltk.util.task.config.parameter import TrainTask
+from fltk.util.task.task import ArrivalTask
 
 
 @dataclass
@@ -40,10 +43,12 @@ class Resource:
 
 class BuildDescription:
     resources: V1ResourceRequirements
-    identifier: str
-    container: client.V1Container
-    template: client.V1PodTemplateSpec
-    spec: client.V1JobSpec
+    master_container: V1Container
+    worker_container: V1Container
+    master_template: V1PodTemplateSpec
+    worker_template: V1PodTemplateSpec
+    id: UUID
+    spec: V1PyTorchJobSpec
 
 
 class ResourceWatchDog:
@@ -64,7 +69,7 @@ class ResourceWatchDog:
         Work should be based on the details listed here:
         https://github.com/scylladb/scylla-cluster-tests/blob/a7b09e69f0152a4d70bfb25ded3d75b7e7328acc/sdcm/cluster_k8s/__init__.py#L216-L223
         """
-        self._v1: client.CoreV1Api = None
+        self._v1: client.CoreV1Api
         self._logger = logging.getLogger('ResourceWatchDog')
         self._Q = Convert()
 
@@ -102,7 +107,7 @@ class ResourceWatchDog:
 
     def __monitor_nodes(self) -> None:
         """
-        Watchdog function that watches the Cluster resources in a K8s cluster. Requires the config to be set and loaded
+        Watchdog function that watches the Cluster resources in a K8s cluster. Requires the conf to be set and loaded
         prior to calling.
         @return: None
         @rtype: None
@@ -129,8 +134,9 @@ class ResourceWatchDog:
         new_resource_mapper = {}
 
         self._logger.info("Fetching pod information of cluster...")
-        try:
-            for node_name, node in self._node_lookup.items():
+        for node_name, node in self._node_lookup.items():
+            try:
+
                 # Create field selector to only get active pods that 'request' memory
                 selector = f'status.phase!=Succeeded,status.phase!=Failed,spec.nodeName={node_name}'
                 # Select pods from all namespaces on specific Kubernetes node
@@ -150,15 +156,20 @@ class ResourceWatchDog:
                         mem_lim += self._Q(lmts["memory"])
                 resource = Resource(node_name, alloc_cpu, alloc_mem, core_req, mem_req, core_lim, mem_lim)
                 new_resource_mapper[node_name] = resource
-        except Exception as e:
-            self._logger.error(f'Namespace lookup for {node_name} failed. Reason: {e}')
+            except Exception as e:
+                self._logger.error(f'Namespace lookup for {node_name} failed. Reason: {e}')
 
         self._resource_lookup = new_resource_mapper
         self._logger.debug(self._resource_lookup)
 
 
 class ClusterManager(metaclass=Singleton):
-    _alive = False
+    """
+    Object to potentially further extend. This shows how the information of different Pods in a cluster can be
+    requested and parsed. Currently, it mainly exists to start the ResourceWatchDog, which now only logs the amount of
+    resources...
+    """
+    __alive = False
     __threadpool: ThreadPool = None
 
     def __init__(self):
@@ -168,13 +179,12 @@ class ClusterManager(metaclass=Singleton):
         self._logger = logging.getLogger('ClusterManager')
         self._config = config.load_incluster_config()
         self._watchdog = ResourceWatchDog()
-        self._client_handler = ClientHandler()
 
     def start(self):
         self._logger.info("Spinning up cluster manager...")
         # Set debugging to WARNING only, as otherwise DEBUG statements will flood the logs.
         client.rest.logger.setLevel(logging.WARNING)
-        self._alive = True
+        self.__alive = True
         self.__thread_pool = ThreadPool(processes=2)
         self.__thread_pool.apply_async(self._watchdog.start)
         self.__thread_pool.apply_async(self._run)
@@ -182,21 +192,16 @@ class ClusterManager(metaclass=Singleton):
     def _stop(self):
         self._logger.info("Stopping execution of ClusterManager, halting components...")
         self._watchdog.stop()
+        self.__alive = False
         self.__thread_pool.join()
         self._logger.info("Successfully stopped execution of ClusterManager")
 
     def _run(self):
-        while self._alive:
+        while self.__alive:
             self._logger.info("Still alive...")
             time.sleep(10)
 
         self._stop()
-
-    def _schedulable_task(self, train_task: TrainTask):
-        current_resources = self._watchdog._resource_lookup
-
-    def deploy_task(self):
-        train_task: TrainTask = None
 
 
 class DeploymentBuilder:
@@ -205,12 +210,8 @@ class DeploymentBuilder:
     def reset(self) -> None:
         self._buildDescription = BuildDescription()
 
-    def create_identifier(self, identifier) -> None:
-        # TODO: Move, or create identifier here.
-        self._buildDescription.identifier = identifier
-
     @staticmethod
-    def __resource_dict(mem: str, cpu: str) -> Dict[str, str]:
+    def __resource_dict(mem: str, cpu: int) -> Dict[str, str]:
         """
         Private helper function to create a resource dictionary for deployments. Currently only supports the creation
         of the requests/limits directory that is needed for a V1ResoruceRequirements object.
@@ -222,47 +223,97 @@ class DeploymentBuilder:
         @return:
         @rtype:
         """
-        return {'memory': mem, 'cpu': cpu}
+        return {'memory': mem, 'cpu': str(cpu)}
 
-    def build_resources(self, mem_req, cpu_req, mem_lim, cpu_lim) -> None:
-        req_dict = self.__resource_dict(mem_req, cpu_req)
-        lim_dict = self.__resource_dict(mem_lim, cpu_lim)
+    def build_resources(self, arrival_task: ArrivalTask) -> None:
+        system_reqs = arrival_task.sys_conf
+        req_dict = self.__resource_dict(mem=system_reqs.executor_memory,
+                                        cpu=system_reqs.executor_cores)
+        # Currently the request is set to the limits. You may want to change this.
         self._buildDescription.resources = client.V1ResourceRequirements(requests=req_dict,
-                                                                         limits=lim_dict)
+                                                                         limits=req_dict)
 
-    def build_container(self, identifier: str = None) -> None:
-        self._buildDescription.container = client.V1Container(
-            name=f'client-test',
-            image='localhost:5000/fltk',
-            command=["python3", "fltk/launch.py", "single",
-                     "configs/cloud_experiment.yaml"],
-            # TODO: Decide how to give client identifier.
+    def _generate_command(self, config: BareConfig, task: ArrivalTask):
+        command = (f'python3 -m client {config.config_path} {task.id} '
+                   f'--model {task.network} --dataset {task.dataset} '
+                   f'--optimizer Adam --max_epoch {task.param_conf.max_epoch} '
+                   f'--batch_size {task.param_conf.bs} --learning_rate {task.param_conf.lr} '
+                   f'--decay {task.param_conf.lr_decay} --loss CrossEntropy')
+        return command.split(' ')
+
+    def _build_container(self, conf: BareConfig, task: ArrivalTask, name: str = "pytorch",
+                         vol_mnts: List[V1VolumeMount] = None) -> V1Container:
+        return V1Container(
+            name=name,
+            image=conf.image,
+            command=self._generate_command(conf, task),
             args=['hello world'],
             image_pull_policy='Always',
             # Set the resources to the pre-generated resources
-            resources=self._buildDescription.resources
+            resources=self._buildDescription.resources,
+            volume_mounts=vol_mnts
         )
 
-    def build_template(self, restart_policy='Never') -> None:
-        self._buildDescription.template = client.V1PodTemplateSpec(
+    def build_worker_container(self, conf: BareConfig, task: ArrivalTask, name: str = "pytorch") -> None:
+        self._buildDescription.worker_container = self._build_container(conf, task, name)
+
+    def build_master_container(self, conf: BareConfig, task: ArrivalTask, name: str = "pytorch") -> None:
+        """
+        Function to build the Master worker container. This requires the LOG PV to be mounted on the expected
+        logging directory. Make sure that any changes in the Helm charts are also reflected here.
+        @param image:
+        @type image:
+        @param name:
+        @type name:
+        @return:
+        @rtype:
+        """
+        master_mounts: List[V1VolumeMount] = [V1VolumeMount(
+            mount_path=f'/opt/federation-lab/{conf.get_log_dir()}"',
+            name='fl-log-claim',
+            read_only=False
+        )]
+        self._buildDescription.master_container = self._build_container(conf, task, name, master_mounts)
+
+    def build_container(self, task: ArrivalTask, conf: BareConfig):
+        self.build_master_container(conf, task)
+        self.build_worker_container(conf, task)
+
+    def build_template(self) -> None:
+        """
+
+        @return:
+        @rtype:
+        """
+        # TODO: Add support for tolerations to use only affinitity nodes to deploy to...
+        # Ensure with taints that
+        # https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+
+        """
+        V1Toleration()
+        """
+        V1Toleration()
+        self._buildDescription.master_template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
-            spec=client.V1PodSpec(restart_policy=restart_policy,
-                                  containers=[self._buildDescription.container]))
+            spec=client.V1PodSpec(containers=[self._buildDescription.master_container]))
+        self._buildDescription.worker_template = client.V1PodTemplateSpec(
+            metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
+            spec=client.V1PodSpec(containers=[self._buildDescription.worker_container]))
 
-    def build_spec(self, worker_num: int = 0) -> None:
-        # TODO: Ensure ReadWriteMany PVC is mounted to the Master node.
-        replica_spec = {"Master": V1ReplicaSpec(
-            replicas=1,
-            restart_policy="OnFailure",
-            template=self._buildDescription.template
-        )}
-
-        if worker_num > 0:
-            replica_spec['Worker'] = V1ReplicaSpec(
-                replicas=worker_num,
-                restart_policy="OnFailure",
-                template=self._buildDescription.template
+    def build_spec(self, task: ArrivalTask, restart_policy: str = 'OnFailure') -> None:
+        pt_rep_spec: Dict[str, V1ReplicaSpec] = \
+            {"Master": V1ReplicaSpec(
+                replicas=1,
+                restart_policy=restart_policy,
+                template=self._buildDescription.master_template
+            )}
+        if task.sys_conf.data_parallelism > 1:
+            pt_rep_spec['Worker'] = V1ReplicaSpec(
+                replicas=task.sys_conf.data_parallelism - 1,
+                restart_policy=restart_policy,
+                template=self._buildDescription.worker_template
             )
+        self._buildDescription.spec = V1PyTorchJobSpec(pytorch_replica_specs=pt_rep_spec)
 
     def construct(self) -> V1PyTorchJob:
         """
@@ -275,30 +326,30 @@ class DeploymentBuilder:
         job = V1PyTorchJob(
             api_version="kubeflow.org/v1",
             kind="PyTorchJob",
-            metadata=V1ObjectMeta(name=self._buildDescription.identifier, namespace='kubeflow'),
+            metadata=V1ObjectMeta(name=self._buildDescription.id, namespace='kubeflow'),
             spec=self._buildDescription.spec)
         return job
 
+    def create_identifier(self, task: ArrivalTask):
+        self._buildDescription.id = task.id
 
-def construct_job():
+
+def construct_job(conf: BareConfig, task: ArrivalTask) -> V1PyTorchJob:
+    """
+    Function to build a Job, based on the specifications of an ArrivalTask, and the general configuration of the
+    BareConfig.
+    @param conf: configuration object that contains specifics to properly start a client.
+    @type conf: BareConfig
+    @param task: Learning task for which a job description must be made.
+    @type task: ArrivalTask
+    @return: KubeFlow compatible PyTorchJob description to create a Job with the requested system and hyper parameters.
+    @rtype: V1PyTorchJob
+    """
     dp_builder = DeploymentBuilder()
-
-    dp_builder.create_identifier("client_example")
-    dp_builder.build_resources("1024Mi", '1000m', "1024Mi", "1000m")
-    dp_builder.build_container()
+    dp_builder.create_identifier(task)
+    dp_builder.build_resources(task)
+    dp_builder.build_container(task, conf)
     dp_builder.build_template()
-    dp_builder.build_spec()
+    dp_builder.build_spec(task)
     job = dp_builder.construct()
-
-
-def deploy_job(api_instance: BatchV1Api, job: V1Job):
-    api_instance.create_namespaced_job(body=job, namespace="test")
-
-
-class ClientHandler(object):
-    def __init__(self):
-        self._v1 = client.CoreV1Api()
-
-    def deploy_client(self, description):
-        # API to exec with
-        k8s_apps_v1 = client.AppsV1Api()
+    return job

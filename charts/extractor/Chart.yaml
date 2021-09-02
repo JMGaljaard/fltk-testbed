@@ -1,0 +1,10 @@
+name: fltk-extractor
+description: Helm Chart for running the Extractor for the FLTK framework
+version: 0.1.0
+apiVersion: v1
+appVersion: 1.17.0
+keywords:
+  - extractor
+  - FLTK
+sources:
+home:

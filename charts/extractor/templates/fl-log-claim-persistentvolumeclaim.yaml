@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    io.fltk.service: fl-log-claim
+  name: fl-log-claim
+spec:
+  # Only the Extractor pod should be able to write to the part. Other pods 'simply' use it as read-only
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.extractor.logging.size }}
+  storageClassName: "nfs"

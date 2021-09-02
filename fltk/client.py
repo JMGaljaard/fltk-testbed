@@ -1,29 +1,31 @@
 import datetime
 import logging
 from pathlib import Path
-from typing import Union, List
+from typing import Union, List, Tuple
 
+import numpy as np
 import torch
 import torch.distributed as dist
-from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
+from torch.utils.tensorboard import SummaryWriter
 
 from fltk.nets.util.evaluation import calculate_class_precision, calculate_class_recall
 from fltk.nets.util.utils import save_model, load_model_from_file
 from fltk.schedulers import MinCapableStepLR
+from fltk.schedulers.min_lr_step import LearningScheduler
 from fltk.util.config.arguments import LearningParameters
 from fltk.util.config.base_config import BareConfig
 from fltk.util.results import EpochData
 
 
-class Client:
+class Client(object):
 
-    def __init__(self, rank: int, task_id: int, world_size: int, config: BareConfig = None,
+    def __init__(self, rank: int, task_id: str, world_size: int, config: BareConfig = None,
                  learning_params: LearningParameters = None):
         """
         @param rank: PyTorch rank provided by KubeFlow setup.
         @type rank: int
-        @param task_id: String identifier representing the UID of the training task
+        @param task_id: String id representing the UID of the training task
         @type task_id: str
         @param config:
         @type config:
@@ -33,7 +35,6 @@ class Client:
         self._logger = logging.getLogger(f'Client-{rank}-{task_id}')
 
         self._logger.info("Initializing learning client")
-        self._logger.debug(f"Configuration received: {config}")
         self._id = rank
         self._world_size = world_size
         self._task_id = task_id
@@ -48,18 +49,20 @@ class Client:
         self.model = self.learning_params.get_model_class()()
         self.device = self._init_device()
 
-        self.optimizer = None
-        self.scheduler = None
+        self.optimizer: torch.optim.Optimizer
+        self.scheduler: LearningScheduler
+        self.tb_writer: SummaryWriter
 
-    def prepare_learner(self, distributed: bool = False, backend: Union[str, dist.Backend] = None):
+    def prepare_learner(self, distributed: bool = False, backend: Union[str, dist.Backend] = None) -> None:
         """
         Function to prepare the learner, i.e. load all the necessary data into memory.
-        @param distributed:
-        @type distributed:
-        @param backend:
-        @type backend:
-        @return:
-        @rtype:
+        @param distributed: Indicates whether the execution must be run in Distributed fashion with DDP.
+        @type distributed: bool
+        @param backend: Which backend to use during training, needed when executing in distributed fashion,
+        for CPU execution the GLOO (default) backend must be used. For GPU execution, the NCCL execution is needed.
+        @type backend: dist.Backend
+        @return: None
+        @rtype: None
         """
         self._logger.info(f"Preparing learner model with distributed={distributed}")
         self.model.to(self.device)
@@ -75,6 +78,12 @@ class Client:
                                           self.config.get_scheduler_step_size(),
                                           self.config.get_scheduler_gamma(),
                                           self.config.get_min_lr())
+
+        self.tb_writer = SummaryWriter(str(self.config.get_log_path(self._task_id, self._id, self.learning_params.model)))
+
+    def stop_learner(self):
+        self._logger.info(f"Tearing down Client {self._id}")
+        self.tb_writer.close()
 
     def _init_device(self, cuda_device: torch.device = torch.device('cpu')):
         """
@@ -104,7 +113,7 @@ class Client:
         default_model_path = Path(self.config.get_default_model_folder_path()).joinpath(model_file)
         load_model_from_file(self.model, default_model_path)
 
-    def train(self, epoch, log_interval: int = 100):
+    def train(self, epoch, log_interval: int = 50):
         """
         Function to start training, regardless of DistributedDataParallel (DPP) or local training. DDP will account for
         synchronization of nodes. If extension requires to make use of torch.distributed.send and torch.distributed.recv
@@ -150,17 +159,18 @@ class Client:
 
         return final_running_loss
 
-    def test(self):
+    def test(self) -> Tuple[float, float, np.array, np.array, np.array]:
         correct = 0
         total = 0
         targets_ = []
         pred_ = []
         loss = 0.0
+
         # Disable gradient calculation, as we are only interested in predictions
         with torch.no_grad():
             for (images, labels) in self.dataset.get_test_loader():
                 images, labels = images.to(self.device), labels.to(self.device)
-                dist.reduce
+
                 outputs = self.model(images)
                 # Currently the FLTK framework assumes that a classification task is performed (hence max).
                 # Future work may add support for non-classification training.
@@ -174,19 +184,18 @@ class Client:
                 loss += self.loss_function(outputs, labels).item()
 
         accuracy = 100.0 * correct / total
-        confusion_mat = confusion_matrix(targets_, pred_)
+        confusion_mat: np.array = confusion_matrix(targets_, pred_)
 
-        class_precision = calculate_class_precision(confusion_mat)
-        class_recall = calculate_class_recall(confusion_mat)
+        class_precision: np.array = calculate_class_precision(confusion_mat)
+        class_recall: np.array = calculate_class_recall(confusion_mat)
 
-        self._logger.debug('Test set: Accuracy: {}/{} ({:.0f}%)'.format(correct, total, accuracy))
-        self._logger.debug('Test set: Loss: {}'.format(loss))
-        self._logger.debug("Classification Report:\n" + classification_report(targets_, pred_))
-        self._logger.debug("Confusion Matrix:\n" + str(confusion_mat))
-        self._logger.debug("Class precision: {}".format(str(class_precision)))
-        self._logger.debug("Class recall: {}".format(str(class_recall)))
+        # self._logger.debug('Test set: Accuracy: {}/{} ({:.0f}%)'.format(correct, total, accuracy))
+        # self._logger.debug('Test set: Loss: {}'.format(loss))
+        # self._logger.debug("Confusion Matrix:\n" + str(confusion_mat))
+        # self._logger.debug("Class precision: {}".format(str(class_precision)))
+        # self._logger.debug("Class recall: {}".format(str(class_recall)))
 
-        return accuracy, loss, class_precision, class_recall
+        return accuracy, loss, class_precision, class_recall, confusion_mat
 
     def run_epochs(self) -> List[EpochData]:
         """
@@ -207,14 +216,15 @@ class Client:
                 train_time_ms = int(elapsed_time_train.total_seconds() * 1000)
 
                 start_time_test = datetime.datetime.now()
-                accuracy, test_loss, class_precision, class_recall = self.test()
+                accuracy, test_loss, class_precision, class_recall, confusion_mat = self.test()
 
                 elapsed_time_test = datetime.datetime.now() - start_time_test
                 test_time_ms = int(elapsed_time_test.total_seconds() * 1000)
 
                 data = EpochData(train_time_ms, test_time_ms, train_loss, accuracy, test_loss, class_precision,
-                                 class_recall, client_id=self._id)
+                                 confusion_mat, class_recall)
                 epoch_results.append(data)
+                self.log_progress(data, epoch)
         return epoch_results
 
     def save_model(self, epoch):
@@ -224,3 +234,14 @@ class Client:
         """
         self._logger.debug(f"Saving model to flat file storage. Saved at epoch #{epoch}")
         save_model(self.model, self.config.get_save_model_folder_path(), epoch)
+
+    def log_progress(self, epoch_data: EpochData, epoch):
+
+
+        self.tb_writer.add_scalar('training loss per epoch',
+                                    epoch_data.loss_train,
+                                    epoch)
+
+        self.tb_writer.add_scalar('accuracy per epoch',
+                                    epoch_data.accuracy,
+                                    epoch)

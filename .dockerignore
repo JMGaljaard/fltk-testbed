@@ -1,3 +1,6 @@
-venv
-data_loaders
-simple_example
+# Ignoring the venv
+venv/
+
+#
+# Ignoring all the compressed archives
+**/*.tar.gz

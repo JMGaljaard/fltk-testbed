@@ -2,13 +2,13 @@
   "jobClassParameters": [
     {
       "networkConfiguration": {
-        "network": "ExampleCNN",
+        "network": "FashionMNISTCNN",
         "dataset": "MNIST"
       },
       "systemParameters": {
         "dataParallelism": "1",
         "executorCores": "1",
-        "executorMemory": "1G",
+        "executorMemory": "1Gi",
         "action": "train"
       },
       "hyperParameters": {
@@ -25,22 +25,19 @@
     }
   ],
   "lambda": 0.004,
-  "preemptJobs": 0,
-  "runtime": 3600
+  "preemptJobs": 0
 },
   {
     "jobClassParameters": [
       {
         "networkConfiguration": {
-          "network": "ExampleCNN",
+          "network": "FashionMNISTResNet",
           "dataset": "MNIST"
         },
         "systemParameters": {
-          "driverCores": "1",
-          "driverMemory": "1G",
           "dataParallelism": "1",
           "executorCores": "1",
-          "executorMemory": "1G",
+          "executorMemory": "1Gi",
           "action": "train"
         },
         "hyperParameters": {
@@ -56,13 +53,13 @@
       },
       {
         "networkConfiguration": {
-          "network": "ExampleCNN",
+          "network": "FashionMNISTCNN",
           "dataset": "MNIST"
         },
         "systemParameters": {
           "dataParallelism": "1",
           "executorCores": "1",
-          "executorMemory": "1G",
+          "executorMemory": "1Gi",
           "action": "train"
         },
         "hyperParameters": {
@@ -79,8 +76,7 @@
       }
     ],
     "lambda": 0.004,
-    "preemptJobs": 0,
-    "runtime": 3600
+    "preemptJobs": 0
   }
 ]
 

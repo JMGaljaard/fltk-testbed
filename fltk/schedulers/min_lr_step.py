@@ -1,7 +1,15 @@
+import abc
 import logging
 
 
-class MinCapableStepLR:
+class LearningScheduler(abc.ABC):
+
+    @abc.abstractmethod
+    def step(self):
+        raise NotImplementedError()
+
+
+class MinCapableStepLR(LearningScheduler):
 
     def __init__(self, optimizer, step_size, gamma, min_lr):
         """
