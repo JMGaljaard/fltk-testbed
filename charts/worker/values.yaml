@@ -1,3 +1,0 @@
-worker:
-    cpu: 500m
-    memory: 1500000000

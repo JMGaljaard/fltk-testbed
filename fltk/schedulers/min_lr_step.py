@@ -13,7 +13,7 @@ class LearningScheduler(abc.ABC):
 
 class MinCapableStepLR(LearningScheduler):
 
-    def __init__(self, optimizer: torch.nn.Optimizer, step_size, gamma, min_lr):
+    def __init__(self, optimizer: torch.optim.Optimizer, step_size, gamma, min_lr):
         """
         :param logger: logger
         :type logger: logger

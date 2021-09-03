@@ -24,7 +24,7 @@
       ]
     }
   ],
-  "lambda": 0.004,
+  "lambda": 40,
   "preemptJobs": 0
 },
   {
@@ -75,7 +75,7 @@
         ]
       }
     ],
-    "lambda": 0.004,
+    "lambda": 20,
     "preemptJobs": 0
   }
 ]
