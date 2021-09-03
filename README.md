@@ -230,9 +230,9 @@ starts at 1 TiB. As such, we setup a NFS on our cluster, which will provide this
 For this, we will make use of the `nfs-server-provisioner` Helm chart, that neatly wraps this functionality in an easy
 to deploy chart. Make sure to install the NFS server in the same *namespace* as where you want to run your experiments.
 ```bash
-helm install repo raphael https://raphaelmonrouzeau.github.io/charts/repository/
+helm install repo kvaps https://raphaelmonrouzeau.github.io/charts/repository/
 helm update
-helm install nfs-server raphael/nfs-server-provisioner --set persistence.enabled=true,persistence.storageClass=do-block-storage,persistence.size=20Gi
+helm install nfs-server kvaps/nfs-server-provisioner --set persistence.enabled=true,persistence.storageClass=do-block-storage,persistence.size=20Gi
 ```
 
 **N.B.** If you wish to use a volume as both **ReadWriteOnce** and **ReadOnlyMany**, GCE does not provide this service

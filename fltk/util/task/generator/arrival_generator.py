@@ -1,4 +1,5 @@
 import logging
+import multiprocessing
 import time
 from abc import abstractmethod
 from asyncio import sleep
@@ -11,7 +12,7 @@ from typing import Dict, List, Union
 import numpy as np
 
 from fltk.util.singleton import Singleton
-from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser
+from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser, JobClassParameter
 
 
 @dataclass
@@ -53,11 +54,12 @@ class ExperimentGenerator(ArrivalGenerator):
 
     _tick_list: List[Arrival] = []
     _alive: bool = False
-    _decrement = 1
-    __default_config: Path = Path('configs/example_cloud_experiment.json')
+    _decrement = 10
+    __default_config: Path = Path('configs/tasks/example_arrival_config.json')
 
     def __init__(self, custom_config: Path = None):
         super(ExperimentGenerator, self).__init__(custom_config or self.__default_config)
+        self.load_config()
 
     def set_logger(self, name: str = None):
         """
@@ -70,29 +72,29 @@ class ExperimentGenerator(ArrivalGenerator):
         logging_name = name or self.__class__.__name__
         self.logger = logging.getLogger(logging_name)
 
-    def load_config(self):
+    def load_config(self, alternative_path: Path = None):
         """
         Generate
         """
-        parser = ExperimentParser(config_path=self.configuration_path)
+        parser = ExperimentParser(config_path=alternative_path or self.configuration_path)
         experiment_descriptions = parser.parse()
-        self.job_description = {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions)}
+        self.job_dict = {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions)}
 
-    def generate_arrival(self, task_id: str) -> None:
+    def generate_arrival(self, task_id: str) -> Arrival:
         """
         Generate a training task for a JobDescription once the inter-arrival time has been 'deleted'.
-        @param train_id: id for a training task correspnoding to the JobDescription.
-        @type train_id: str
+        @param task_id: identifier for a training task corresponding to the JobDescription.
+        @type task_id: str
         """
         self.logger.info(f"Creating task for {task_id}")
-        job = self.job_description[task_id]
-        parameters = choices(job.job_class_parameters, [param.probability for param in job.job_class_parameters])[0]
-        priority = choices(parameters.priorities, [prio.probabilities for prio in parameters.priorities], k=1)[0]
+        job: JobDescription = self.job_dict[task_id]
+        parameters: JobClassParameter = choices(job.job_class_parameters, [param.class_probability for param in job.job_class_parameters])[0]
+        priority = choices(parameters.priorities, [prio.probability for prio in parameters.priorities], k=1)[0]
 
         inter_arrival_ticks = np.random.poisson(lam=job.arrival_statistic)
         train_task = TrainTask(task_id, parameters, priority)
 
-        self._tick_list.append(Arrival(inter_arrival_ticks, train_task, task_id))
+        return Arrival(inter_arrival_ticks, train_task, task_id)
 
     def start(self, duration: Union[float, int]):
         """
@@ -118,22 +120,29 @@ class ExperimentGenerator(ArrivalGenerator):
         @return:
         @rtype:
         """
+        np.random.seed(42)
         self.start_time = time.time()
         self.logger.info("Populating tick lists with initial arrivals")
-        for task_id, job_description in self.job_dict.keys():
-            self.generate_arrival(task_id)
-            self.logger.debug(f"Arrival {task_id} arrives at {self._tick_list[-1].ticks} seconds")
-
+        for task_id in self.job_dict.keys():
+            new_arrival: Arrival = self.generate_arrival(task_id)
+            self._tick_list.append(new_arrival)
+            self.logger.info(f"Arrival {new_arrival} arrives at {new_arrival.ticks} seconds")
+        event = multiprocessing.Event()
         while self._alive and time.time() - self.start_time < duration:
             save_time = time.time()
+            new_scheduled = []
             for indx, entry in enumerate(self._tick_list):
                 entry.ticks -= self._decrement
                 if entry.ticks <= 0:
                     self._tick_list.pop(indx)
                     self.arrivals.put(entry)
-                    self.generate_arrival(entry.task_id)
+                    new_arrival = self.generate_arrival(entry.task_id)
+                    new_scheduled.append(new_arrival)
+                    self.logger.info(f"Arrival {new_arrival} arrives at {new_arrival.ticks} seconds")
+                    break
+            self._tick_list += new_scheduled
             # Correct for time drift between execution, otherwise drift adds up, and arrivals don't generate correctly
             correction_time = time.time() - save_time
-            sleep(self._decrement - correction_time)
+            event.wait(timeout=self._decrement - correction_time)
         self.stop_time = time.time()
         self.logger.info(f"Stopped execution at: {self.stop_time}, duration: {self.stop_time - self.start_time}/{duration}")

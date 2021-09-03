@@ -11,7 +11,7 @@
       }
    },
    "execution_config": {
-      "duration": 3600
+      "duration": 3600,
       "experiment_prefix": "cloud_experiment",
       "cuda": false,
       "tensorboard": {

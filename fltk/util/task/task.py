@@ -1,12 +1,11 @@
-import abc
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import UUID
 
 from fltk.util.task.config.parameter import SystemParameters, HyperParameters
 
 
 @dataclass(order=True)
-class ArrivalTask(abc):
+class ArrivalTask:
     """
     Object to contain configuration of training task. It describes the following properties;
         * Number of machines
@@ -15,9 +14,9 @@ class ArrivalTask(abc):
         * Dataset
         * Hyper-parameters
     """
-    id: UUID
-    priority: int = field(st)
-    network: str
-    dataset: str
-    sys_conf: SystemParameters
-    param_conf: HyperParameters
+    id: UUID = field(compare=False)
+    priority: int
+    network: str = field(compare=False)
+    dataset: str = field(compare=False)
+    sys_conf: SystemParameters = field(compare=False)
+    param_conf: HyperParameters = field(compare=False)

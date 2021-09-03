@@ -69,7 +69,7 @@ class JobClassParameter:
     system_parameters: SystemParameters = field(metadata=config(field_name="systemParameters"))
     hyper_parameters: HyperParameters = field(metadata=config(field_name="hyperParameters"))
     class_probability: float = field(metadata=config(field_name="classProbability"))
-    priorities: List[Priority]
+    priorities: List[Priority] = field(metadata=config(field_name="priorities"))
 
 
 @dataclass_json
@@ -98,7 +98,6 @@ class TrainTask:
     network_configuration: NetworkConfiguration = field(compare=False)
     system_parameters: SystemParameters = field(compare=False)
     hyper_parameters: HyperParameters = field(compare=False)
-    arrival_ticks: float = field(compare=False)
     identifier: str = field(compare=False)
 
     def __init__(self, identity: str, job_parameters: JobClassParameter, priority: Priority):

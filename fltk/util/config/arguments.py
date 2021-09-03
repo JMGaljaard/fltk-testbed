@@ -91,12 +91,12 @@ def extract_learning_parameters(args: Namespace) -> LearningParameters:
 
 def create_extractor_parser(subparsers):
     extractor_parser = subparsers.add_parser('extractor')
-    extractor_parser.add_argument('conf', type=str)
+    extractor_parser.add_argument('config', type=str)
 
 
 def create_client_parser(subparsers) -> None:
     client_parser = subparsers.add_parser('client')
-    client_parser.add_argument('conf', type=str)
+    client_parser.add_argument('config', type=str)
     client_parser.add_argument('task_id', type=str)
 
     # Add hyper-parameters
@@ -106,4 +106,4 @@ def create_client_parser(subparsers) -> None:
 
 def create_cluster_parser(subparsers) -> None:
     cluster_parser = subparsers.add_parser('cluster')
-    cluster_parser.add_argument('conf', type=str)
+    cluster_parser.add_argument('config', type=str)
