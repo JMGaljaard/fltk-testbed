@@ -87,7 +87,7 @@ class ClusterConfig:
     client: ClientConfig
     wait_for_clients: bool = True
     namespace: str = 'test'
-
+    image: str = 'gcr.io/test-bed-distml/fltk:latest'
 
 @dataclass_json
 @dataclass

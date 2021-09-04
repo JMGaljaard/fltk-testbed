@@ -10,7 +10,7 @@ import schedule
 from kubeflow.pytorchjob import V1PyTorchJob, V1ReplicaSpec, V1PyTorchJobSpec
 from kubernetes import client, config
 from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container, V1PodTemplateSpec, \
-    V1VolumeMount, V1Toleration
+    V1VolumeMount, V1Toleration, V1Volume, V1PersistentVolumeClaimVolumeSource
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.util.cluster.conversion import Convert
@@ -177,7 +177,6 @@ class ClusterManager(metaclass=Singleton):
         # https://github.com/kubernetes-client/python/blob/master/examples/in_cluster_config.py#L21
         self._v1 = client.CoreV1Api()
         self._logger = logging.getLogger('ClusterManager')
-        self._config = config.load_incluster_config()
         self._watchdog = ResourceWatchDog()
 
     def start(self):
@@ -245,7 +244,7 @@ class DeploymentBuilder:
                          vol_mnts: List[V1VolumeMount] = None) -> V1Container:
         return V1Container(
             name=name,
-            image=conf.image,
+            image=conf.cluster_config.image,
             command=self._generate_command(conf, task),
             args=['hello world'],
             image_pull_policy='Always',
@@ -295,25 +294,34 @@ class DeploymentBuilder:
         V1Toleration()
         self._buildDescription.master_template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
-            spec=client.V1PodSpec(containers=[self._buildDescription.master_container]))
+            spec=client.V1PodSpec(containers=[self._buildDescription.master_container], volumes=
+                                  [V1Volume(name="fl-log-claim",
+                                            persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(
+                                                claim_name='fl-log-claim'
+                                            ))]))
         self._buildDescription.worker_template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
             spec=client.V1PodSpec(containers=[self._buildDescription.worker_container]))
 
     def build_spec(self, task: ArrivalTask, restart_policy: str = 'OnFailure') -> None:
-        pt_rep_spec: Dict[str, V1ReplicaSpec] = \
-            {"Master": V1ReplicaSpec(
+        master_repl_spec = V1ReplicaSpec(
                 replicas=1,
                 restart_policy=restart_policy,
-                template=self._buildDescription.master_template
-            )}
-        if task.sys_conf.data_parallelism > 1:
-            pt_rep_spec['Worker'] = V1ReplicaSpec(
+                template=self._buildDescription.master_template)
+        master_repl_spec.openapi_types = master_repl_spec.swagger_types
+        pt_rep_spec: Dict[str, V1ReplicaSpec] = {"Master": master_repl_spec}
+        if int(task.sys_conf.data_parallelism) > 1:
+            worker_repl_spec = V1ReplicaSpec(
                 replicas=task.sys_conf.data_parallelism - 1,
                 restart_policy=restart_policy,
                 template=self._buildDescription.worker_template
             )
-        self._buildDescription.spec = V1PyTorchJobSpec(pytorch_replica_specs=pt_rep_spec)
+            worker_repl_spec.openapi_types = worker_repl_spec.swagger_types
+            pt_rep_spec['Worker'] = worker_repl_spec
+
+        job_spec = V1PyTorchJobSpec(pytorch_replica_specs=pt_rep_spec)
+        job_spec.openapi_types = job_spec.swagger_types
+        self._buildDescription.spec = job_spec
 
     def construct(self) -> V1PyTorchJob:
         """
@@ -326,7 +334,7 @@ class DeploymentBuilder:
         job = V1PyTorchJob(
             api_version="kubeflow.org/v1",
             kind="PyTorchJob",
-            metadata=V1ObjectMeta(name=self._buildDescription.id, namespace='kubeflow'),
+            metadata=V1ObjectMeta(name=str(self._buildDescription.id), namespace='test'),
             spec=self._buildDescription.spec)
         return job
 
@@ -352,4 +360,5 @@ def construct_job(conf: BareConfig, task: ArrivalTask) -> V1PyTorchJob:
     dp_builder.build_template()
     dp_builder.build_spec(task)
     job = dp_builder.construct()
+    job.openapi_types = job.swagger_types
     return job

@@ -46,7 +46,7 @@ class SystemParameters:
     data_parallelism: int = field(metadata=config(field_name="dataParallelism"))
     executor_cores: int = field(metadata=config(field_name="executorCores"))
     executor_memory: str = field(metadata=config(field_name="executorMemory"))
-    action: str
+    action: str = field(metadata=config(field_name="action"))
 
 
 @dataclass_json

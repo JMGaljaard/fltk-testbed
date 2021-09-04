@@ -46,7 +46,9 @@ def cluster_start(args: Namespace, configuration: BareConfig):
     Function to to launch Orchestrator for execution with provided configurations. Currently
     this assumes that a single Orchestrator is started that manages all the resources in the cluster.
     """
-    launch_orchestrator(args=args, config=configuration)
+    logging.basicConfig(level=logging.DEBUG,
+                        datefmt='%m-%d %H:%M')
+    launch_orchestrator(args=args, conf=configuration)
 
 
 def client_start(args: Namespace, configuration: BareConfig):
@@ -56,4 +58,9 @@ def client_start(args: Namespace, configuration: BareConfig):
 
 
 if __name__ == "__main__":
+    root = logging.getLogger()
+    if root.handlers:
+        for handler in root.handlers:
+            root.removeHandler(handler)
+    logging.basicConfig(format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s', datefmt='%m-%d-%Y %H:%M:%S',)
     __main__()
