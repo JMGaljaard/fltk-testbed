@@ -107,3 +107,4 @@ def create_client_parser(subparsers) -> None:
 def create_cluster_parser(subparsers) -> None:
     cluster_parser = subparsers.add_parser('cluster')
     cluster_parser.add_argument('config', type=str)
+    cluster_parser.add_argument('-l', '--local', type=bool, default=False)

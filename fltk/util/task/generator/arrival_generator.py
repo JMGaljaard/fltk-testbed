@@ -12,7 +12,8 @@ from typing import Dict, List, Union
 import numpy as np
 
 from fltk.util.singleton import Singleton
-from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser, JobClassParameter
+from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser, JobClassParameter, \
+    NetworkConfiguration
 
 
 @dataclass
@@ -20,9 +21,10 @@ class ArrivalGenerator(metaclass=Singleton):
     """
     Abstract Base Class for generating arrivals in the system. These tasks must be run
     """
+
     configuration_path: Path
     logger: logging.Logger = None
-    arrivals = Queue()
+    arrivals: "Queue[Arrival]" = Queue()
 
     @abstractmethod
     def load_config(self):
@@ -45,6 +47,21 @@ class Arrival:
     ticks: int
     task: TrainTask
     task_id: str
+
+    def get_priority(self):
+        return self.task.priority
+
+    def get_network(self) -> str:
+        return self.task.network_configuration.network
+
+    def get_dataset(self) -> str:
+        return self.task.network_configuration.dataset
+
+    def get_system_config(self):
+        return self.task.system_parameters
+
+    def get_parameter_config(self):
+        return self.task.hyper_parameters
 
 
 class ExperimentGenerator(ArrivalGenerator):
@@ -130,17 +147,18 @@ class ExperimentGenerator(ArrivalGenerator):
         event = multiprocessing.Event()
         while self._alive and time.time() - self.start_time < duration:
             save_time = time.time()
+
             new_scheduled = []
-            for indx, entry in enumerate(self._tick_list):
+            for entry in self._tick_list:
                 entry.ticks -= self._decrement
                 if entry.ticks <= 0:
-                    self._tick_list.pop(indx)
                     self.arrivals.put(entry)
                     new_arrival = self.generate_arrival(entry.task_id)
                     new_scheduled.append(new_arrival)
                     self.logger.info(f"Arrival {new_arrival} arrives at {new_arrival.ticks} seconds")
-                    break
-            self._tick_list += new_scheduled
+                else:
+                    new_scheduled.append(entry)
+            self._tick_list = new_scheduled
             # Correct for time drift between execution, otherwise drift adds up, and arrivals don't generate correctly
             correction_time = time.time() - save_time
             event.wait(timeout=self._decrement - correction_time)

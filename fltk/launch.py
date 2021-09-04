@@ -4,6 +4,7 @@ from argparse import Namespace
 from multiprocessing.pool import ThreadPool
 
 import torch.distributed as dist
+from kubernetes import config
 
 from fltk.client import Client
 from fltk.extractor import download_datasets
@@ -12,8 +13,6 @@ from fltk.util.cluster.client import ClusterManager
 from fltk.util.config.arguments import LearningParameters
 from fltk.util.config.base_config import BareConfig
 from fltk.util.task.generator.arrival_generator import ExperimentGenerator
-
-logging.basicConfig(level=logging.INFO)
 
 
 def is_distributed() -> bool:
@@ -57,7 +56,7 @@ def launch_client(task_id: str, config: BareConfig = None, learning_params: Lear
     print(epoch_data)
 
 
-def launch_orchestrator(args: Namespace = None, config: BareConfig = None):
+def launch_orchestrator(args: Namespace = None, conf: BareConfig = None):
     """
     Default runner for the Orchestrator that is based on KubeFlow
     @param args: Commandline arguments passed to the execution. Might be removed in a future commit.
@@ -69,19 +68,25 @@ def launch_orchestrator(args: Namespace = None, config: BareConfig = None):
     """
     logging.info('Starting as Orchestrator')
     logging.info("Starting Orchestrator, initializing resources....")
+    if args.local:
+        logging.info("Loading local configuration file")
+        config.load_kube_config()
+    else:
+        logging.info("Loading in cluster configuration file")
+        config.load_incluster_config()
 
     arrival_generator = ExperimentGenerator()
-    # cluster_manager = ClusterManager()
-    #
-    # orchestrator = Orchestrator(cluster_manager, arrival_generator, config)
+    cluster_manager = ClusterManager()
+
+    orchestrator = Orchestrator(cluster_manager, arrival_generator, conf)
 
     pool = ThreadPool(3)
     logging.info("Starting cluster manager")
-    # pool.apply_async(cluster_manager.start)
-    # logging.info("Starting arrival generator")
-    pool.apply(arrival_generator.start, args=[config.get_duration()])
-    # logging.info("Starting orchestrator")
-    # pool.apply(orchestrator.run)
+    pool.apply(cluster_manager.start)
+    logging.info("Starting arrival generator")
+    pool.apply_async(arrival_generator.start, args=[conf.get_duration()])
+    logging.info("Starting orchestrator")
+    pool.apply(orchestrator.run)
     pool.join()
 
     logging.info("Stopped execution of Orchestrator...")
