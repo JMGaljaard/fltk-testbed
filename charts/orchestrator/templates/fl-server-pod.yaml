@@ -11,18 +11,16 @@ spec:
         - -m
         - fltk
         - cluster
-        - configs/example_cloud_experiment.json
+        - configs/{{ .Values.orchestrator.configurationFile }}
       env:
         - name: PYTHONUNBUFFERED
           value: "1"
       image: {{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName}}
       name: federation-lab-server
-      ports:
-        - containerPort: {{ (.Values.fltk.port) }}
       resources:
         limits:
-          cpu: {{ (.Values.federator.cpu | int) }}
-          memory: {{ (.Values.federator.memory | int) }}
+          cpu: {{ (.Values.orchestrator.cpu | int) }}
+          memory: {{ (.Values.orchestrator.memory | int) }}
       volumeMounts:
         - mountPath: /opt/federation-lab/output
           name: fl-server-claim
