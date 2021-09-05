@@ -53,7 +53,7 @@ class Client(object):
         self.scheduler: LearningScheduler
         self.tb_writer: SummaryWriter
 
-    def prepare_learner(self, distributed: bool = False, backend: Union[str, dist.Backend] = None) -> None:
+    def prepare_learner(self, distributed: bool = False) -> None:
         """
         Function to prepare the learner, i.e. load all the necessary data into memory.
         @param distributed: Indicates whether the execution must be run in Distributed fashion with DDP.
@@ -67,7 +67,6 @@ class Client(object):
         self._logger.info(f"Preparing learner model with distributed={distributed}")
         self.model.to(self.device)
         if distributed:
-            dist.init_process_group(backend)
             self.model = torch.nn.parallel.DistributedDataParallel(self.model)
 
         # Currently it is assumed to use an SGD optimizer. **kwargs need to be used to launch this properly

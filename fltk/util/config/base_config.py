@@ -13,7 +13,6 @@ class GeneralNetConfig:
     save_model_path: str = 'models'
     epoch_save_start_suffix: str = 'cloud_experiment'
     epoch_save_end_suffix: str = 'cloud_experiment'
-
     scheduler_step_size = 50
     scheduler_gamma = 0.5
     min_lr = 1e-10
@@ -63,7 +62,7 @@ class ExecutionConfig:
     epoch_save_end_suffix = "epoch_end"
     save_model_path = "models"
     data_path = "data"
-    log_path = "log"
+    log_path = "logging"
 
 
 @dataclass_json

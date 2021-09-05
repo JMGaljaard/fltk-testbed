@@ -6,7 +6,7 @@
         "dataset": "MNIST"
       },
       "systemParameters": {
-        "dataParallelism": "1",
+        "dataParallelism": "3",
         "executorCores": "1",
         "executorMemory": "1Gi",
         "action": "train"

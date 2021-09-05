@@ -2,20 +2,21 @@ from argparse import Namespace
 from dataclasses import dataclass
 from typing import List, Tuple, Type
 
+import torch.distributed as dist
 import torch.nn
 
-from fltk.datasets import CIFAR10Dataset, FashionMNISTDataset, CIFAR100Dataset
+import fltk.nets as nets
+from fltk.datasets import CIFAR10Dataset, FashionMNISTDataset, CIFAR100Dataset, MNIST
 from fltk.datasets.dataset import Dataset
-from fltk.nets import Cifar100ResNet, Cifar100VGG, Cifar10CNN, Cifar10ResNet, FashionMNISTCNN, FashionMNISTResNet
 
 CLIENT_ARGS: List[Tuple[str, str, str, type]] = \
     [("model", "md", "Which model to train", str),
      ("dataset", "ds", "Which dataset to train the model on", str),
-     ("bs", "bs",
+     ("batch_size", "bs",
       "Number that are 'batched' together in a single forward/backward pass during the optimization steps.", int),
      ("max_epoch", "ep",
       "Maximum number of times that the 'training' set instances can be used during the optimization steps", int),
-     ("lr", "lr", "Factor to limit the step size that is taken during each gradient descent step.", float),
+     ("learning_rate", "lr", "Factor to limit the step size that is taken during each gradient descent step.", float),
      ("decay", 'dc',
       "Rate at which the learning rate decreases (i.e. the optimization takes smaller steps", float),
      ("loss", 'ls', "Loss function to use for optimization steps", str),
@@ -35,18 +36,19 @@ class LearningParameters:
     optimizer: str
 
     _available_nets = {
-        "Cifar100ResNet": Cifar100ResNet,
-        "Cifar100VGG": Cifar100VGG,
-        "Cifar10CNN": Cifar10CNN,
-        "Cifar10ResNet": Cifar10ResNet,
-        "FashionMNISTCNN": FashionMNISTCNN,
-        "FashionMNISTResNet": FashionMNISTResNet
+        "CIFAR100ResNet": nets.Cifar100ResNet,
+        "CIFAR100VGG": nets.Cifar100VGG,
+        "CIFAR10CNN": nets.Cifar10CNN,
+        "CIFAR10ResNet": nets.Cifar10ResNet,
+        "FashionMNISTCNN": nets.FashionMNISTCNN,
+        "FashionMNISTResNet": nets.FashionMNISTResNet
     }
 
     _available_data = {
-        "Cifar10": CIFAR10Dataset,
-        "Cifar100": CIFAR100Dataset,
-        "FashionMnist": FashionMNISTDataset
+        "CIFAR10": CIFAR10Dataset,
+        "CIFAR100": CIFAR100Dataset,
+        "FashionMNIST": FashionMNISTDataset,
+        "MNIST": MNIST
     }
 
     _available_loss = {
@@ -102,6 +104,11 @@ def create_client_parser(subparsers) -> None:
     # Add hyper-parameters
     for long, short, hlp, tpe in CLIENT_ARGS:
         client_parser.add_argument(f'-{short}', f'--{long}', type=tpe, help=hlp, required=True)
+
+    # Add parameter parser for backend
+    client_parser.add_argument('--backend', type=str, help='Distributed backend',
+                               choices=[dist.Backend.GLOO, dist.Backend.NCCL, dist.Backend.MPI],
+                               default=dist.Backend.GLOO)
 
 
 def create_cluster_parser(subparsers) -> None:
