@@ -3,12 +3,12 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from multiprocessing.pool import ThreadPool
-from typing import Dict, List
+from typing import Dict, List, Tuple, Optional
 from uuid import UUID
 
 import schedule
 from kubeflow.pytorchjob import V1PyTorchJob, V1ReplicaSpec, V1PyTorchJobSpec
-from kubernetes import client, config
+from kubernetes import client
 from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container, V1PodTemplateSpec, \
     V1VolumeMount, V1Toleration, V1Volume, V1PersistentVolumeClaimVolumeSource
 from torch.utils.tensorboard import SummaryWriter
@@ -49,6 +49,7 @@ class BuildDescription:
     worker_template: V1PodTemplateSpec
     id: UUID
     spec: V1PyTorchJobSpec
+    tolerations: List[V1Toleration]
 
 
 class ResourceWatchDog:
@@ -233,11 +234,12 @@ class DeploymentBuilder:
                                                                          limits=req_dict)
 
     def _generate_command(self, config: BareConfig, task: ArrivalTask):
-        command = (f'python3 -m client {config.config_path} {task.id} '
+        command = (f'python3 -m fltk client {config.config_path} {task.id} '
                    f'--model {task.network} --dataset {task.dataset} '
                    f'--optimizer Adam --max_epoch {task.param_conf.max_epoch} '
                    f'--batch_size {task.param_conf.bs} --learning_rate {task.param_conf.lr} '
-                   f'--decay {task.param_conf.lr_decay} --loss CrossEntropy')
+                   f'--decay {task.param_conf.lr_decay} --loss CrossEntropy '
+                   f'--backend gloo')
         return command.split(' ')
 
     def _build_container(self, conf: BareConfig, task: ArrivalTask, name: str = "pytorch",
@@ -246,7 +248,6 @@ class DeploymentBuilder:
             name=name,
             image=conf.cluster_config.image,
             command=self._generate_command(conf, task),
-            args=['hello world'],
             image_pull_policy='Always',
             # Set the resources to the pre-generated resources
             resources=self._buildDescription.resources,
@@ -268,7 +269,7 @@ class DeploymentBuilder:
         @rtype:
         """
         master_mounts: List[V1VolumeMount] = [V1VolumeMount(
-            mount_path=f'/opt/federation-lab/{conf.get_log_dir()}"',
+            mount_path=f'/opt/federation-lab/{conf.get_log_dir()}',
             name='fl-log-claim',
             read_only=False
         )]
@@ -277,6 +278,16 @@ class DeploymentBuilder:
     def build_container(self, task: ArrivalTask, conf: BareConfig):
         self.build_master_container(conf, task)
         self.build_worker_container(conf, task)
+
+    def build_tolerations(self, tols: List[Tuple[str, Optional[str], str, str]] = None):
+        if not tols:
+            self._buildDescription.tolerations = [
+                V1Toleration(key="fltk.node",
+                             operator="Exists",
+                             effect="NoSchedule")]
+        else:
+            self._buildDescription.tolerations = \
+                [V1Toleration(key=key, value=vl, operator=op, effect=effect) for key, vl, op, effect in tols]
 
     def build_template(self) -> None:
         """
@@ -288,31 +299,32 @@ class DeploymentBuilder:
         # Ensure with taints that
         # https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
 
-        """
-        V1Toleration()
-        """
-        V1Toleration()
+        master_volumes = \
+            [V1Volume(name="fl-log-claim",
+                      persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(claim_name='fl-log-claim'))
+             ]
+
         self._buildDescription.master_template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
-            spec=client.V1PodSpec(containers=[self._buildDescription.master_container], volumes=
-                                  [V1Volume(name="fl-log-claim",
-                                            persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(
-                                                claim_name='fl-log-claim'
-                                            ))]))
+            spec=client.V1PodSpec(containers=[self._buildDescription.master_container],
+                                  volumes=master_volumes,
+                                  tolerations=self._buildDescription.tolerations))
         self._buildDescription.worker_template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
-            spec=client.V1PodSpec(containers=[self._buildDescription.worker_container]))
+            spec=client.V1PodSpec(containers=[self._buildDescription.worker_container],
+                                  tolerations=self._buildDescription.tolerations))
 
     def build_spec(self, task: ArrivalTask, restart_policy: str = 'OnFailure') -> None:
         master_repl_spec = V1ReplicaSpec(
-                replicas=1,
-                restart_policy=restart_policy,
-                template=self._buildDescription.master_template)
+            replicas=1,
+            restart_policy=restart_policy,
+            template=self._buildDescription.master_template)
         master_repl_spec.openapi_types = master_repl_spec.swagger_types
         pt_rep_spec: Dict[str, V1ReplicaSpec] = {"Master": master_repl_spec}
-        if int(task.sys_conf.data_parallelism) > 1:
+        parallelism = int(task.sys_conf.data_parallelism)
+        if parallelism > 1:
             worker_repl_spec = V1ReplicaSpec(
-                replicas=task.sys_conf.data_parallelism - 1,
+                replicas=parallelism - 1,
                 restart_policy=restart_policy,
                 template=self._buildDescription.worker_template
             )
@@ -357,6 +369,7 @@ def construct_job(conf: BareConfig, task: ArrivalTask) -> V1PyTorchJob:
     dp_builder.create_identifier(task)
     dp_builder.build_resources(task)
     dp_builder.build_container(task, conf)
+    dp_builder.build_tolerations()
     dp_builder.build_template()
     dp_builder.build_spec(task)
     job = dp_builder.construct()

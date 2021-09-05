@@ -21,7 +21,7 @@ class CIFAR10Dataset(Dataset):
 
         train_dataset = datasets.CIFAR10(root=self.config.get_data_path(), train=True, download=True, transform=transform)
         sampler = DistributedSampler(train_dataset, rank=rank, num_replicas=self.world_size) if self.world_size else None
-        train_loader = DataLoader(train_dataset, batch_size=self.learning_params.bs, sampler=sampler,
+        train_loader = DataLoader(train_dataset, batch_size=self.learning_params.batch_size, sampler=sampler,
                                   shuffle=(sampler is None))
 
         return train_loader
@@ -36,5 +36,5 @@ class CIFAR10Dataset(Dataset):
                                         transform=transform)
         sampler = DistributedSampler(test_dataset, rank=self.rank,
                                      num_replicas=self.world_size) if self.world_size else None
-        test_loader = DataLoader(test_dataset, batch_size=self.learning_params.bs, sampler=sampler)
+        test_loader = DataLoader(test_dataset, batch_size=self.learning_params.batch_size, sampler=sampler)
         return test_loader

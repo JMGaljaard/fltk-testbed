@@ -11,7 +11,7 @@ spec:
       args:
         - tensorboard
         - --logdir
-        - logs
+        - logging
       image: "{{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName }}"
       ports:
         - containerPort: 8443
@@ -25,7 +25,7 @@ spec:
         - mountPath: /opt/federation-lab/output
           name: fl-server-claim
           readOnly: true                      # We mount output readOnly as this is for Orchestrator data.
-        - mountPath: /opt/federation-lab/log
+        - mountPath: /opt/federation-lab/logging
           name: fl-log-claim
           readOnly: true                      # We mount log readOnly as this is for the Master worker nodes.
   restartPolicy: OnFailure                    # Whenever the container crashes, restart.

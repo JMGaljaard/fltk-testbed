@@ -83,14 +83,12 @@ class Orchestrator(object):
             while not self.pending_tasks.empty():
                 # Do blocking request to priority queue
                 curr_task = self.pending_tasks.get()
-                self.__logger.info(f"Scheduling arrival of Arrival: {curr_task}")
+                self.__logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
                 job_to_start = construct_job(self._config, curr_task)
-                # Hack to overcome limitation of KubeFlow version (Made for older version of Kubernetes)
+                # Hack to overcome limitation of KubeFlow version (Made for older version of Kubernetes
+                self.__logger.info(f"Deploying on cluster: {curr_task.id}")
                 self.__client.create(job_to_start, namespace=self._config.cluster_config.namespace)
-                exit(10)
                 self.deployed_tasks.append(curr_task)
-            # TODO: Keep track of Jobs that were started, but may have completed....
-            # That would conclude the MVP.
             self.__logger.debug("Still alive...")
             time.sleep(5)
 

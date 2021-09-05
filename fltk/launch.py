@@ -15,7 +15,7 @@ from fltk.util.config.base_config import BareConfig
 from fltk.util.task.generator.arrival_generator import ExperimentGenerator
 
 
-def is_distributed() -> bool:
+def should_distribute() -> bool:
     """
     Function to check whether distributed execution is needed.
 
@@ -25,13 +25,11 @@ def is_distributed() -> bool:
     @rtype: bool
     """
     world_size = int(os.environ.get('WORLD_SIZE', 1))
-    leader_port = int(os.environ.get('MASTER_PORT', 5000))
-    leader_address = os.environ.get('MASTER_ADDR', 'localhost')
-    logging.info(f"Training with WS: {world_size} connecting to: {leader_address}:{leader_port}")
     return dist.is_available() and world_size > 1
 
 
-def launch_client(task_id: str, config: BareConfig = None, learning_params: LearningParameters = None):
+def launch_client(task_id: str, config: BareConfig = None, learning_params: LearningParameters = None,
+                  namespace: Namespace = None):
     """
     @param task_id:
     @type task_id:
@@ -44,14 +42,15 @@ def launch_client(task_id: str, config: BareConfig = None, learning_params: Lear
     """
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
     rank, world_size, backend = 0, None, None
-    distributed = is_distributed()
+    distributed = should_distribute()
     if distributed:
+        dist.init_process_group(namespace.backend)
         rank = dist.get_rank()
         world_size = dist.get_world_size()
         backend = dist.get_backend()
     logging.info(f'Starting Creating client with {rank}')
     client = Client(rank, task_id, world_size, config, learning_params)
-    client.prepare_learner(distributed, backend)
+    client.prepare_learner(distributed)
     epoch_data = client.run_epochs()
     print(epoch_data)
 
