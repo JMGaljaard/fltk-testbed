@@ -11,23 +11,11 @@ from kubeflow.pytorchjob import V1PyTorchJob, V1ReplicaSpec, V1PyTorchJobSpec
 from kubernetes import client
 from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container, V1PodTemplateSpec, \
     V1VolumeMount, V1Toleration, V1Volume, V1PersistentVolumeClaimVolumeSource
-from torch.utils.tensorboard import SummaryWriter
 
 from fltk.util.cluster.conversion import Convert
 from fltk.util.config import BareConfig
 from fltk.util.singleton import Singleton
 from fltk.util.task.task import ArrivalTask
-
-
-@dataclass
-class ClientRef:
-    name: str
-    ref: str
-    tb_writer: SummaryWriter
-    data_size = 0
-
-    def __repr__(self):
-        return self.name
 
 
 @dataclass
