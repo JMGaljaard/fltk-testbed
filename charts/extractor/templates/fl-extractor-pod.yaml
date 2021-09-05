@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   creationTimestamp: null
   labels:
-    srv.fltk.extractor: fl-extractor
+    fltk.service: fl-extractor
   name: fl-extractor
 spec:
   containers:
@@ -14,7 +14,7 @@ spec:
         - logging
       image: "{{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName }}"
       ports:
-        - containerPort: 8443
+        - containerPort: 6006
       resources:
         # Set the following values in case you want to limit the reserved resources.
         # Whenever the pod exceeds these requirements, the Scheduler (Kubernetes) may kill

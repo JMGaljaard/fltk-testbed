@@ -128,15 +128,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-
 venv
 venv-*
-default_models
-data
-data_loaders
-simple_example
+data/**
+!data/.gitkeep
 output
-docker_data
 .idea
-*.tmp.txt
-docker-compose.yml
