@@ -1,0 +1,12 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fl-server
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: test
+roleRef:
+  kind: ClusterRole
+  name: fl-server
+  apiGroup: rbac.authorization.k8s.io

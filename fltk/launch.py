@@ -1,68 +1,95 @@
-import os
-import sys
-import torch.distributed.rpc as rpc
 import logging
+import os
+from argparse import Namespace
+from multiprocessing.pool import ThreadPool
 
-import yaml
-import argparse
+import torch.distributed as dist
+from kubernetes import config
 
-import torch.multiprocessing as mp
-from fltk.federator import Federator
-from fltk.strategy.antidote import Antidote
-from fltk.strategy.attack import Attack
-from fltk.util.base_config import BareConfig
-from fltk.util.env.learner_environment import prepare_environment
+from fltk.client import Client
+from fltk.extractor import download_datasets
+from fltk.orchestrator import Orchestrator
+from fltk.util.cluster.client import ClusterManager
+from fltk.util.config.arguments import LearningParameters
+from fltk.util.config.base_config import BareConfig
+from fltk.util.task.generator.arrival_generator import ExperimentGenerator
 
-logging.basicConfig(level=logging.DEBUG)
+
+def should_distribute() -> bool:
+    """
+    Function to check whether distributed execution is needed.
+
+    Note: the WORLD_SIZE environmental variable needs to be set for this to work (larger than 1).
+    PytorchJobs launched from KubeFlow automatically set this property.
+    @return: Indicator for distributed execution.
+    @rtype: bool
+    """
+    world_size = int(os.environ.get('WORLD_SIZE', 1))
+    return dist.is_available() and world_size > 1
 
 
-def run_ps(rpc_ids_triple, args, attack: Attack = None, antidote: Antidote = None):
-    print(f'Starting the federator...')
-    fed = Federator(rpc_ids_triple, config=args, attack=attack, antidote=antidote)
-    fed.run()
-
-def run_single(rank, world_size, host = None, args = None, nic = None, attack=None, antidote=None):
-    logging.info(f'Starting with rank={rank} and world size={world_size}')
-    prepare_environment(host, nic)
-
+def launch_client(task_id: str, config: BareConfig = None, learning_params: LearningParameters = None,
+                  namespace: Namespace = None):
+    """
+    @param task_id:
+    @type task_id:
+    @param config: Configuration for components, needed for spinning up components of the Orchestrator.
+    @type config: BareConfig
+    @param learning_params:
+    @type: LearningParameters
+    @return: None
+    @rtype: None
+    """
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
-    options = rpc.TensorPipeRpcBackendOptions(
-        num_worker_threads=20, # TODO: Retrieve number of cores from system
-        rpc_timeout=0,  # infinite timeout
-        init_method=f'tcp://{os.environ["MASTER_ADDR"]}:{os.environ["MASTER_PORT"]}'
-    )
+    rank, world_size, backend = 0, None, None
+    distributed = should_distribute()
+    if distributed:
+        dist.init_process_group(namespace.backend)
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
+        backend = dist.get_backend()
+    logging.info(f'Starting Creating client with {rank}')
+    client = Client(rank, task_id, world_size, config, learning_params)
+    client.prepare_learner(distributed)
+    epoch_data = client.run_epochs()
+    print(epoch_data)
 
-    if rank != 0:
-        logging.info(f'Starting worker {rank}')
-        rpc.init_rpc(
-            f"client{rank}",
-            rank=rank,
-            world_size=world_size,
-            rpc_backend_options=options,
-        )
-        # trainer passively waiting for ps to kick off training iterations
+
+def launch_orchestrator(args: Namespace = None, conf: BareConfig = None):
+    """
+    Default runner for the Orchestrator that is based on KubeFlow
+    @param args: Commandline arguments passed to the execution. Might be removed in a future commit.
+    @type args: Namespace
+    @param config: Configuration for components, needed for spinning up components of the Orchestrator.
+    @type config: BareConfig
+    @return: None
+    @rtype: None
+    """
+    logging.info('Starting as Orchestrator')
+    logging.info("Starting Orchestrator, initializing resources....")
+    if args.local:
+        logging.info("Loading local configuration file")
+        config.load_kube_config()
     else:
-        logging.info('Starting the ps')
-        rpc.init_rpc(
-            "ps",
-            rank=rank,
-            world_size=world_size,
-            rpc_backend_options=options
+        logging.info("Loading in cluster configuration file")
+        config.load_incluster_config()
 
-        )
-        run_ps([(f"client{r}", r, world_size) for r in range(1, world_size)], args, attack, antidote)
+    arrival_generator = ExperimentGenerator()
+    cluster_manager = ClusterManager()
 
-    # block until all rpc finish
-    rpc.shutdown()
+    orchestrator = Orchestrator(cluster_manager, arrival_generator, conf)
 
-# def run_single(rank, world_size, host = None, args = None, nic = None):
+    pool = ThreadPool(3)
+    logging.info("Starting cluster manager")
+    pool.apply(cluster_manager.start)
+    logging.info("Starting arrival generator")
+    pool.apply_async(arrival_generator.start, args=[conf.get_duration()])
+    logging.info("Starting orchestrator")
+    pool.apply(orchestrator.run)
+    pool.join()
 
-def run_spawn(config):
-    world_size = config.world_size
-    master_address = config.federator_host
-    mp.spawn(
-        run_single,
-        args=(world_size, master_address, config),
-        nprocs=world_size,
-        join=True
-    )
+    logging.info("Stopped execution of Orchestrator...")
+
+
+def launch_extractor(args: Namespace, config: BareConfig):
+    download_datasets(args, config)

@@ -1,11 +1,10 @@
-import torch
 import torch.nn as nn
 
 cfg = {
-    'A' : [64,     'M', 128,      'M', 256, 256,           'M', 512, 512,           'M', 512, 512,           'M'],
-    'B' : [64, 64, 'M', 128, 128, 'M', 256, 256,           'M', 512, 512,           'M', 512, 512,           'M'],
-    'D' : [64, 64, 'M', 128, 128, 'M', 256, 256, 256,      'M', 512, 512, 512,      'M', 512, 512, 512,      'M'],
-    'E' : [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M']
+    'A': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
+    'B': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
+    'D': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
+    'E': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M']
 }
 
 
@@ -28,9 +27,10 @@ def make_layers(cfg, batch_norm=False):
 
     return nn.Sequential(*layers)
 
+
 class Cifar100VGG(nn.Module):
 
-    def __init__(self, features = make_layers(cfg['D'], batch_norm=True), num_class=100):
+    def __init__(self, features=make_layers(cfg['D'], batch_norm=True), num_class=100):
         super(Cifar100VGG, self).__init__()
         self.features = features
 
@@ -55,11 +55,14 @@ class Cifar100VGG(nn.Module):
 def vgg11_bn():
     return Cifar100VGG(make_layers(cfg['A'], batch_norm=True))
 
+
 def vgg13_bn():
     return Cifar100VGG(make_layers(cfg['B'], batch_norm=True))
 
+
 def vgg16_bn():
     return Cifar100VGG(make_layers(cfg['D'], batch_norm=True))
+
 
 def vgg19_bn():
     return Cifar100VGG(make_layers(cfg['E'], batch_norm=True))

@@ -1,199 +1,105 @@
-import copy
 import datetime
 import logging
-import os
-import random
-import time
-import traceback
-import gc
+from pathlib import Path
+from typing import Union, List, Tuple
+
 import numpy as np
 import torch
-import yaml
-from sklearn.metrics import classification_report
+import torch.distributed as dist
 from sklearn.metrics import confusion_matrix
-from torch.distributed import rpc
+from torch.utils.tensorboard import SummaryWriter
 
+from fltk.nets.util.evaluation import calculate_class_precision, calculate_class_recall
+from fltk.nets.util.utils import save_model, load_model_from_file
 from fltk.schedulers import MinCapableStepLR
-from fltk.util.base_config import BareConfig
-from fltk.util.log import FLLogger
-from fltk.util.poison.poisonpill import PoisonPill
+from fltk.schedulers.min_lr_step import LearningScheduler
+from fltk.util.config.arguments import LearningParameters
+from fltk.util.config.base_config import BareConfig
 from fltk.util.results import EpochData
 
-logging.basicConfig(level=logging.DEBUG)
 
+class Client(object):
 
+    def __init__(self, rank: int, task_id: str, world_size: int, config: BareConfig = None,
+                 learning_params: LearningParameters = None):
+        """
+        @param rank: PyTorch rank provided by KubeFlow setup.
+        @type rank: int
+        @param task_id: String id representing the UID of the training task
+        @type task_id: str
+        @param config:
+        @type config:
+        @param learning_params:
+        @type learning_params: LearningParameters
+        """
+        self._logger = logging.getLogger(f'Client-{rank}-{task_id}')
 
-def _call_method(method, rref, *args, **kwargs):
-    """helper for _remote_method()"""
-    return method(rref.local_value(), *args, **kwargs)
+        self._logger.info("Initializing learning client")
+        self._id = rank
+        self._world_size = world_size
+        self._task_id = task_id
 
-def _remote_method(method, rref, *args, **kwargs):
-    """
-    executes method(*args, **kwargs) on the from the machine that owns rref
+        self.config = config
+        self.learning_params = learning_params
 
-    very similar to rref.remote().method(*args, **kwargs), but method() doesn't have to be in the remote scope
-    """
-    args = [method, rref] + list(args)
-    return rpc.rpc_sync(rref.owner(), _call_method, args=args, kwargs=kwargs)
+        # Create model and dataset
+        self.loss_function = self.learning_params.get_loss()()
+        self.dataset = self.learning_params.get_dataset_class()(self.config, self.learning_params, self._id,
+                                                                self._world_size)
+        self.model = self.learning_params.get_model_class()()
+        self.device = self._init_device()
 
-def _remote_method_async(method, rref, *args, **kwargs):
-    args = [method, rref] + list(args)
-    return rpc.rpc_async(rref.owner(), _call_method, args=args, kwargs=kwargs)
+        self.optimizer: torch.optim.Optimizer
+        self.scheduler: LearningScheduler
+        self.tb_writer: SummaryWriter
 
-class Client:
-    counter = 0
-    finished_init = False
-    dataset = None
-    epoch_counter = 0
+    def prepare_learner(self, distributed: bool = False) -> None:
+        """
+        Function to prepare the learner, i.e. load all the necessary data into memory.
+        @param distributed: Indicates whether the execution must be run in Distributed fashion with DDP.
+        @type distributed: bool
+        @param backend: Which backend to use during training, needed when executing in distributed fashion,
+        for CPU execution the GLOO (default) backend must be used. For GPU execution, the NCCL execution is needed.
+        @type backend: dist.Backend
+        @return: None
+        @rtype: None
+        """
+        self._logger.info(f"Preparing learner model with distributed={distributed}")
+        self.model.to(self.device)
+        if distributed:
+            self.model = torch.nn.parallel.DistributedDataParallel(self.model)
 
+        # Currently it is assumed to use an SGD optimizer. **kwargs need to be used to launch this properly
+        self.optimizer = self.learning_params.get_optimizer()(self.model.parameters(),
+                                                              lr=self.learning_params.learning_rate,
+                                                              momentum=0.9)
+        self.scheduler = MinCapableStepLR(self.optimizer,
+                                          self.config.get_scheduler_step_size(),
+                                          self.config.get_scheduler_gamma(),
+                                          self.config.get_min_lr())
 
-    def __init__(self, id, log_rref, rank, world_size, config: BareConfig = None):
-        logging.info(f'Welcome to client {id}')
-        self.net: torch.nn.Module = None
-        self.id = id
-        self.log_rref = log_rref
-        self.rank = rank
-        self.world_size = world_size
+        self.tb_writer = SummaryWriter(str(self.config.get_log_path(self._task_id, self._id, self.learning_params.model)))
 
-        self.args = config
-        self.args.init_logger(logging)
-        self.device = self.init_device()
-        self.set_net(self.load_default_model())
-        self.loss_function = self.args.get_loss_function()()
-        self.optimizer = torch.optim.SGD(self.net.parameters(),
-                                         lr=self.args.get_learning_rate(),
-                                         momentum=self.args.get_momentum())
-        self.scheduler = MinCapableStepLR(self.args.get_logger(), self.optimizer,
-                                          self.args.get_scheduler_step_size(),
-                                          self.args.get_scheduler_gamma(),
-                                          self.args.get_min_lr())
+    def stop_learner(self):
+        self._logger.info(f"Tearing down Client {self._id}")
+        self.tb_writer.close()
 
-    def init_device(self):
-        if self.args.cuda and torch.cuda.is_available():
-            return torch.device("cuda:0")
+    def _init_device(self, cuda_device: torch.device = torch.device('cpu')):
+        """
+        Initialize Torch to use available devices. Either prepares CUDA device, or disables CUDA during execution to run
+        with CPU only inference/training.
+        @param cuda_device: Torch device to use, refers to the CUDA device to be used in case there are multiple.
+        Defaults to the first cuda device when CUDA is enabled at index 0.
+        @type cuda_device: torch.device
+        @return:
+        @rtype:
+        """
+        if self.config.cuda_enabled() and torch.cuda.is_available():
+            return torch.device(cuda_device)
         else:
             # Force usage of CPU
             torch.cuda.is_available = lambda: False
             return torch.device("cpu")
-
-
-    def reset_model(self):
-        """
-        Function to reset the learning process. In addition, reset the loss function and the
-        optimizer, in case this uses certain decay according to some internal counter.
-        @return: None
-        @rtype: None
-        """
-        def reset(self):
-            # Reset logger
-            self.args.init_logger(logging)
-            # Reset the epoch counter
-            self.epoch_counter = 0
-            self.finished_init = False
-            # Dataset will be re-initialized so save memory
-            # Awards, but we delete possible gradient information.
-            del self.dataset, self.net, self.optimizer, self.scheduler
-
-            # Force collect garbage after running.
-            gc.collect()
-            self.set_net(self.load_default_model())
-
-            # Set loss function for gradient calculation
-            self.loss_function = self.args.get_loss_function()()
-
-            self.optimizer = torch.optim.SGD(self.net.parameters(),
-                                             lr=self.args.get_learning_rate(),
-                                             momentum=self.args.get_momentum())
-            self.scheduler = MinCapableStepLR(self.args.get_logger(), self.optimizer,
-                                              self.args.get_scheduler_step_size(),
-                                              self.args.get_scheduler_gamma(),
-                                              self.args.get_min_lr())
-            # Force collect garbage after running.
-            gc.collect()
-        reset(self)
-
-    def ping(self):
-        """
-        Aliveness checker for the federator during initialization.
-        @return: String to the important question, `ping?', which is pong.
-        @rtype: str
-        """
-        return 'pong'
-
-    def rpc_test(self):
-        sleep_time = random.randint(1, 5)
-        time.sleep(sleep_time)
-        self.local_log(f'sleep for {sleep_time} seconds')
-        self.counter += 1
-        log_line = f'Number of times called: {self.counter}'
-        self.local_log(log_line)
-        self.remote_log(log_line)
-
-    def remote_log(self, message):
-        _remote_method_async(FLLogger.log, self.log_rref, self.id, message, time.time())
-
-    def local_log(self, message):
-        logging.info(f'[{self.id}: {time.time()}]: {message}')
-
-    def set_configuration(self, config: str):
-        yaml_config = yaml.safe_load(config)
-
-    def init(self):
-        pass
-
-    def init_dataloader(self, pill: PoisonPill = None):
-
-        def init(self, pill):
-            self.args.distributed = True
-            self.args.rank = self.rank
-
-            self.args.world_size = self.world_size
-
-            try:
-                self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args, pill)
-            except Exception as e:
-                tb = traceback.format_exc()
-                print(tb)
-
-            self.finished_init = True
-            print("Done with init")
-            logging.info('Done with init')
-        init(self, pill)
-
-    def init_dataloader(self, pill: PoisonPill = None):
-        self.args.distributed = True
-        self.args.rank = self.rank
-
-        self.args.world_size = self.world_size
-
-        try:
-            self.dataset = self.args.DistDatasets[self.args.dataset_name](self.args, pill)
-        except Exception as e:
-            tb = traceback.format_exc()
-            print(tb)
-
-        self.finished_init = True
-        print("Done with init")
-        logging.info('Done with init')
-
-    def is_ready(self):
-        print(self.finished_init)
-        return self.finished_init
-
-    def set_net(self, net):
-        self.net = net
-        self.net.to(self.device)
-
-    def load_model_from_file(self, model_file_path):
-        model_class = self.args.get_net()
-        default_model_path = os.path.join(self.args.get_default_model_folder_path(), model_class.__name__ + ".model")
-        return self.load_model_from_file(default_model_path)
-
-    def get_nn_parameters(self):
-        """
-        Return the NN's parameters.
-        """
-        return self.net.state_dict()
 
     def load_default_model(self):
         """
@@ -201,198 +107,148 @@ class Client:
 
         This is used to ensure consistent default model behavior.
         """
-        model_class = self.args.get_net()
-        default_model_path = os.path.join(self.args.get_default_model_folder_path(), model_class.__name__ + ".model")
 
-        return self.load_model_from_file(default_model_path)
+        model_file = Path(f'{self.model.__name__}.model')
+        default_model_path = Path(self.config.get_default_model_folder_path()).joinpath(model_file)
+        load_model_from_file(self.model, default_model_path)
 
-    def load_model_from_file(self, model_file_path):
+    def train(self, epoch, log_interval: int = 50):
         """
-        Load a model from a file.
+        Function to start training, regardless of DistributedDataParallel (DPP) or local training. DDP will account for
+        synchronization of nodes. If extension requires to make use of torch.distributed.send and torch.distributed.recv
+        (for example for customized training or Federated Learning), additional torch.distributed.barrier calls might
+        be required to launch.
 
-        :param model_file_path: string
-        """
-        model_class = self.args.get_net()
-        model = model_class()
-        # TODO undo
-        # model_file_path = '/opt/federation-lab/' + model_file_path
-        if os.path.exists(model_file_path):
-            try:
-                model.load_state_dict(torch.load(model_file_path))
-            except:
-                self.args.get_logger().warning("Couldn't load model. Attempting to map CUDA tensors to CPU to solve error.")
-
-                model.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
-        else:
-            self.args.get_logger().warning("Could not find model: {}".format(model_file_path))
-
-        return model
-
-    def get_client_index(self):
-        """
-        Returns the client index.
-        """
-        return self.client_idx
-
-
-    def update_nn_parameters(self, new_params):
-        """
-        Update the NN's parameters.
-
-        :param new_params: New weights for the neural network
-        :type new_params: dict
-        """
-
-
-        def update(self, new_params):
-            self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
-            del new_params
-            if self.log_rref:
-                self.remote_log(f'Weights of the model are updated')
-        update(self, new_params)
-
-    def train(self, epoch, pill: PoisonPill = None):
-        """
         :param epoch: Current epoch #
         :type epoch: int
+        @param log_interval: Iteration interval at which to log.
+        @type log_interval: int
         """
-        # self.net.train()
-
-        # save model
-        if self.args.should_save_model(epoch):
-            self.save_model(epoch, self.args.get_epoch_save_start_suffix())
-
         running_loss = 0.0
         final_running_loss = 0.0
-        if self.args.distributed:
-            self.dataset.train_sampler.set_epoch(epoch)
-
-        self.net.train()
-        for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
-            # TODO: check if these parameters are correct, labels or ouputs?
-            if pill is not None:
-                inputs = pill.poison_input(inputs)
-                inputs, labels = pill.poison_output(inputs, labels)
-
+        self.model.train()
+        for i, (inputs, labels) in enumerate(self.dataset.get_train_loader()):
             # zero the parameter gradients
             self.optimizer.zero_grad()
 
-            # forward + backward + optimize
+            # Forward through the net to train
+            outputs = self.model(inputs)
 
-            outputs = self.net(inputs)
-
+            # Calculate the loss
             loss = self.loss_function(outputs, labels)
+
+            # Update weights, DPP will account for synchronization of the weights.
             loss.backward()
             self.optimizer.step()
+
             running_loss += float(loss.detach().item())
-            del loss, outputs
-            if i % self.args.get_log_interval() == 0:
-                self.args.get_logger().info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / self.args.get_log_interval()))
-                final_running_loss = running_loss / self.args.get_log_interval()
+            if i % log_interval == 0:
+                self._logger.info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / log_interval))
+                final_running_loss = running_loss / log_interval
                 running_loss = 0.0
         self.scheduler.step()
-        # save model
-        if self.args.should_save_model(epoch):
-            self.save_model(epoch, self.args.get_epoch_save_end_suffix())
 
-        # Force collect garbage after running.
-        gc.collect()
+        # Save model
+        if self.config.should_save_model(epoch):
+            # Note that currently this is not supported in the Framework. However, the creation of a ReadWriteMany
+            # PVC in the deployment charts, and mounting this in the appropriate directory, would resolve this issue.
+            # This can be done by copying the setup of the PVC used to record the TensorBoard information (used by
+            # logger created by the rank==0 node during the training process (i.e. to keep track of process).
+            self.save_model(epoch)
 
-        return final_running_loss, self.get_nn_parameters()
+        return final_running_loss
 
-    def test(self):
+    def test(self) -> Tuple[float, float, np.array, np.array, np.array]:
         correct = 0
         total = 0
         targets_ = []
         pred_ = []
         loss = 0.0
 
-
+        # Disable gradient calculation, as we are only interested in predictions
         with torch.no_grad():
             for (images, labels) in self.dataset.get_test_loader():
                 images, labels = images.to(self.device), labels.to(self.device)
 
-                outputs = self.net(images)
+                outputs = self.model(images)
+                # Currently the FLTK framework assumes that a classification task is performed (hence max).
+                # Future work may add support for non-classification training.
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
-                # TODO: Log the information regarding the poisoned accuracy
                 correct += (predicted == labels).sum().item()
 
-                targets_.extend(labels.cpu().view_as(predicted).numpy())
-                pred_.extend(predicted.cpu().numpy())
+                targets_.extend(labels.detach().cpu().view_as(predicted).numpy())
+                pred_.extend(predicted.detach().cpu().numpy())
 
                 loss += self.loss_function(outputs, labels).item()
 
-        accuracy = 100 * correct / total
-        confusion_mat = confusion_matrix(targets_, pred_)
+        accuracy = 100.0 * correct / total
+        confusion_mat: np.array = confusion_matrix(targets_, pred_)
 
-        class_precision = self.calculate_class_precision(confusion_mat)
-        class_recall = self.calculate_class_recall(confusion_mat)
+        class_precision: np.array = calculate_class_precision(confusion_mat)
+        class_recall: np.array = calculate_class_recall(confusion_mat)
 
-        self.args.get_logger().debug('Test set: Accuracy: {}/{} ({:.0f}%)'.format(correct, total, accuracy))
-        self.args.get_logger().debug('Test set: Loss: {}'.format(loss))
-        self.args.get_logger().debug("Classification Report:\n" + classification_report(targets_, pred_))
-        self.args.get_logger().debug("Confusion Matrix:\n" + str(confusion_mat))
-        self.args.get_logger().debug("Class precision: {}".format(str(class_precision)))
-        self.args.get_logger().debug("Class recall: {}".format(str(class_recall)))
+        self._logger.debug('Test set: Accuracy: {}/{} ({:.0f}%)'.format(correct, total, accuracy))
+        self._logger.debug('Test set: Loss: {}'.format(loss))
+        self._logger.debug("Confusion Matrix:\n" + str(confusion_mat))
+        self._logger.debug("Class precision: {}".format(str(class_precision)))
+        self._logger.debug("Class recall: {}".format(str(class_recall)))
 
-        return accuracy, loss, class_precision, class_recall
+        return accuracy, loss, class_precision, class_recall, confusion_mat
 
-    def run_epochs(self, num_epoch, pill: PoisonPill = None):
+    def run_epochs(self) -> List[EpochData]:
         """
+        Function to run epochs with
         """
-        self.finished_init = False
+        max_epoch = self.learning_params.max_epoch + 1
         start_time_train = datetime.datetime.now()
-        self.dataset.get_train_sampler().set_epoch_size(num_epoch)
-        loss, weights = self.train(self.epoch_counter, pill)
-        self.epoch_counter += num_epoch
-        elapsed_time_train = datetime.datetime.now() - start_time_train
-        train_time_ms = int(elapsed_time_train.total_seconds()*1000)
 
-        start_time_test = datetime.datetime.now()
-        accuracy, test_loss, class_precision, class_recall = self.test()
-        elapsed_time_test = datetime.datetime.now() - start_time_test
-        test_time_ms = int(elapsed_time_test.total_seconds()*1000)
+        epoch_results = []
+        for epoch in range(1, max_epoch):
+            train_loss = self.train(epoch)
+            if self._id == 0:
+                # Let only the 'master node' work on training. Possibly DDP can be used
+                # to have a distributed test loader as well to speed up (would require
+                # aggregation of data.
+                # Example https://github.com/fabio-deep/Distributed-Pytorch-Boilerplate/blob/0206247150720ca3e287e9531cb20ef68dc9a15f/src/datasets.py#L271-L303.
+                elapsed_time_train = datetime.datetime.now() - start_time_train
+                train_time_ms = int(elapsed_time_train.total_seconds() * 1000)
 
-        data = EpochData(self.epoch_counter, train_time_ms, test_time_ms, loss, accuracy, test_loss, class_precision, class_recall, client_id=self.id)
-        # Copy GPU tensors to CPU
-        for k, v in weights.items():
-            # Detach to remove computational graph.
-            weights[k] = v.cpu().detach()
-        # Force collect garbage after running.
-        gc.collect()
-        return data, weights
+                start_time_test = datetime.datetime.now()
+                accuracy, test_loss, class_precision, class_recall, confusion_mat = self.test()
 
-    def save_model(self, epoch, suffix):
+                elapsed_time_test = datetime.datetime.now() - start_time_test
+                test_time_ms = int(elapsed_time_test.total_seconds() * 1000)
+
+                data = EpochData(epoch_id=epoch,
+                                 duration_train=train_time_ms,
+                                 duration_test=test_time_ms,
+                                 loss_train=train_loss,
+                                 accuracy=accuracy,
+                                 loss=test_loss,
+                                 class_precision=class_precision,
+                                 class_recall=class_recall,
+                                 confusion_mat=confusion_mat)
+
+                epoch_results.append(data)
+                self.log_progress(data, epoch)
+        return epoch_results
+
+    def save_model(self, epoch):
         """
+        Move function to utils directory.
         Saves the model if necessary.
         """
-        self.args.get_logger().debug(f"Saving model to flat file storage. Save #{epoch}")
+        self._logger.debug(f"Saving model to flat file storage. Saved at epoch #{epoch}")
+        save_model(self.model, self.config.get_save_model_folder_path(), epoch)
 
-        if not os.path.exists(self.args.get_save_model_folder_path()):
-            os.mkdir(self.args.get_save_model_folder_path())
+    def log_progress(self, epoch_data: EpochData, epoch):
 
-        full_save_path = os.path.join(self.args.get_save_model_folder_path(), f"model_{self.id}_{epoch}_{suffix}.model")
-        torch.save(self.get_nn_parameters(), full_save_path)
 
-    def calculate_class_precision(self, confusion_mat):
-        """
-        Calculates the precision for each class from a confusion matrix.
-        """
-        return np.diagonal(confusion_mat) / np.sum(confusion_mat, axis=0)
+        self.tb_writer.add_scalar('training loss per epoch',
+                                    epoch_data.loss_train,
+                                    epoch)
 
-    def calculate_class_recall(self, confusion_mat):
-        """
-        Calculates the recall for each class from a confusion matrix.
-        """
-        return np.diagonal(confusion_mat) / np.sum(confusion_mat, axis=1)
-
-    def get_client_datasize(self):
-        if self.dataset is not None:
-            return len(self.dataset.get_train_sampler())
-        else:
-            return False
-
-    def __del__(self):
-        print(f'Client {self.id} is stopping')
+        self.tb_writer.add_scalar('accuracy per epoch',
+                                    epoch_data.accuracy,
+                                    epoch)

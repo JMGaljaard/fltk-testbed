@@ -2,9 +2,9 @@ from setuptools import setup, find_packages
 setup(
     name="fltk",
     author="Bart Cox",
-    author_email="b.a.cox@tudelft.nl",
-    maintainer="Bart Cox",
-    maintainer_email="b.a.cox@tudelft.nl",
+    author_email="B.A.Cox@tudelft.nl",
+    maintainer="Jeroen Martijn Galjaard",
+    maintainer_email="J.M.Galjaard-1@student.tudelft.nl",
     description="Federated Learning Toolkit",
     packages=find_packages(),
     version='0.3.1',

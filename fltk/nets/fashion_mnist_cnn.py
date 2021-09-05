@@ -1,6 +1,5 @@
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
+
 
 class FashionMNISTCNN(nn.Module):
 
@@ -18,7 +17,7 @@ class FashionMNISTCNN(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(2))
 
-        self.fc = nn.Linear(7*7*32, 10)
+        self.fc = nn.Linear(7 * 7 * 32, 10)
 
     def forward(self, x):
         x = self.layer1(x)
