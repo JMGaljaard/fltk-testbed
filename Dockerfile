@@ -21,7 +21,7 @@ RUN apt-get update \
 ADD data/ data/
 
 # Use cache for pip, otherwise we repeatedly pull from repository
-ADD setup.py requirements.txt ./
+ADD requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip python3 -m pip install -r requirements.txt
 
 # Add FLTK and configurations
