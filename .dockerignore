@@ -3,3 +3,4 @@ venv/
 logging/
 # Ignoring all the compressed archives
 **/*.tar.gz
+**/__pycache__

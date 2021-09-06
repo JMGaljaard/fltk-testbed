@@ -40,6 +40,15 @@ extension of the project is planned to implement a `FederatedClient` that allows
 * The location of devices matters (network latency and bandwidth)
 * Communication can be costly
 
+### Overview of deployed project
+When deploying the system, the following diagram shows how the system operates. `PyTorchJob`s are launched by the 
+Orchestrator (see the [Orchestrator charts](./charts/orchestrator)). The Extractor keeps track of progress (see the 
+[Extractor charts](./charts/extractor)).
+
+The `PyTorchJob`s can consist on a variable number of machines, with different hardware for the Master/Leader node and the
+Client nodes. KubeFlow (not depicted) orchestrates the deployment of the `PyTorchJob`s.
+
+![Overview of deployment](https://lucid.app/publicSegments/view/027793d8-a059-4c45-a030-660a492a4c0a/image.png)
 ## Something is broken/missing
 
 It might be that something is missing, please open a pull request/issue).
