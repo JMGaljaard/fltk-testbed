@@ -15,7 +15,7 @@ WORKDIR /opt/federation-lab
 
 # Update the Ubuntu software repository and fetch packages
 RUN apt-get update \
-  && apt-get install -y vim curl python3 python3-pip net-tools iproute2
+  && apt-get install -y curl python3 python3-pip net-tools iproute2
 
 # Add Pre-downloaded models (otherwise needs be run every-time)
 ADD data/ data/
