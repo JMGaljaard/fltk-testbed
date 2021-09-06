@@ -70,7 +70,7 @@ project
 
 ## Models
 
-* Cifar10-CNN
+* Cifar10-CNN (CIFAR10CNN)
 * Cifar10-ResNet
 * Cifar100-ResNet
 * Cifar100-VGG
@@ -158,19 +158,43 @@ Currently, this guide was tested to result in a working FLTK setup on GKE and Mi
 
 The guide is structured as follows:
 
-1. Install KubeFlow's Pytorch-Operator (in a bare minimum configuration).
+1. (Optional) Setup a Kubernetes Dashboard instance for monitoring
+2. Install KubeFlow's Pytorch-Operator (in a bare minimum configuration).
    * KubeFlow is used to create and manage Training jobs for Pytorch Training jobs. However, you can also
       extend the work by making use of KubeFlows TF-Operator, to make use of Tensorflow.
-2. Install an NFS server.
+3. (Optional) Deploy KubeFlow PyTorch Job using an example project.
+4. Install an NFS server.
    * To simplify FLTK's deployment, an NFS server is used to allow for the creation of `ReadWriteMany` volumes in Kubernetes.
       These volumes are, for example, used to create a centralized logging point, that allows for easy extraction of data
       from the `Extractor` pod.
-3. Setup and install the `Extractor` pod.
+5. Setup and install the `Extractor` pod.
    * The `Extractor` pod is used to create the required volume claims, as well as create a single access point to gain
      insight into the training process. Currently, it spawns a pod that runs the a `Tensorboard` instance, as a
      `SummaryWriter` is used to record progress in a `Tensorboard` format. These are written to a `ReadWriteMany` mounted
      on a pods `$WORKING_DIR/logging` by default during execution.
-4. Deploy a default FLTK experiment.
+6. Deploy a default FLTK experiment.
+
+### (Optional) setup Kubernetes Dashboard
+Kubernetes Dashboard provides a comprehensive interface into some metrics, logs and status information of your cluster
+and the deployments it's running. To setup this dashboard, Helm can be used as follows:
+
+
+```bash
+helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+helm install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard
+```
+
+After setup completes, running the following commands (in case you change the release name to something different, you can 
+fetch the command using `helm status your-release-name --namespace optional-namespace-name`) to connect to your Kubernetes
+Dashboard.
+```bash
+export POD_NAME=$(kubectl get pods -n default -l "app.kubernetes.io/name=kubernetes-dashboard,app.kubernetes.io/instance=kubernetes-dashboard" -o jsonpath="{.items[0].metadata.name}")
+kubectl -n default port-forward $POD_NAME 8443:8443
+```
+
+Then browsing to [https://localhost:8443](https://localhost:8443) on your machine will connect you to the Dashboard instance.
+Note that the certificate is self-signed of the Kubernetes Dashboard, so your browser may give warnings that the site is 
+unsafe.
 
 ### Installing KubeFlow + PyTorch-Operator
 Kubeflow is an ML toolkit that allows to for a wide range of distributed machine and deep learning operations on Kubernetes clusters. 
@@ -233,6 +257,26 @@ kustomize build common/istio-1-9/kubeflow-istio-resources/base | kubectl apply -
 kustomize build apps/pytorch-job/upstream/overlays/kubeflow | kubectl apply -f -
 ```
 
+### (Optional) Testing KubeFlow deployment
+
+In case you want to test your KubeFlow deployment, an example training job can be run. For this, an example project of
+the pytorch-operator [repository](https://github.com/kubeflow/pytorch-operator/) can be used.
+
+```bash
+git checkout https://github.com/kubeflow/pytorch-operator.git
+cd pytorch-operator/examples/mnist
+```
+
+Follow the `README.md` instructions, and make sure to *rename* the image name in `pytorch-operator/examples/mnist/v1/pytorch_job_mnist_gloo.yaml`
+(line 33 and 35), to your project on GCE. Also commend out the `resource` descriptions in lines 20-22 and 36-38. Otherwise
+jobs require GPU support to run.
+
+Build and push the Docker container, and execute the command to launch your first PyTorchJob on your cluster.
+
+```bash
+kubectl create -f ./v1/pytorch_job_mnist_gloo.yaml
+```
+
 ### Create experiment Namespace
 Create your namespace in your cluster, that will later be used to deploy experiments. This guide (and the default
 setup of the project) assumes that the namespace `test` is used. To create a namespace, run the following command with your cluster credentials set up before running these commands.
@@ -275,7 +319,7 @@ You'll need to either create a **ReadWriteMany** Volume with read-only Claims, o
 the readers are spawned (and thus allowing for **ReadWriteOnce** to be allowed during deployment). For more information
 consult the Kubernetes and GKE Kubernetes 
 
-### Creating and uploading Docker container
+### Creating and pushing Docker containers
 On your remote cluster, you need to have set up a docker registry. For example, Google provides the Google Container Registry
 (GCR). In this example, we will make use of GCR, to push our container to a project `test-bed-distml` under the tag `fltk`.
 
