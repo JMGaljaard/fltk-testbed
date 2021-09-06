@@ -1,6 +1,5 @@
 # Ignoring the venv
 venv/
-
-#
+logging/
 # Ignoring all the compressed archives
 **/*.tar.gz
