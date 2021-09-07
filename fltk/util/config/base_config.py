@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import yaml
 from dataclasses_json import config, dataclass_json
 
 
@@ -85,8 +86,34 @@ class ClusterConfig:
     orchestrator: OrchestratorConfig
     client: ClientConfig
     wait_for_clients: bool = True
+    # TODO: Pull info from the environment (Helm chart also).
     namespace: str = 'test'
-    image: str = 'gcr.io/test-bed-distml/fltk:latest'
+    image: str = 'fltk:latest'
+
+    def load_incluster_namespace(self):
+        with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace") as f:
+            current_namespace = f.read()
+            self.namespace = current_namespace
+
+    def load_incluster_image(self):
+        """
+        Function to load the in-cluster image. The fltk-values.yaml file in charts is expected to have (atleast) the
+        following contents.
+
+        provider:
+            domain: gcr.io
+            projectName: <your-project-name>
+            imageName: fltk:latest
+
+        @return: None
+        @rtype: None
+        """
+        with open("charts/fltk-values.yaml") as f:
+            loaded = yaml.safe_load(f)
+            provider = loaded['provider']
+            domain, p_name, im_name = provider['domain'], provider['projectName'], provider['imageName']
+            current_image_name = f"{domain}/{p_name}/{im_name}"
+            self.image = current_image_name
 
 @dataclass_json
 @dataclass
