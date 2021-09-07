@@ -377,7 +377,7 @@ before running into trouble later.
 
 ```bash
 cd charts
-helm install flearner ./federator --namespace test -f fltk-values.yaml
+helm install flearner ./orchestrator --namespace test -f fltk-values.yaml
 ```
 
 This will spawn an `fl-server` Pod in the `test` Namespace, which will spawn Pods (using `V1PyTorchJobs`), that
