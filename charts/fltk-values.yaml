@@ -1,7 +1,5 @@
 fltk:
-    worldsize: 50
     config: cloud_experiment.yaml
-    port: 5000
 provider:
     domain: gcr.io
     projectName: test-bed-distml

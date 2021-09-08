@@ -313,7 +313,7 @@ You may want to change this amount, depending on your need. Other service provid
 `storageClass` to be set to `do-block-storage` instead of `default`.
 
 ```bash
-helm install repo kvaps https://raphaelmonrouzeau.github.io/charts/repository/
+helm repo add kvaps https://kvaps.github.io/charts
 helm update
 helm install nfs-server kvaps/nfs-server-provisioner --namespace test --set persistence.enabled=true,persistence.storageClass=standard,persistence.size=20Gi
 ```
@@ -383,6 +383,8 @@ helm install flearner ./orchestrator --namespace test -f fltk-values.yaml
 This will spawn an `fl-server` Pod in the `test` Namespace, which will spawn Pods (using `V1PyTorchJobs`), that
 run experiments. It will currently make use of the [`configs/example_cloud_experiment.json`](./configs/example_cloud_experiment.json)
 default configuration. As described in the [values](./charts/orchestrator/values.yaml) file of the `Orchestrator`s Helm chart
-## Known issues
+
+
+## Known issues / Limitations
 
 * Currently, there is no GPU support in the Docker containers.
