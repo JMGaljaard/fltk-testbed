@@ -15,6 +15,8 @@ spec:
       env:
         - name: PYTHONUNBUFFERED
           value: "1"
+        - name: IMAGE_NAME
+          value: "{{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName}}"
       image: {{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName}}
       name: federation-lab-server
       resources:

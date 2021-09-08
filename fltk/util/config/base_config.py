@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -108,12 +109,7 @@ class ClusterConfig:
         @return: None
         @rtype: None
         """
-        with open("charts/fltk-values.yaml") as f:
-            loaded = yaml.safe_load(f)
-            provider = loaded['provider']
-            domain, p_name, im_name = provider['domain'], provider['projectName'], provider['imageName']
-            current_image_name = f"{domain}/{p_name}/{im_name}"
-            self.image = current_image_name
+        self.image = os.environ.get('IMAGE_NAME')
 
 @dataclass_json
 @dataclass
