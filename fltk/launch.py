@@ -74,6 +74,10 @@ def launch_orchestrator(args: Namespace = None, conf: BareConfig = None):
         logging.info("Loading in cluster configuration file")
         config.load_incluster_config()
 
+        logging.info("Pointing configuration to in cluster configuration.")
+        conf.cluster_config.load_incluster_namespace()
+        conf.cluster_config.load_incluster_image()
+
     arrival_generator = ExperimentGenerator()
     cluster_manager = ClusterManager()
 
