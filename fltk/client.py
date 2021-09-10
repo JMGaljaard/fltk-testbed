@@ -206,31 +206,32 @@ class Client(object):
         epoch_results = []
         for epoch in range(1, max_epoch):
             train_loss = self.train(epoch)
+
+            # Let only the 'master node' work on training. Possibly DDP can be used
+            # to have a distributed test loader as well to speed up (would require
+            # aggregation of data.
+            # Example https://github.com/fabio-deep/Distributed-Pytorch-Boilerplate/blob/0206247150720ca3e287e9531cb20ef68dc9a15f/src/datasets.py#L271-L303.
+            elapsed_time_train = datetime.datetime.now() - start_time_train
+            train_time_ms = int(elapsed_time_train.total_seconds() * 1000)
+
+            start_time_test = datetime.datetime.now()
+            accuracy, test_loss, class_precision, class_recall, confusion_mat = self.test()
+
+            elapsed_time_test = datetime.datetime.now() - start_time_test
+            test_time_ms = int(elapsed_time_test.total_seconds() * 1000)
+
+            data = EpochData(epoch_id=epoch,
+                             duration_train=train_time_ms,
+                             duration_test=test_time_ms,
+                             loss_train=train_loss,
+                             accuracy=accuracy,
+                             loss=test_loss,
+                             class_precision=class_precision,
+                             class_recall=class_recall,
+                             confusion_mat=confusion_mat)
+
+            epoch_results.append(data)
             if self._id == 0:
-                # Let only the 'master node' work on training. Possibly DDP can be used
-                # to have a distributed test loader as well to speed up (would require
-                # aggregation of data.
-                # Example https://github.com/fabio-deep/Distributed-Pytorch-Boilerplate/blob/0206247150720ca3e287e9531cb20ef68dc9a15f/src/datasets.py#L271-L303.
-                elapsed_time_train = datetime.datetime.now() - start_time_train
-                train_time_ms = int(elapsed_time_train.total_seconds() * 1000)
-
-                start_time_test = datetime.datetime.now()
-                accuracy, test_loss, class_precision, class_recall, confusion_mat = self.test()
-
-                elapsed_time_test = datetime.datetime.now() - start_time_test
-                test_time_ms = int(elapsed_time_test.total_seconds() * 1000)
-
-                data = EpochData(epoch_id=epoch,
-                                 duration_train=train_time_ms,
-                                 duration_test=test_time_ms,
-                                 loss_train=train_loss,
-                                 accuracy=accuracy,
-                                 loss=test_loss,
-                                 class_precision=class_precision,
-                                 class_recall=class_recall,
-                                 confusion_mat=confusion_mat)
-
-                epoch_results.append(data)
                 self.log_progress(data, epoch)
         return epoch_results
 
