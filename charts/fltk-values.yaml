@@ -1,6 +1,6 @@
 fltk:
     config: cloud_experiment.yaml
 provider:
-    domain: gcr.io
-    projectName: test-bed-distml
+    domain: eu.gcr.io
+    projectName: qpecs-325321
     imageName: fltk:latest
