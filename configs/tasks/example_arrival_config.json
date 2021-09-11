@@ -1,42 +1,14 @@
-[ {
-  "jobClassParameters": [
-    {
-      "networkConfiguration": {
-        "network": "FashionMNISTCNN",
-        "dataset": "MNIST"
-      },
-      "systemParameters": {
-        "dataParallelism": "3",
-        "executorCores": "1",
-        "executorMemory": "1Gi",
-        "action": "train"
-      },
-      "hyperParameters": {
-        "batchSize": 128,
-        "maxEpoch": 10,
-        "learningRate": 0.01,
-        "learningrateDecay": 0.0002,
-        "decayStepSize": 50
-      },
-      "classProbability": 0.1,
-      "priorities": [
-        { "priority": 1, "probability": 1 }
-      ]
-    }
-  ],
-  "lambda": 40,
-  "preemptJobs": 0
-},
+[
   {
     "jobClassParameters": [
       {
         "networkConfiguration": {
-          "network": "FashionMNISTResNet",
-          "dataset": "MNIST"
+          "network": "FashionMNISTCNN",
+          "dataset": "FashionMNIST"
         },
         "systemParameters": {
           "dataParallelism": "1",
-          "executorCores": "1",
+          "executorCores": "1000m",
           "executorMemory": "1Gi",
           "action": "train"
         },
@@ -48,30 +20,10 @@
         },
         "classProbability": 0.1,
         "priorities": [
-          { "priority": 1, "probability": 1 }
-        ]
-      },
-      {
-        "networkConfiguration": {
-          "network": "FashionMNISTCNN",
-          "dataset": "MNIST"
-        },
-        "systemParameters": {
-          "dataParallelism": "1",
-          "executorCores": "1",
-          "executorMemory": "1Gi",
-          "action": "train"
-        },
-        "hyperParameters": {
-          "batchSize": "128",
-          "maxEpoch": "5",
-          "learningRate": "0.01",
-          "learningrateDecay": "0.0002"
-        },
-        "classProbability": 0.8,
-        "priorities": [
-          { "priority": 0, "probability": 0.9 },
-          { "priority": 1, "probability": 0.1 }
+          {
+            "priority": 1,
+            "probability": 1
+          }
         ]
       }
     ],
