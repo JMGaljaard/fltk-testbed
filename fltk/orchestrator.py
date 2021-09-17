@@ -58,7 +58,12 @@ class Orchestrator(object):
     def run(self, clear: bool = True) -> None:
         """
         Main loop of the Orchestartor.
-        :return:
+        @param clear: Boolean indicating whether a previous deployment needs to be cleaned up (i.e. lingering jobs that
+        were deployed by the previous run).
+
+        @type clear: bool
+        @return: None
+        @rtype: None
         """
         self._alive = True
         start_time = time.time()
