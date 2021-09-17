@@ -31,11 +31,11 @@ def should_distribute() -> bool:
 def launch_client(task_id: str, config: BareConfig = None, learning_params: LearningParameters = None,
                   namespace: Namespace = None):
     """
-    @param task_id:
-    @type task_id:
+    @param task_id: String representation (should be unique) corresponding to a client.
+    @type task_id: str
     @param config: Configuration for components, needed for spinning up components of the Orchestrator.
     @type config: BareConfig
-    @param learning_params:
+    @param learning_params: Parsed configuration of Hyper-Parameters for learning.
     @type: LearningParameters
     @return: None
     @rtype: None
@@ -60,7 +60,8 @@ def launch_orchestrator(args: Namespace = None, conf: BareConfig = None):
     Default runner for the Orchestrator that is based on KubeFlow
     @param args: Commandline arguments passed to the execution. Might be removed in a future commit.
     @type args: Namespace
-    @param config: Configuration for components, needed for spinning up components of the Orchestrator.
+    @param config: Configuration for execution of Orchestrators components, needed for spinning up components of the
+    Orchestrator.
     @type config: BareConfig
     @return: None
     @rtype: None
@@ -95,5 +96,14 @@ def launch_orchestrator(args: Namespace = None, conf: BareConfig = None):
     logging.info("Stopped execution of Orchestrator...")
 
 
-def launch_extractor(args: Namespace, config: BareConfig):
-    download_datasets(args, config)
+def launch_extractor(args: Namespace, conf: BareConfig):
+    """
+    Extractor launch function, will only download all models and quit execution.
+    @param args: Arguments passed from CLI.
+    @type args: Namespace
+    @param conf: Parsed configuration file passed from the CLI.
+    @type conf: BareConfig
+    @return: None
+    @rtype: None
+    """
+    download_datasets(args, conf)

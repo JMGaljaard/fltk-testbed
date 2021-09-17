@@ -1,12 +1,12 @@
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: fl-server
+  name: fltk-administrator-binding
 subjects:
   - kind: ServiceAccount
     name: default
-    namespace: test
+    namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
-  name: fl-server
+  name: fltk-administrator-role
   apiGroup: rbac.authorization.k8s.io

@@ -2,7 +2,6 @@ import logging
 import multiprocessing
 import time
 from abc import abstractmethod
-from asyncio import sleep
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
@@ -12,8 +11,7 @@ from typing import Dict, List, Union
 import numpy as np
 
 from fltk.util.singleton import Singleton
-from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser, JobClassParameter, \
-    NetworkConfiguration
+from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser, JobClassParameter
 
 
 @dataclass
@@ -80,18 +78,23 @@ class ExperimentGenerator(ArrivalGenerator):
 
     def set_logger(self, name: str = None):
         """
-        Set logging name to make debugging easier.
-        @param name:
-        @type name:
-        @return:
-        @rtype:
+        Set logging name of the ArrrivalGenerator object to a recognizable name. Needs to be called once, as otherwise
+        the logger is Uninitialized, resulting in failed execution.
+        @param name: Name to use, by default the name 'ArrivalGenerator' is used.
+        @type name: str
+        @return: None
+        @rtype: None
         """
         logging_name = name or self.__class__.__name__
         self.logger = logging.getLogger(logging_name)
 
     def load_config(self, alternative_path: Path = None):
         """
-        Generate
+        Load configuration from default path, if alternative path is not provided.
+        @param alternative_path: Optional non-default location to load the configuration from.
+        @type alternative_path: Path
+        @return: None
+        @rtype: None
         """
         parser = ExperimentParser(config_path=alternative_path or self.configuration_path)
         experiment_descriptions = parser.parse()
@@ -102,6 +105,8 @@ class ExperimentGenerator(ArrivalGenerator):
         Generate a training task for a JobDescription once the inter-arrival time has been 'deleted'.
         @param task_id: identifier for a training task corresponding to the JobDescription.
         @type task_id: str
+        @return: generated arrival corresponding to the unique task_id.
+        @rtype: Arrival
         """
         self.logger.info(f"Creating task for {task_id}")
         job: JobDescription = self.job_dict[task_id]
@@ -116,8 +121,8 @@ class ExperimentGenerator(ArrivalGenerator):
     def start(self, duration: Union[float, int]):
         """
         Function to start arrival generator, requires to
-        @return:
-        @rtype: int, float
+        @return: None
+        @rtype: None
         """
         if not self.logger:
             self.set_logger()
@@ -126,16 +131,20 @@ class ExperimentGenerator(ArrivalGenerator):
         self.run(duration)
 
     def stop(self) -> None:
+        """
+        Function to call when the generator needs to stop. By default the generator will run for 1 hour.
+        @return: None
+        @rtype: None
+        """
         self.logger.info("Received stopping signal")
         self._alive = False
 
     def run(self, duration: float):
         """
-        Run function to generate arrivals during existence of the Orchestrator. WIP.
-
-        Currently supports for time-drift correction to account for execution duration of the generator.
-        @return:
-        @rtype:
+        Run function to generate arrivals during existence of the Orchestrator. Accounts time-drift correction for
+        long-term execution duration of the generator (i.e. for time taken by Python interpreter).
+        @return: None
+        @rtype: None
         """
         np.random.seed(42)
         self.start_time = time.time()

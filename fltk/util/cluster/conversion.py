@@ -28,6 +28,3 @@ class Convert:
         @rtype: int
         """
         return self.__Registry.Quantity(value)
-
-
-

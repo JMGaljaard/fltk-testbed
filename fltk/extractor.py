@@ -14,7 +14,7 @@ def download_datasets(args: Namespace, config: BareConfig):
     using the FLTK framework).
     @param args: Namespace object.
     @type args: Namespace
-    @param config: FLTK configuration file, for finding the datapath.
+    @param config: FLTK configuration file, for finding the path where the datasets should be stored.
     @type config: BareConfig
     @return: None
     @rtype: None

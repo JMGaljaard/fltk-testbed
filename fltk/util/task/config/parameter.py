@@ -22,7 +22,6 @@ class HyperParameters:
     lr: str = field(metadata=config(field_name="learningRate"))
     lr_decay: str = field(metadata=config(field_name="learningrateDecay"))
 
-
 @dataclass_json
 @dataclass(frozen=True)
 class Priority:
@@ -76,10 +75,11 @@ class JobClassParameter:
 @dataclass(frozen=True)
 class JobDescription:
     """
-    Dataclass describing the characteristics of a Job type, as well as the arrival statistics.
+    Dataclass describing the characteristics of a Job type, as well as the corresponding arrival statistic.
     Currently, the arrival statistics is the lambda value used in a Poisson arrival process.
 
-    preemtible_jobs: indicates whether the jobs can be pre-emptively rescheduled by the scheduler.
+    preemtible_jobs: indicates whether the jobs can be pre-emptively rescheduled by the scheduler. This is currently
+    not implemented in FLTK, but could be added as a project (advanced)
     """
     job_class_parameters: List[JobClassParameter] = field(metadata=config(field_name="jobClassParameters"))
     arrival_statistic: float = field(metadata=config(field_name="lambda"))

@@ -58,7 +58,12 @@ class Orchestrator(object):
     def run(self, clear: bool = True) -> None:
         """
         Main loop of the Orchestartor.
-        :return:
+        @param clear: Boolean indicating whether a previous deployment needs to be cleaned up (i.e. lingering jobs that
+        were deployed by the previous run).
+
+        @type clear: bool
+        @return: None
+        @rtype: None
         """
         self._alive = True
         start_time = time.time()
@@ -85,10 +90,19 @@ class Orchestrator(object):
                 curr_task = self.pending_tasks.get()
                 self.__logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
                 job_to_start = construct_job(self._config, curr_task)
-                # Hack to overcome limitation of KubeFlow version (Made for older version of Kubernetes
+
+
+                # Hack to overcome limitation of KubeFlow version (Made for older version of Kubernetes)
                 self.__logger.info(f"Deploying on cluster: {curr_task.id}")
                 self.__client.create(job_to_start, namespace=self._config.cluster_config.namespace)
                 self.deployed_tasks.append(curr_task)
+
+                # TODO: Extend this logic in your real project, this is only meant for demo purposes
+                # For now we exit the thread after scheduling a single task.
+
+                self.stop()
+                return
+
             self.__logger.debug("Still alive...")
             time.sleep(5)
 
