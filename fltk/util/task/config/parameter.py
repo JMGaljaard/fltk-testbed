@@ -21,6 +21,7 @@ class HyperParameters:
     max_epoch: int = field(metadata=config(field_name="maxEpoch"))
     lr: str = field(metadata=config(field_name="learningRate"))
     lr_decay: str = field(metadata=config(field_name="learningrateDecay"))
+    no_attn: str = field(metadata=config(field_name="numberAttentionHeads"))
 
 
 @dataclass_json

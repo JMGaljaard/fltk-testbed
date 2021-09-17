@@ -5,11 +5,11 @@ metadata:
     io.fltk.service: fl-server-claim
   name: fl-server-claim
 spec:
-  # Only the Orchestator pod should be able to write to the part. Extractor functions as a simple 'read' to
-  # Make datacollection easier.
+  # Only the Orchestrator pod should be able to write to the part. Extractor functions as a simple 'read' to
+  # Make data collection easier.
   accessModes:
     - ReadWriteMany
   resources:
     requests:
-      storage: {{ .Values.extractor.logging.size }}
+      storage: {{ .Values.extractor.output.size }}
   storageClassName: "nfs"
