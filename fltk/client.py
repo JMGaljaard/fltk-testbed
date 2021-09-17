@@ -1,7 +1,7 @@
 import datetime
 import logging
 from pathlib import Path
-from typing import Union, List, Tuple
+from typing import List, Tuple
 
 import numpy as np
 import torch
@@ -27,9 +27,9 @@ class Client(object):
         @type rank: int
         @param task_id: String id representing the UID of the training task
         @type task_id: str
-        @param config:
-        @type config:
-        @param learning_params:
+        @param config: Parsed configuration file representation to extract runtime information from.
+        @type config: BareConfig
+        @param learning_params: Hyper-parameter configuration to be used during the training process by the learner.
         @type learning_params: LearningParameters
         """
         self._logger = logging.getLogger(f'Client-{rank}-{task_id}')
@@ -78,9 +78,15 @@ class Client(object):
                                           self.config.get_scheduler_gamma(),
                                           self.config.get_min_lr())
 
-        self.tb_writer = SummaryWriter(str(self.config.get_log_path(self._task_id, self._id, self.learning_params.model)))
+        self.tb_writer = SummaryWriter(
+            str(self.config.get_log_path(self._task_id, self._id, self.learning_params.model)))
 
     def stop_learner(self):
+        """
+        @deprecated Function to stop a learner upon command of another learner.
+        @return: None
+        @rtype: None
+        """
         self._logger.info(f"Tearing down Client {self._id}")
         self.tb_writer.close()
 
@@ -91,8 +97,8 @@ class Client(object):
         @param cuda_device: Torch device to use, refers to the CUDA device to be used in case there are multiple.
         Defaults to the first cuda device when CUDA is enabled at index 0.
         @type cuda_device: torch.device
-        @return:
-        @rtype:
+        @return: None
+        @rtype: None
         """
         if self.config.cuda_enabled() and torch.cuda.is_available():
             return torch.device(cuda_device)
@@ -103,9 +109,9 @@ class Client(object):
 
     def load_default_model(self):
         """
-        Load a model from default model file.
-
-        This is used to ensure consistent default model behavior.
+        @deprecated Load a model from default model file. This function could be used to ensure consistent default model
+        behavior. When using PyTorch's DistributedDataParallel, however, the first step will always synchronize the
+        model.
         """
 
         model_file = Path(f'{self.model.__name__}.model')
@@ -119,7 +125,7 @@ class Client(object):
         (for example for customized training or Federated Learning), additional torch.distributed.barrier calls might
         be required to launch.
 
-        :param epoch: Current epoch #
+        :param epoch: Current epoch number
         :type epoch: int
         @param log_interval: Iteration interval at which to log.
         @type log_interval: int
@@ -159,6 +165,15 @@ class Client(object):
         return final_running_loss
 
     def test(self) -> Tuple[float, float, np.array, np.array, np.array]:
+        """
+        Function to test the trained model using the test dataset. Returns a number of statistics of the training
+        process.
+        @warning Currently the testing process assumes that the model performs classification, for different types of
+        tasks this function would need to be updated.
+        @return: (accuracy, loss, class_precision, class_recall, confusion_mat): class_precision, class_recal and
+        confusion_mat will be in a np.array, which corresponds to the nubmer of classes in a classification task.
+        @rtype: Tuple[float, float, np.array, np.array, np.array]:
+        """
         correct = 0
         total = 0
         targets_ = []
@@ -198,7 +213,10 @@ class Client(object):
 
     def run_epochs(self) -> List[EpochData]:
         """
-        Function to run epochs with
+        Function to run training epochs using the pre-set Hyper-Parameters.
+        @return: A list of data gathered during the execution, containing progress information such as accuracy. See also
+        EpochData.
+        @rtype: List[EpochData]
         """
         max_epoch = self.learning_params.max_epoch + 1
         start_time_train = datetime.datetime.now()
@@ -237,19 +255,27 @@ class Client(object):
 
     def save_model(self, epoch):
         """
-        Move function to utils directory.
-        Saves the model if necessary.
+        @deprecated Move function to utils directory.
         """
         self._logger.debug(f"Saving model to flat file storage. Saved at epoch #{epoch}")
         save_model(self.model, self.config.get_save_model_folder_path(), epoch)
 
-    def log_progress(self, epoch_data: EpochData, epoch):
-
+    def log_progress(self, epoch_data: EpochData, epoch: int):
+        """
+        Function to log the progress of the learner between epochs. Only the MASTER/RANK=0 process should call this
+        function. Other learners' SummaryWriters data will be gone after the pod reached 'Completed' status.
+        @param epoch_data: data object which needs to be logged with the learners SummaryWriter.
+        @type epoch_data: EpochData
+        @param epoch: Number of the epoch.
+        @type epoch: int
+        @return: None
+        @rtype: None
+        """
 
         self.tb_writer.add_scalar('training loss per epoch',
-                                    epoch_data.loss_train,
-                                    epoch)
+                                  epoch_data.loss_train,
+                                  epoch)
 
         self.tb_writer.add_scalar('accuracy per epoch',
-                                    epoch_data.accuracy,
-                                    epoch)
+                                  epoch_data.accuracy,
+                                  epoch)
