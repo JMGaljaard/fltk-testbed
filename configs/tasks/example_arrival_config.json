@@ -7,8 +7,8 @@
           "dataset": "FashionMNIST"
         },
         "systemParameters": {
-          "dataParallelism": "1",
-          "executorCores": "1000m",
+          "dataParallelism": "4",
+          "executorCores": "1",
           "executorMemory": "1Gi",
           "action": "train"
         },
@@ -16,7 +16,8 @@
           "batchSize": "128",
           "maxEpoch": "5",
           "learningRate": "0.01",
-          "learningrateDecay": "0.0002"
+          "learningrateDecay": "0.0002",
+          "numberAttentionHeads": "100"
         },
         "classProbability": 0.1,
         "priorities": [

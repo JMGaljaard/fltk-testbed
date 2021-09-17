@@ -1,5 +1,5 @@
 extractor:
-  dataset:
-    size: 2Gi
   logging:
+    size: 2Gi
+  output:
     size: 5Gi
