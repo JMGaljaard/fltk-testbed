@@ -17,7 +17,6 @@
           "maxEpoch": "5",
           "learningRate": "0.01",
           "learningrateDecay": "0.0002",
-          "numberAttentionHeads": "100"
         },
         "classProbability": 0.1,
         "priorities": [
