@@ -3,8 +3,8 @@
     "jobClassParameters": [
       {
         "networkConfiguration": {
-          "network": "FashionMNISTCNN",
-          "dataset": "FashionMNIST"
+          "network": "FashionMNISTResNet",
+          "dataset": "MNIST"
         },
         "systemParameters": {
           "dataParallelism": "1",

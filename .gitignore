@@ -134,3 +134,5 @@ data/**
 !data/.gitkeep
 output
 .idea
+
+logging/**/events.out.**
