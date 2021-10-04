@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 
@@ -51,13 +52,17 @@ class FashionMNISTResNet(nn.Module):
                                     ResNet_block(64, 128, 2),
                                     ResNet_block(128, 256, 2),
                                     ResNet_block(256, 512, 2))
-        self.block3 = nn.Sequential(nn.AvgPool2d(kernel_size=3))
-        self.Dense = nn.Linear(512, 10)
+        # Set to adaptive as ResNet default average pool is not compatible with shape
+        # (512, 1, 1) and kernel size=3 (... - 1 in size, so needs padding or AdaptiveAvgPool2d).
+        self.block3 = nn.AdaptiveAvgPool2d((1, 1))
+        # Instead of reshape/view use Flatten layer to perform flattening for 'Dense' layer for readability.
+        self.flatten = nn.Flatten()
+        self.Dense = nn.Linear(512, num_classes)
 
     def forward(self, x):
         y = self.block1(x)
         y = self.block2(y)
+
         y = self.block3(y)
-        y = y.view(-1, 512)
-        y = self.Dense(y)
+        y = self.Dense(self.flatten(y))
         return y
