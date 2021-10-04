@@ -64,7 +64,7 @@ class Bottleneck(nn.Module):
 
 
 class Cifar10ResNet(nn.Module):
-    def __init__(self, block=Union[BasicBlock, Bottleneck], num_blocks=[2, 2, 2, 2], num_classes=10):
+    def __init__(self, block: nn.Module = BasicBlock, num_blocks=[2, 2, 2, 2], num_classes=10):
         super(Cifar10ResNet, self).__init__()
         self.in_planes = 64
 
