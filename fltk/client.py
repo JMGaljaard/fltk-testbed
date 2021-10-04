@@ -90,7 +90,7 @@ class Client(object):
         self._logger.info(f"Tearing down Client {self._id}")
         self.tb_writer.close()
 
-    def _init_device(self, cuda_device: torch.device = torch.device('cpu')):
+    def _init_device(self, cuda_device: torch.device = torch.device(f'cpu')):
         """
         Initialize Torch to use available devices. Either prepares CUDA device, or disables CUDA during execution to run
         with CPU only inference/training.
@@ -101,11 +101,11 @@ class Client(object):
         @rtype: None
         """
         if self.config.cuda_enabled() and torch.cuda.is_available():
-            return torch.device(cuda_device)
+            return torch.device(dist.get_rank())
         else:
             # Force usage of CPU
             torch.cuda.is_available = lambda: False
-            return torch.device("cpu")
+            return cuda_device
 
     def load_default_model(self):
         """
@@ -138,10 +138,10 @@ class Client(object):
             self.optimizer.zero_grad()
 
             # Forward through the net to train
-            outputs = self.model(inputs)
+            outputs = self.model(inputs.to(self.device))
 
             # Calculate the loss
-            loss = self.loss_function(outputs, labels)
+            loss = self.loss_function(outputs, labels.to(self.device))
 
             # Update weights, DPP will account for synchronization of the weights.
             loss.backward()
