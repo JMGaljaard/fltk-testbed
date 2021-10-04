@@ -1,6 +1,6 @@
 from argparse import Namespace
 from dataclasses import dataclass
-from typing import List, Tuple, Type
+from typing import List, Tuple, Type, Dict, T
 
 import torch.distributed as dist
 import torch.nn
@@ -36,40 +36,76 @@ class LearningParameters:
     optimizer: str
 
     _available_nets = {
-        "CIFAR100ResNet": nets.Cifar100ResNet,
+        "CIFAR100RESNET": nets.Cifar100ResNet,
         "CIFAR100VGG": nets.Cifar100VGG,
         "CIFAR10CNN": nets.Cifar10CNN,
-        "CIFAR10ResNet": nets.Cifar10ResNet,
-        "FashionMNISTCNN": nets.FashionMNISTCNN,
-        "FashionMNISTResNet": nets.FashionMNISTResNet
+        "CIFAR10RESNET": nets.Cifar10ResNet,
+        "FASHIONMNISTCNN": nets.FashionMNISTCNN,
+        "FASHIONMNISTRESNET": nets.FashionMNISTResNet
     }
 
     _available_data = {
         "CIFAR10": CIFAR10Dataset,
         "CIFAR100": CIFAR100Dataset,
-        "FashionMNIST": FashionMNISTDataset,
+        "FASHIONMNIST": FashionMNISTDataset,
         "MNIST": MNIST
     }
 
     _available_loss = {
-        "CrossEntropy": torch.nn.CrossEntropyLoss
+        "CROSSENTROPY": torch.nn.CrossEntropyLoss
     }
 
     _available_optimizer = {
-        "Adam": torch.optim.SGD
+        "ADAM": torch.optim.SGD
     }
 
+    @staticmethod
+    def __safe_get(lookup: Dict[str, T], keyword: str) -> T:
+        """
+        Static function to 'safe' get elements from a dictionary, to prevent issues with Capitalization in the code.
+        @param lookup: Lookup dictionary to 'safe get' from.
+        @type lookup: dict
+        @param keyword: Keyword to 'get' from the Lookup dictionary.
+        @type keyword: str
+        @return: Lookup value from 'safe get' request.
+        @rtype: T
+        """
+        safe_keyword = str.upper(keyword)
+        return lookup.get(safe_keyword)
+
     def get_model_class(self) -> Type[torch.nn.Module]:
-        return self._available_nets.get(self.model)
+        """
+        Function to obtain the model class that was given via commandline.
+        @return: Type corresponding to the model that was passed as argument.
+        @rtype: Type[torch.nn.Module]
+        """
+        return self.__safe_get(self._available_nets, self.model)
 
     def get_dataset_class(self) -> Type[Dataset]:
-        return self._available_data.get(self.dataset)
+        """
+        Function to obtain the dataset class that was given via commandline.
+        @return: Type corresponding to the dataset that was passed as argument.
+        @rtype: Type[Dataset]
+        """
+        return self.__safe_get(self._available_data, self.dataset)
 
-    def get_loss(self):
-        return self._available_loss.get(self.loss)
+    def get_loss(self) -> Type:
+        """
+        Function to obtain the loss function Type that was given via commandline to be used during the training
+        execution.
+        @return: Type corresponding to the loss function that was passed as argument.
+        @rtype: Type
+        """
+        return self.__safe_get(self._available_loss, self.loss)
 
     def get_optimizer(self) -> Type[torch.optim.Optimizer]:
-        return self._available_optimizer.get(self.optimizer)
+        """
+        Function to obtain the loss function Type that was given via commandline to be used during the training
+        execution.
+        @return: Type corresponding to the Optimizer to be used during training.
+        @rtype: Type[torch.optim.Optimizer]
+        """
+        return self.__safe_get(self._available_optimizer, self.optimizer)
 
 
 def extract_learning_parameters(args: Namespace) -> LearningParameters:
