@@ -4,7 +4,7 @@
       {
         "networkConfiguration": {
           "network": "FashionMNISTCNN",
-          "dataset": "FashionMNIST"
+          "dataset": "MNIST"
         },
         "systemParameters": {
           "dataParallelism": "1",

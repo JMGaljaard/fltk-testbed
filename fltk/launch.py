@@ -47,7 +47,10 @@ def launch_client(task_id: str, config: BareConfig = None, learning_params: Lear
         dist.init_process_group(namespace.backend)
         rank = dist.get_rank()
         world_size = dist.get_world_size()
-        backend = dist.get_backend()
+
+    logging.info(f'Initializing backend for training process: {namespace.backend}')
+    dist.init_process_group(namespace.backend)
+
     logging.info(f'Starting Creating client with {rank}')
     client = Client(rank, task_id, world_size, config, learning_params)
     client.prepare_learner(distributed)
