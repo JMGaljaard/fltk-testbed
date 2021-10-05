@@ -80,6 +80,9 @@ class Orchestrator(object):
                 self.__logger.debug(f"Arrival of: {task}")
                 self.pending_tasks.put(task)
 
+            repeats = 10
+            repeat_nbr = 0
+
             while not self.pending_tasks.empty():
                 # Do blocking request to priority queue
                 curr_task = self.pending_tasks.get()
@@ -95,8 +98,11 @@ class Orchestrator(object):
                 # TODO: Extend this logic in your real project, this is only meant for demo purposes
                 # For now we exit the thread after scheduling a single task.
 
-                self.stop()
-                return
+                repeat_nbr += 1
+
+                if repeat_nbr > repeats:
+                    self.stop()
+                    return
 
             self.__logger.debug("Still alive...")
             time.sleep(5)

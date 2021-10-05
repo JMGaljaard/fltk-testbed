@@ -7,7 +7,7 @@
           "dataset": "FashionMNIST"
         },
         "systemParameters": {
-          "dataParallelism": "1",
+          "dataParallelism": "4",
           "executorCores": "1000m",
           "executorMemory": "1Gi",
           "action": "train"
