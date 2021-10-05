@@ -1,5 +1,5 @@
 fltk:
-    config: cloud_experiment.yaml
+    config: example_cloud_experiment.yaml
 provider:
     domain: eu.gcr.io
     projectName: qpecs-325321
