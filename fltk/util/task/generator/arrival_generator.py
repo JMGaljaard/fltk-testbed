@@ -146,7 +146,6 @@ class ExperimentGenerator(ArrivalGenerator):
         @return: None
         @rtype: None
         """
-        np.random.seed(42)
         self.start_time = time.time()
         self.logger.info("Populating tick lists with initial arrivals")
         for task_id in self.job_dict.keys():
