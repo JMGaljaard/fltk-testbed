@@ -3,8 +3,6 @@ import os
 from argparse import Namespace
 from multiprocessing.pool import ThreadPool
 
-import numpy as np
-import torch
 import torch.distributed as dist
 from kubernetes import config
 
