@@ -53,6 +53,7 @@ def cluster_start(args: Namespace, configuration: BareConfig):
 
 def client_start(args: Namespace, configuration: BareConfig):
     learning_params = extract_learning_parameters(args)
+    configuration.set_seed()
     task_id = args.task_id
     launch_client(task_id, config=configuration, learning_params=learning_params, namespace=args)
 

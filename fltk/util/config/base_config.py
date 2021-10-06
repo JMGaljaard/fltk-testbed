@@ -4,6 +4,8 @@ from pathlib import Path
 
 from dataclasses_json import config, dataclass_json
 
+from fltk.nets.util.reproducability import init_reproducibility
+
 
 @dataclass_json
 @dataclass
@@ -117,6 +119,19 @@ class BareConfig(object):
     cluster_config: ClusterConfig = field(metadata=config(field_name="cluster"))
     config_path: Path = None
 
+    def set_seed(self) -> None:
+        """
+        Set seeds for better reproducibility, and prevent testing random initialization of the model,
+        i.e. 'lucky draws' in network initialization.
+        @return: None
+        @rtype: None
+        """
+        init_reproducibility(
+                torch_seed=self.execution_config.reproducibility.torch_seed,
+                cuda=self.execution_config.cuda,
+                numpy_seed=self.execution_config.reproducibility.arrival_seed
+        )
+
     def get_duration(self) -> int:
         """
         Function to get execution duration of an experiment.
@@ -136,7 +151,7 @@ class BareConfig(object):
     def get_log_path(self, experiment_id: str, client_id: int, network_name: str) -> Path:
         """
         Function to get the logging path that corresponds to a specific experiment, client and network that has been
-        deployed as learnign task.
+        deployed as learning task.
         @param experiment_id: Unique experiment ID (should be provided by the Orchestrator).
         @type experiment_id: str
         @param client_id: Rank of the client.
@@ -152,7 +167,7 @@ class BareConfig(object):
 
     def get_scheduler_step_size(self) -> int:
         """
-        Function to get the stepsize of the Learning Rate decay scheduler/
+        Function to get the step_size of the Learning Rate decay scheduler/
         @return: Learning rate scheduler step-size.
         @rtype: int
         """

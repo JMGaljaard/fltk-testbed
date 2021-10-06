@@ -69,7 +69,6 @@ class Bottleneck(nn.Module):
 
 
 class Cifar100ResNet(nn.Module):
-
     def __init__(self, block: nn.Module = BasicBlock, num_block=None, num_classes=100):
         super(Cifar100ResNet, self).__init__()
         if num_block is None:
@@ -127,7 +126,6 @@ class Cifar100ResNet(nn.Module):
 
 
 class ResNet18(Cifar100ResNet):
-
     def __init__(self):
         super(ResNet18).__init__(BasicBlock, [2, 2, 2, 2])
 
