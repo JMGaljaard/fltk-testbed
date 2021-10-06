@@ -222,8 +222,6 @@ class Client(object):
         """
         max_epoch = self.learning_params.max_epoch + 1
         start_time_train = datetime.datetime.now()
-
-        torch.save(self.model.state_dict(), 'test2.pth')
         epoch_results = []
         for epoch in range(1, max_epoch):
             train_loss = self.train(epoch)
