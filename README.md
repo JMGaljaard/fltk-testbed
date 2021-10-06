@@ -385,6 +385,30 @@ run experiments. It will currently make use of the [`configs/example_cloud_exper
 default configuration. As described in the [values](./charts/orchestrator/values.yaml) file of the `Orchestrator`s Helm chart
 
 
+## Running tests
+In addition to the FLTK framework implementation, some tests are available to prevent regression of bugs. Currently, only a limited subset of features 
+is tested of FLTK. All current tests are deterministic, flaky tests indicate that something is likely broken
+
+### Prerequisites
+Setup a `development` virtual environment, using the [`requirements-dev.txt`](requirements-dev.txt) requirements file.
+This will install the same requirements as the [`requirements.txt`](requirements.txt), with some additional packages needed to run the tests.
+
+```bash
+python3 -m venv venv-dev
+source venv-dev/bin/activate
+pip install -r requirements.txt
+```
+
+### Executing tests
+Make sure to run in a shell with the `venv-dev` virtual environment. With the environment enabled, we can run using:
+
+```bash
+python3 -m pytest -v
+```
+
+Which will collect and run all the tests in the repository, and show in `verbose` which tests passed. 
+
+
 ## Known issues / Limitations
 
 * Currently, there is no GPU support in the Docker containers.
