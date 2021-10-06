@@ -98,24 +98,24 @@ class Cifar10ResNet(nn.Module):
 class ResNet18(Cifar10ResNet):
 
     def __init__(self):
-        super(ResNet18).__init__(BasicBlock, [2, 2, 2, 2])
+        super(ResNet18, self).__init__(BasicBlock, [2, 2, 2, 2])
 
 
 class ResNet34(Cifar10ResNet):
     def __init__(self):
-        super(ResNet34).__init__(BasicBlock, [3, 4, 6, 3])
+        super(ResNet34, self).__init__(BasicBlock, [3, 4, 6, 3])
 
 
 class ResNet50(Cifar10ResNet):
     def __init__(self):
-        super(ResNet50).__init__(Bottleneck, [3, 4, 6, 3])
+        super(ResNet50, self).__init__(Bottleneck, [3, 4, 6, 3])
 
 
 class ResNet101(Cifar10ResNet):
     def __init__(self):
-        super(ResNet101).__init__(Bottleneck, [3, 4, 23, 3])
+        super(ResNet101, self).__init__(Bottleneck, [3, 4, 23, 3])
 
 
 class ResNet152(Cifar10ResNet):
     def __init__(self):
-        super(ResNet152).__init__(Bottleneck, [3, 8, 36, 3])
+        super(ResNet152, self).__init__(Bottleneck, [3, 8, 36, 3])

@@ -3,6 +3,8 @@ import os
 from argparse import Namespace
 from multiprocessing.pool import ThreadPool
 
+import numpy as np
+import torch
 import torch.distributed as dist
 from kubernetes import config
 
@@ -52,6 +54,7 @@ def launch_client(task_id: str, config: BareConfig = None, learning_params: Lear
     dist.init_process_group(namespace.backend)
 
     logging.info(f'Starting Creating client with {rank}')
+
     client = Client(rank, task_id, world_size, config, learning_params)
     client.prepare_learner(distributed)
     epoch_data = client.run_epochs()
