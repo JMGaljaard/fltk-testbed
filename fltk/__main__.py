@@ -48,11 +48,16 @@ def cluster_start(args: Namespace, configuration: BareConfig):
     """
     logging.basicConfig(level=logging.DEBUG,
                         datefmt='%m-%d %H:%M')
+    # Set the seed for arrivals, torch seed is mostly ignored. Set the `arrival_seed` to a different value
+    # for each repetition that you want to run an experiment with.
+    configuration.set_seed()
     launch_orchestrator(args=args, conf=configuration)
 
 
 def client_start(args: Namespace, configuration: BareConfig):
     learning_params = extract_learning_parameters(args)
+    # Set the seed for PyTorch, numpy seed is mostly ignored. Set the `torch_seed` to a different value
+    # for each repetition that you want to run an experiment with.
     configuration.set_seed()
     task_id = args.task_id
     launch_client(task_id, config=configuration, learning_params=learning_params, namespace=args)
