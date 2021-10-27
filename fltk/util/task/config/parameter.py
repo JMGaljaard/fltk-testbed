@@ -84,6 +84,7 @@ class JobDescription:
     job_class_parameters: List[JobClassParameter] = field(metadata=config(field_name="jobClassParameters"))
     arrival_statistic: float = field(metadata=config(field_name="lambda"))
     preemtible_jobs: float = field(metadata=config(field_name="preemptJobs"))
+    elastic_index: str = field(metadata=config(field_name="elasticsearchIndex"))
 
 
 @dataclass(order=True)

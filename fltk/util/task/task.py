@@ -20,3 +20,4 @@ class ArrivalTask:
     dataset: str = field(compare=False)
     sys_conf: SystemParameters = field(compare=False)
     param_conf: HyperParameters = field(compare=False)
+    elastic_index: str = "default"

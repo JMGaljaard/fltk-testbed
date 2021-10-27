@@ -47,6 +47,7 @@ class Arrival:
     ticks: int
     task: TrainTask
     task_id: str
+    elastic_index: str
 
     def get_priority(self):
         return self.task.priority
@@ -109,9 +110,10 @@ class ExperimentGenerator(ArrivalGenerator):
         priority = choices(parameters.priorities, [prio.probability for prio in parameters.priorities], k=1)[0]
 
         inter_arrival_ticks = np.random.poisson(lam=job.arrival_statistic)
+        elastic_index = job.elastic_index
         train_task = TrainTask(task_id, parameters, priority)
 
-        return Arrival(inter_arrival_ticks, train_task, task_id)
+        return Arrival(inter_arrival_ticks, train_task, task_id, elastic_index)
 
     def start(self, duration: Union[float, int]):
         """

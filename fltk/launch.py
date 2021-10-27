@@ -13,6 +13,8 @@ from fltk.util.cluster.client import ClusterManager
 from fltk.util.config.arguments import LearningParameters
 from fltk.util.config.base_config import BareConfig
 from fltk.util.task.generator.arrival_generator import ExperimentGenerator
+from elasticsearch import Elasticsearch
+from datetime import datetime
 
 
 def should_distribute() -> bool:
@@ -40,6 +42,8 @@ def launch_client(task_id: str, config: BareConfig = None, learning_params: Lear
     @return: None
     @rtype: None
     """
+
+    es = Elasticsearch(["3.137.193.160:9200"])
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
     rank, world_size, backend = 0, None, None
     distributed = should_distribute()
@@ -52,7 +56,14 @@ def launch_client(task_id: str, config: BareConfig = None, learning_params: Lear
     client = Client(rank, task_id, world_size, config, learning_params)
     client.prepare_learner(distributed)
     epoch_data = client.run_epochs()
+    end_time = datetime.now()
     print(epoch_data)
+    doc_end = {
+        'task_id': task_id,
+        'event': 'stop',
+        'timestamp': datetime.now()
+    }
+    res = es.index(index=learning_params.elastic_index, id=task_id, document=doc_end)
 
 
 def launch_orchestrator(args: Namespace = None, conf: BareConfig = None):

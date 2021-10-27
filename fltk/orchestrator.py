@@ -12,6 +12,8 @@ from fltk.util.cluster.client import construct_job, ClusterManager
 from fltk.util.config.base_config import BareConfig
 from fltk.util.task.generator.arrival_generator import ArrivalGenerator, Arrival
 from fltk.util.task.task import ArrivalTask
+from elasticsearch import Elasticsearch
+from datetime import datetime
 
 
 class Orchestrator(object):
@@ -42,6 +44,7 @@ class Orchestrator(object):
         self.__cluster_mgr = cluster_mgr
         self.__arrival_generator = arv_gen
         self._config = config
+        self._elasticsearch = Elasticsearch(["3.137.193.160:9200"])
 
         # API to interact with the cluster.
         self.__client = PyTorchJobClient()
@@ -75,12 +78,13 @@ class Orchestrator(object):
                                    network=arrival.get_network(),
                                    dataset=arrival.get_dataset(),
                                    sys_conf=arrival.get_system_config(),
-                                   param_conf=arrival.get_parameter_config())
+                                   param_conf=arrival.get_parameter_config(),
+                                   elastic_index=arrival.elastic_index)
 
                 self.__logger.debug(f"Arrival of: {task}")
                 self.pending_tasks.put(task)
 
-            repeats = 10
+            repeats = 5
             repeat_nbr = 0
 
             while not self.pending_tasks.empty():
@@ -89,14 +93,16 @@ class Orchestrator(object):
                 self.__logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
                 job_to_start = construct_job(self._config, curr_task)
 
-
                 # Hack to overcome limitation of KubeFlow version (Made for older version of Kubernetes)
                 self.__logger.info(f"Deploying on cluster: {curr_task.id}")
                 self.__client.create(job_to_start, namespace=self._config.cluster_config.namespace)
+                doc_start = {
+                    'task_id': curr_task.id,
+                    'event': 'start',
+                    'timestamp': datetime.now(),
+                }
                 self.deployed_tasks.append(curr_task)
-
-                # TODO: Extend this logic in your real project, this is only meant for demo purposes
-                # For now we exit the thread after scheduling a single task.
+                self._elasticsearch.index(index=curr_task.elastic_index, document=doc_start)
 
                 repeat_nbr += 1
 

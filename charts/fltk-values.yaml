@@ -1,6 +1,6 @@
 fltk:
     config: example_cloud_experiment.yaml
 provider:
-    domain: eu.gcr.io
-    projectName: qpecs-325321
+    domain: gcr.io
+    projectName: qpefcs-course-project
     imageName: fltk:latest

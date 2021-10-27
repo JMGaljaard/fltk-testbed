@@ -20,7 +20,8 @@ CLIENT_ARGS: List[Tuple[str, str, str, type]] = \
      ("decay", 'dc',
       "Rate at which the learning rate decreases (i.e. the optimization takes smaller steps", float),
      ("loss", 'ls', "Loss function to use for optimization steps", str),
-     ("optimizer", 'op', "Which optimizer to use during the training process", str)
+     ("optimizer", 'op', "Which optimizer to use during the training process", str),
+     ("elastic_index", 'ei', "Index name to use for elastic", str)
      ]
 
 
@@ -34,6 +35,7 @@ class LearningParameters:
     learning_decay: float
     loss: str
     optimizer: str
+    elastic_index: str
 
     _available_nets = {
         "CIFAR100ResNet": nets.Cifar100ResNet,
@@ -88,7 +90,8 @@ def extract_learning_parameters(args: Namespace) -> LearningParameters:
     decay = args.decay
     loss = args.loss
     optimizer = args.optimizer
-    return LearningParameters(model, dataset, batch_size, epoch, lr, decay, loss, optimizer)
+    elastic_index = args.elastic_index
+    return LearningParameters(model, dataset, batch_size, epoch, lr, decay, loss, optimizer, elastic_index)
 
 
 def create_extractor_parser(subparsers):

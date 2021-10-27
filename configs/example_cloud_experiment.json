@@ -9,7 +9,7 @@
          "prefix": "client",
          "tensorboard_active": false
       },
-      "image": "eu.gcr.io/qpecs-325321/fltk:latest"
+      "image": "gcr.io/qpefcs-course-project/fltk:latest"
    },
    "execution_config": {
       "duration": 3600,

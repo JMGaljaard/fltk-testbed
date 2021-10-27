@@ -227,7 +227,7 @@ class DeploymentBuilder:
                    f'--optimizer Adam --max_epoch {task.param_conf.max_epoch} '
                    f'--batch_size {task.param_conf.bs} --learning_rate {task.param_conf.lr} '
                    f'--decay {task.param_conf.lr_decay} --loss CrossEntropy '
-                   f'--backend gloo')
+                   f'--backend gloo --elastic_index {task.elastic_index}')
         return command.split(' ')
 
     def _build_container(self, conf: BareConfig, task: ArrivalTask, name: str = "pytorch",
