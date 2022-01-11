@@ -7,7 +7,9 @@ services:
     build: . # look for the docker file where this file is currently located
     volumes:
 #      - ./data/MNIST:/opt/federation-lab/data/MNIST
+      - ./data:/opt/federation-lab/data
       - ./output:/opt/federation-lab/output
+      - ./fltk:/opt/federation-lab/fltk
     environment:
       - PYTHONUNBUFFERED=1
       - RANK=0

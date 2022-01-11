@@ -2,7 +2,8 @@ import pathlib
 import os
 import logging
 
-from fltk.datasets import CIFAR10Dataset, FashionMNISTDataset, CIFAR100Dataset
+from fltk.datasets.distributed import DistCIFAR10Dataset, DistCIFAR100Dataset, DistFashionMNISTDataset
+# from fltk.datasets import CIFAR10Dataset, FashionMNISTDataset, CIFAR100Dataset
 from fltk.util.arguments import Arguments
 from fltk.util.data_loader_utils import generate_train_loader, generate_test_loader, save_data_loader_to_file
 
@@ -15,7 +16,7 @@ if __name__ == '__main__':
     # ---------------------------------
     # ------------ CIFAR10 ------------
     # ---------------------------------
-    dataset = CIFAR10Dataset(args)
+    dataset = DistCIFAR10Dataset(args)
     TRAIN_DATA_LOADER_FILE_PATH = "data_loaders/cifar10/train_data_loader.pickle"
     TEST_DATA_LOADER_FILE_PATH = "data_loaders/cifar10/test_data_loader.pickle"
 
@@ -34,7 +35,7 @@ if __name__ == '__main__':
     # ---------------------------------
     # --------- Fashion-MNIST ---------
     # ---------------------------------
-    dataset = FashionMNISTDataset(args)
+    dataset = DistFashionMNISTDataset(args)
     TRAIN_DATA_LOADER_FILE_PATH = "data_loaders/fashion-mnist/train_data_loader.pickle"
     TEST_DATA_LOADER_FILE_PATH = "data_loaders/fashion-mnist/test_data_loader.pickle"
 
@@ -53,7 +54,7 @@ if __name__ == '__main__':
     # ---------------------------------
     # ------------ CIFAR100 -----------
     # ---------------------------------
-    dataset = CIFAR100Dataset(args)
+    dataset = DistCIFAR100Dataset(args)
     TRAIN_DATA_LOADER_FILE_PATH = "data_loaders/cifar100/train_data_loader.pickle"
     TEST_DATA_LOADER_FILE_PATH = "data_loaders/cifar100/test_data_loader.pickle"
 

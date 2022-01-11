@@ -39,10 +39,10 @@ def generate(num_clients: int):
 
     for client_id in range(1, num_clients+1):
         client_type = 'default'
-        if client_id == 1:
-            client_type='slow'
-        if client_id == 2:
-            client_type='medium'
+        # if client_id == 1:
+        #     client_type='slow'
+        # if client_id == 2:
+        #     client_type='medium'
         client_template: dict = load_client_template(type=client_type)
         client_definition, container_name = generate_client(client_id, client_template, world_size, type=client_type)
         system_template['services'].update(client_definition)

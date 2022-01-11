@@ -3,9 +3,11 @@ client_name: # name can be anything
     restart: "no" # if it crashes for example
     build: . # look for the docker file where this file is currently located
     volumes:
-      - ./docker_data:/opt/federation-lab/data
+#      - ./docker_data:/opt/federation-lab/data
+      - ./data:/opt/federation-lab/data
       - ./default_models:/opt/federation-lab/default_models
       - ./data_loaders:/opt/federation-lab/data_loaders
+      - ./fltk:/opt/federation-lab/fltk
     environment:
       - PYTHONUNBUFFERED=1
       - RANK={rank}

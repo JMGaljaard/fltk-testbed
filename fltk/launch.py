@@ -29,8 +29,8 @@ def run_single(rank, world_size, host = None, args = None, nic = None):
         os.environ['GLOO_SOCKET_IFNAME'] = nic
         os.environ['TP_SOCKET_IFNAME'] = nic
     else:
-        os.environ['GLOO_SOCKET_IFNAME'] = 'wlo1'
-        os.environ['TP_SOCKET_IFNAME'] = 'wlo1'
+        os.environ['GLOO_SOCKET_IFNAME'] = 'eth0'
+        os.environ['TP_SOCKET_IFNAME'] = 'eth0'
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
     options = rpc.TensorPipeRpcBackendOptions(
         num_worker_threads=16,

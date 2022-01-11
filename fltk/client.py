@@ -12,16 +12,23 @@ import logging
 import numpy as np
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
+from torch.distributed.rpc import RRef
+
 from fltk.schedulers import MinCapableStepLR
 from fltk.util.arguments import Arguments
+from fltk.util.fed_avg import average_nn_parameters
 from fltk.util.log import FLLogger
 
 import yaml
 
+from fltk.util.profiler import Profiler
 from fltk.util.results import EpochData
 
 logging.basicConfig(level=logging.DEBUG)
 
+global_dict = {}
+global_model_weights = {}
+global_offload_received = False
 
 
 def _call_method(method, rref, *args, **kwargs):
@@ -37,9 +44,15 @@ def _remote_method(method, rref, *args, **kwargs):
     args = [method, rref] + list(args)
     return rpc.rpc_sync(rref.owner(), _call_method, args=args, kwargs=kwargs)
 
-def _remote_method_async(method, rref, *args, **kwargs):
+
+def _remote_method_async(method, rref, *args, **kwargs) -> torch.Future:
     args = [method, rref] + list(args)
     return rpc.rpc_async(rref.owner(), _call_method, args=args, kwargs=kwargs)
+
+
+def _remote_method_async_by_info(method, worker_info, *args, **kwargs):
+    args = [method, worker_info] + list(args)
+    return rpc.rpc_async(worker_info, _call_method, args=args, kwargs=kwargs)
 
 class Client:
     counter = 0
@@ -47,11 +60,22 @@ class Client:
     dataset = None
     epoch_results: List[EpochData] = []
     epoch_counter = 0
+    server_ref = None
+
+    # Model offloading
+    received_offload_model = False
+    offloaded_model_weights = None
+    call_to_offload = False
+    client_to_offload_to : str = None
 
 
     def __init__(self, id, log_rref, rank, world_size, config = None):
         logging.info(f'Welcome to client {id}')
         self.id = id
+        global_dict['id'] = id
+        global global_model_weights, global_offload_received
+        global_model_weights = None
+        global_offload_received = False
         self.log_rref = log_rref
         self.rank = rank
         self.world_size = world_size
@@ -75,8 +99,19 @@ class Client:
         else:
             return torch.device("cpu")
 
+    def send_reference(self, server_ref):
+        self.local_log(f'Got worker_info from server {server_ref}')
+        self.server_ref = server_ref
+
+    @staticmethod
+    def static_ping():
+        print(f'Got static ping with global_dict={global_dict}')
+
     def ping(self):
+        self.local_log(f'Pong!')
+        self.local_log(f'Pong2! {self.id}')
         return 'pong'
+
 
     def rpc_test(self):
         sleep_time = random.randint(1, 5)
@@ -109,7 +144,8 @@ class Client:
         logging.info('Done with init')
 
     def is_ready(self):
-        return self.finished_init
+        logging.info("Client is ready")
+        return self.finished_init, RRef(self)
 
     def set_net(self, net):
         self.net = net
@@ -175,13 +211,62 @@ class Client:
         if self.log_rref:
             self.remote_log(f'Weights of the model are updated')
 
-    def train(self, epoch):
+    def report_performance_async(self, performance_data):
+        self.local_log('Reporting performance')
+        from fltk.federator import Federator
+        return _remote_method_async(Federator.perf_metric_endpoint, self.server_ref, self.id, performance_data)
+
+    def report_performance_estimate(self, performance_data):
+        self.local_log('Reporting performance estimate')
+        from fltk.federator import Federator
+        return _remote_method_async(Federator.perf_est_endpoint, self.server_ref, self.id, performance_data)
+
+    @staticmethod
+    def offload_receive_endpoint(model_weights):
+        print(f'Got the offload_receive_endpoint endpoint')
+        global global_model_weights, global_offload_received
+        global_model_weights = copy.deepcopy(model_weights.copy())
+        global_offload_received = True
+
+    @staticmethod
+    def offload_receive_endpoint_2(string):
+        print(f'Got the offload_receive_endpoint endpoint')
+        print(f'Got the offload_receive_endpoint endpoint with arg={string}')
+        # global global_model_weights, global_offload_received
+        # global_model_weights = model_weights.copy(deep=True)
+        # global_offload_received = True
+
+
+    def call_to_offload_endpoint(self, client_to_offload: RRef):
+        self.local_log(f'Got the call to offload endpoint to {client_to_offload}')
+        self.client_to_offload_to = client_to_offload
+        self.call_to_offload = True
+
+    def freeze_layers(self, until):
+        ct = 0
+        for child in self.net.children():
+            ct += 1
+            if ct < until:
+                for param in child.parameters():
+                    param.requires_grad = False
+
+    def unfreeze_layers(self):
+        for param in self.net.parameters():
+            param.requires_grad = True
+
+    def train(self, epoch, deadline_time: int = None):
         """
         :param epoch: Current epoch #
         :type epoch: int
         """
-        # self.net.train()
 
+        # Ignore profiler for now
+        # p = Profiler()
+        # p.attach(self.net)
+
+        # self.net.train()
+        global global_model_weights, global_offload_received
+        deadline_time = None
         # save model
         if self.args.should_save_model(epoch):
             self.save_model(epoch, self.args.get_epoch_save_start_suffix())
@@ -190,19 +275,78 @@ class Client:
         final_running_loss = 0.0
         if self.args.distributed:
             self.dataset.train_sampler.set_epoch(epoch)
+        self.args.get_logger().info(f'{self.id}: Number of training samples: {len(list(self.dataset.get_train_loader()))}')
+        number_of_training_samples = len(list(self.dataset.get_train_loader()))
+        # Ignore profiler for now
+        # performance_metric_interval = 20
+        # perf_resp = None
 
+        profiling_size = 40
+        profiling_data = np.zeros(profiling_size)
+        active_profiling = True
+
+        control_start_time = time.time()
         for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            start_train_time = time.time()
 
+            # Check if there is a call to offload
+            if self.call_to_offload:
+                self.args.get_logger().info('Got call to offload model')
+                model_weights = self.get_nn_parameters()
+                # print(self.client_to_offload_to)
+                # r_ref = rpc.remote(self.client_to_offload_to, Client.static_ping, args=())
+                # print(f'Result of rref: {r_ref.to_here()}')
+                # ret = rpc.rpc_sync(self.client_to_offload_to, Client.static_ping, args=())
+                # print(f'Result of rref: {ret}')
+                # ret = rpc.rpc_sync(self.client_to_offload_to, Client.offload_receive_endpoint_2, args=(["Hello"]))
+                # print(f'Result of rref: {ret}')
+
+                ret = rpc.rpc_sync(self.client_to_offload_to, Client.offload_receive_endpoint, args=([model_weights]))
+                print(f'Result of rref: {ret}')
+
+                # r_ref = rpc.remote(self.client_to_offload_to, Client.static_ping, args=())
+                # r_ref = rpc.remote(self.client_to_offload_to, Client.offload_receive_endpoint_2, args=("Hello world"))
+                # _remote_method_async(Client.static_ping, self.client_to_offload_to)
+                # fut1 = rpc.rpc_async(self.client_to_offload_to, Client.ping)
+                # _remote_method_async_by_info(Client.offload_receive_endpoint, self.client_to_offload_to, model_weights)
+                self.call_to_offload = False
+                self.client_to_offload_to = None
+                # This number only works for cifar10cnn
+                self.freeze_layers(15)
+
+            # Check if there is a model to incorporate
+            if global_offload_received:
+                self.args.get_logger().info('Merging offloaded model')
+                self.args.get_logger().info('FedAvg locally with offloaded model')
+                updated_weights = average_nn_parameters([self.get_nn_parameters(), global_model_weights])
+                self.args.get_logger().info('Updating local weights due to offloading')
+                self.update_nn_parameters(updated_weights)
+                global_offload_received = False
+                global_model_weights = None
+
+
+            if deadline_time is not None:
+                if time.time() >= deadline_time:
+                    self.args.get_logger().info('Stopping training due to deadline time')
+                    break
+                else:
+                    self.args.get_logger().info(f'Time to deadline: {deadline_time - time.time()}')
+
+            inputs, labels = inputs.to(self.device), labels.to(self.device)
             # zero the parameter gradients
             self.optimizer.zero_grad()
 
+            # Ignore profile for now
+            # p.set_warmup(False)
+            # p.signal_forward_start()
             # forward + backward + optimize
             outputs = self.net(inputs)
             loss = self.loss_function(outputs, labels)
+
+            # Ignore profiler for now
+            # p.signal_backward_start()
             loss.backward()
             self.optimizer.step()
-
             # print statistics
             running_loss += loss.item()
             if i % self.args.get_log_interval() == 0:
@@ -210,7 +354,42 @@ class Client:
                 final_running_loss = running_loss / self.args.get_log_interval()
                 running_loss = 0.0
 
+            # Ignore profiler for now
+            # p.set_warmup(True)
+            # if i % performance_metric_interval == 0:
+            #     # perf_metrics = p.calc_metric(15)
+            #     perf_metrics = p.export_data()
+            #     self.args.get_logger().info(f'Number of events = {len(perf_metrics)}')
+            #     perf_resp = self.report_performance_async(perf_metrics)
+            #     p.reset()
+            if active_profiling:
+                # print(i)
+                end_train_time = time.time()
+                batch_duration = end_train_time - start_train_time
+                profiling_data[i] = batch_duration
+                if i == profiling_size-1:
+                    active_profiling = False
+                    time_per_batch = profiling_data.mean()
+                    logging.info(f'Average batch duration is {time_per_batch}')
+
+                    # Estimated training time
+                    est_total_time = number_of_training_samples * time_per_batch
+                    logging.info(f'Estimated training time is {est_total_time}')
+                    self.report_performance_estimate((time_per_batch, est_total_time, number_of_training_samples))
+            # logging.info(f'Batch time is {batch_duration}')
+
+
+            if i > 50:
+                break
+
+        control_end_time = time.time()
+
+        logging.info(f'Measure end time is {(control_end_time - control_start_time)}')
+
         self.scheduler.step()
+
+        # Reset the layers
+        self.unfreeze_layers()
 
         # save model
         if self.args.should_save_model(epoch):
@@ -255,10 +434,15 @@ class Client:
 
         return accuracy, loss, class_precision, class_recall
 
-    def run_epochs(self, num_epoch):
+    def run_epochs(self, num_epoch, deadline: int = None):
+        start_time = time.time()
+        deadline_threshold = 10
         start_time_train = datetime.datetime.now()
+        train_stop_time = None
+        if deadline is not None:
+            train_stop_time = start_time + deadline - deadline_threshold
         self.dataset.get_train_sampler().set_epoch_size(num_epoch)
-        loss, weights = self.train(self.epoch_counter)
+        loss, weights = self.train(self.epoch_counter, train_stop_time)
         self.epoch_counter += num_epoch
         elapsed_time_train = datetime.datetime.now() - start_time_train
         train_time_ms = int(elapsed_time_train.total_seconds()*1000)
