@@ -4,8 +4,9 @@ from typing import Any
 @dataclass
 class EpochData:
     epoch_id: int
-    duration_train: int
-    duration_test: int
+    num_epochs: int
+    duration_train: float
+    duration_test: float
     loss_train: float
     accuracy: float
     loss: float
