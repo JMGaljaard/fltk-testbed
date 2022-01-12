@@ -1,19 +1,21 @@
 ---
 # Experiment configuration
-total_epochs: 4
+total_epochs: 20
 epochs_per_cycle: 1
 wait_for_clients: true
 net: Cifar10CNN
 dataset: cifar10
 # Use cuda is available; setting to false will force CPU
 cuda: false
-experiment_prefix: 'offloading_vanilla'
+experiment_prefix: 'exp_offload_vanilla'
 offload_stategy: vanilla
+profiling_time: 100
+deadline: 500
 output_location: 'output'
 tensor_board_active: true
 clients_per_round: 2
-# sampler: "dirichlet" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
-sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
+sampler: "dirichlet" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
+#sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
 sampler_args:
   - 0.07     # label limit || q probability || alpha || unused
   - 42    # random seed || random seed || random seed || unused

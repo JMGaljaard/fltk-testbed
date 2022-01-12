@@ -43,6 +43,10 @@ class BareConfig:
         self.num_workers = 50
         # self.num_poisoned_workers = 10
 
+        self.offload_strategy = 'vanilla'
+        self.profiling_size = 100
+        self.deadline = 400
+
         self.federator_host = '0.0.0.0'
         self.rank = 0
         self.world_size = 0
@@ -109,6 +113,12 @@ class BareConfig:
             self.set_net_by_name(cfg['net'])
         if 'dataset' in cfg:
             self.dataset_name = cfg['dataset']
+        if 'offload_stategy' in cfg:
+            self.offload_strategy = cfg['offload_stategy']
+        if 'profiling_size' in cfg:
+            self.profiling_size = cfg['profiling_size']
+        if 'deadline' in cfg:
+            self.deadline = cfg['deadline']
         if 'experiment_prefix' in cfg:
             self.experiment_prefix = cfg['experiment_prefix']
         else:

@@ -20,4 +20,4 @@ client_name: # name can be anything
       resources:
         limits:
           cpus: '2'
-          memory: 1024M
+#          memory: 1024M

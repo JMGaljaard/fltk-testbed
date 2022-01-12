@@ -11,3 +11,5 @@ pyyaml
 torchsummary
 dataclass-csv
 tensorboard
+seaborn
+matplotlib

@@ -12,6 +12,7 @@ class EpochData:
     loss: float
     class_precision: Any
     class_recall: Any
+    training_process: int
     client_id: str = None
 
     def to_csv_line(self):

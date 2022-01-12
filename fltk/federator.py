@@ -12,7 +12,9 @@ from torch.utils.data._utils.worker import WorkerInfo
 
 from fltk.client import Client
 from fltk.datasets.data_distribution import distribute_batches_equally
+from fltk.strategy.aggregation import FedAvg
 from fltk.strategy.client_selection import random_selection
+from fltk.strategy.offloading import OffloadingStrategy
 from fltk.util.arguments import Arguments
 from fltk.util.base_config import BareConfig
 from fltk.util.data_loader_utils import load_train_data_loader, load_test_data_loader, \
@@ -112,6 +114,14 @@ class Federator:
     reference_lookup = {}
     performance_estimate = {}
 
+    # Strategies
+    deadline_enabled = False
+    swyh_enabled = False
+    freeze_layers_enabled = False
+    offload_enabled = False
+
+    strategy = OffloadingStrategy.VANILLA
+
 
     # Keep track of the experiment data
     exp_data_general = []
@@ -134,8 +144,43 @@ class Federator:
         self.test_data = Client("test", None, 1, 2, config)
         config.data_sampler = copy_sampler
         self.reference_lookup[get_worker_info().name] = RRef(self)
+        self.strategy = OffloadingStrategy.Parse(config.offload_strategy)
+        self.configure_strategy(self.strategy)
 
 
+
+    def configure_strategy(self, strategy : OffloadingStrategy):
+        if strategy == OffloadingStrategy.VANILLA:
+            logging.info('Running with offloading strategy: VANILLA')
+            self.deadline_enabled = False
+            self.swyh_enabled = False
+            self.freeze_layers_enabled = False
+            self.offload_enabled = False
+        if strategy == OffloadingStrategy.DEADLINE:
+            logging.info('Running with offloading strategy: DEADLINE')
+            self.deadline_enabled = True
+            self.swyh_enabled = False
+            self.freeze_layers_enabled = False
+            self.offload_enabled = False
+        if strategy == OffloadingStrategy.SWYH:
+            logging.info('Running with offloading strategy: SWYH')
+            self.deadline_enabled = True
+            self.swyh_enabled = True
+            self.freeze_layers_enabled = False
+            self.offload_enabled = False
+        if strategy == OffloadingStrategy.FREEZE:
+            logging.info('Running with offloading strategy: FREEZE')
+            self.deadline_enabled = True
+            self.swyh_enabled = False
+            self.freeze_layers_enabled = True
+            self.offload_enabled = False
+        if strategy == OffloadingStrategy.MODEL_OFFLOAD:
+            logging.info('Running with offloading strategy: MODEL_OFFLOAD')
+            self.deadline_enabled = True
+            self.swyh_enabled = False
+            self.freeze_layers_enabled = True
+            self.offload_enabled = True
+        logging.info(f'Offload strategy params: deadline={self.deadline_enabled}, swyh={self.swyh_enabled}, freeze={self.freeze_layers_enabled}, offload={self.offload_enabled}')
 
     def create_clients(self, client_id_triple):
         for id, rank, world_size in client_id_triple:
@@ -235,8 +280,8 @@ class Federator:
 
     def remote_run_epoch(self, epochs):
         start_epoch_time = time.time()
-        deadline = 400
-
+        deadline = self.config.deadline
+        deadline_time = self.config.deadline
         """
         1. Client selection
         2. Run local updates
@@ -245,6 +290,9 @@ class Federator:
         """
 
         client_weights = []
+
+        client_weights_dict = {}
+        client_training_process_dict = {}
         while self.num_available_clients() < self.config.clients_per_round:
             logging.warning(f'Waiting for enough clients to become available. # Available Clients = {self.num_available_clients()}, but need {self.config.clients_per_round}')
             self.process_response_list()
@@ -264,6 +312,10 @@ class Federator:
             res[1].wait()
         logging.info('Weights are updated')
 
+        # Let clients train locally
+
+        if not self.deadline_enabled:
+            deadline = 0
         responses: List[ClientResponse] = []
         for client in selected_clients:
             cr = ClientResponse(self.response_id, client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, deadline=deadline))
@@ -274,7 +326,6 @@ class Federator:
             # responses.append((client, time.time(), _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs)))
         self.epoch_counter += epochs
 
-        deadline_time = 400
         # deadline_time = None
         # Wait loop with deadline
         start = time.time()
@@ -292,8 +343,8 @@ class Federator:
         has_not_called = True
 
         show_perf_data = True
-        while not all_finished and not reached_deadline():
-
+        while not all_finished and not (self.deadline_enabled and reached_deadline()):
+            # if self.deadline_enabled and reached_deadline()
             # if has_not_called and (time.time() -start) > 10:
             #     logging.info('Sending call to offload')
             #     has_not_called = False
@@ -325,16 +376,17 @@ class Federator:
                     #         weak_client = k
                     #     else:
                     #         strong_client = k
+                    if self.offload_enabled:
+                        weak_client = est_keys[0]
+                        strong_client = est_keys[1]
+                        if self.performance_estimate[est_keys[1]][1] > self.performance_estimate[est_keys[0]][1]:
+                            weak_client = est_keys[1]
+                            strong_client = est_keys[0]
 
-                    weak_client = est_keys[0]
-                    strong_client = est_keys[1]
-                    if self.performance_estimate[est_keys[1]][1] > self.performance_estimate[est_keys[0]][1]:
-                        weak_client = est_keys[1]
-                        strong_client = est_keys[0]
+                        logging.info(f'Offloading from {weak_client} -> {strong_client} due to {self.performance_estimate[weak_client]} and {self.performance_estimate[strong_client]}')
+                        logging.info('Sending call to offload')
+                        self.ask_client_to_offload(self.reference_lookup[selected_clients[0].name], selected_clients[1].name)
 
-                    logging.info(f'Offloading from {weak_client} -> {strong_client} due to {self.performance_estimate[weak_client]} and {self.performance_estimate[strong_client]}')
-                    logging.info('Sending call to offload')
-                    self.ask_client_to_offload(self.reference_lookup[selected_clients[0].name], selected_clients[1].name)
                 # selected_clients[0]
             # logging.info(f'Status of all_finished={all_finished} and deadline={reached_deadline()}')
             all_finished = True
@@ -344,6 +396,7 @@ class Federator:
                         client_response.finish()
                 else:
                     all_finished = False
+            time.sleep(0.1)
         logging.info(f'Stopped waiting due to all_finished={all_finished} and deadline={reached_deadline()}')
 
         for client_response in responses:
@@ -361,6 +414,7 @@ class Federator:
                 self.client_data[epoch_data.client_id].append(epoch_data)
                 logging.info(f'{client} had a loss of {epoch_data.loss}')
                 logging.info(f'{client} had a epoch data of {epoch_data}')
+                logging.info(f'{client} has trained on {epoch_data.training_process} samples')
 
                 client.tb_writer.add_scalar('training loss',
                                             epoch_data.loss_train,  # for every 1000 minibatches
@@ -379,10 +433,13 @@ class Federator:
                                             self.epoch_counter)
 
                 client_weights.append(weights)
+                client_weights_dict[client.name] = weights
+                client_training_process_dict[client.name] = epoch_data.training_process
 
         self.performance_estimate = {}
         if len(client_weights):
-            updated_model = average_nn_parameters(client_weights)
+            updated_model = FedAvg(client_weights_dict, client_training_process_dict)
+            # updated_model = average_nn_parameters(client_weights)
 
             # test global model
             logging.info("Testing on global test set")
@@ -399,13 +456,13 @@ class Federator:
 
     def save_experiment_data(self):
         p = Path(f'./{self.config.output_location}')
-        file_output = f'./{self.config.output_location}'
+        # file_output = f'./{self.config.output_location}'
         exp_prefix = self.config.experiment_prefix
-        self.ensure_path_exists(file_output)
-        file_output /= f'{exp_prefix}-general_data.csv'
+        self.ensure_path_exists(p)
+        p /= f'{exp_prefix}-general_data.csv'
         # general_filename = f'{file_output}/general_data.csv'
         df = pd.DataFrame(self.exp_data_general, columns=['epoch', 'duration', 'accuracy', 'loss', 'class_precision', 'class_recall'])
-        df.to_csv(file_output)
+        df.to_csv(p)
 
     def update_client_data_sizes(self):
         responses = []
@@ -427,9 +484,10 @@ class Federator:
 
     def save_epoch_data(self):
         file_output = f'./{self.config.output_location}'
+        exp_prefix = self.config.experiment_prefix
         self.ensure_path_exists(file_output)
         for key in self.client_data:
-            filename = f'{file_output}/{key}_epochs.csv'
+            filename = f'{file_output}/{exp_prefix}_{key}_epochs.csv'
             logging.info(f'Saving data at {filename}')
             with open(filename, "w") as f:
                 w = DataclassWriter(f, self.client_data[key], EpochData)
