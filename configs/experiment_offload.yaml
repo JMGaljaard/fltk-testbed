@@ -1,16 +1,16 @@
 ---
 # Experiment configuration
-total_epochs: 20
+total_epochs: 1
 epochs_per_cycle: 1
 wait_for_clients: true
 net: Cifar10CNN
 dataset: cifar10
 # Use cuda is available; setting to false will force CPU
 cuda: false
-experiment_prefix: 'exp_offload_vanilla'
-offload_stategy: vanilla
-profiling_time: 100
-deadline: 500
+experiment_prefix: 'exp_model_offload_deadline_fedavg_test'
+offload_stategy: offload
+profiling_time: 50
+deadline: 140
 warmup_round: false
 output_location: 'output'
 tensor_board_active: true

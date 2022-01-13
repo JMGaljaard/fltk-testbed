@@ -7,11 +7,11 @@ net: Cifar10CNN
 dataset: cifar10
 # Use cuda is available; setting to false will force CPU
 cuda: false
-experiment_prefix: 'exp_offload_vanilla'
-offload_stategy: vanilla
-profiling_time: 100
-deadline: 500
-warmup_round: false
+experiment_prefix: 'exp_swyh__warmup_deadline'
+offload_stategy: swyh
+profiling_time: 50
+deadline: 140
+warmup_round: true
 output_location: 'output'
 tensor_board_active: true
 clients_per_round: 2

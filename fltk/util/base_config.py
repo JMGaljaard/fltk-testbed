@@ -46,6 +46,8 @@ class BareConfig:
         self.offload_strategy = 'vanilla'
         self.profiling_size = 100
         self.deadline = 400
+        self.first_deadline = 400
+        self.warmup_round = False
 
         self.federator_host = '0.0.0.0'
         self.rank = 0
@@ -119,6 +121,10 @@ class BareConfig:
             self.profiling_size = cfg['profiling_size']
         if 'deadline' in cfg:
             self.deadline = cfg['deadline']
+        if 'first_deadline' in cfg:
+            self.first_deadline = cfg['first_deadline']
+        if 'warmup_round' in cfg:
+            self.warmup_round = cfg['warmup_round']
         if 'experiment_prefix' in cfg:
             self.experiment_prefix = cfg['experiment_prefix']
         else:

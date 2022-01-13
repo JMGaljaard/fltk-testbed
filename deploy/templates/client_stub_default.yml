@@ -12,6 +12,7 @@ client_name: # name can be anything
       - PYTHONUNBUFFERED=1
       - RANK={rank}
       - WORLD_SIZE={world_size}
+      - EXP_CONFIG=${EXP_CONFIG_FILE}
     ports:
       - "5002:5000" # {machine-port}:{docker-port}
     depends_on:

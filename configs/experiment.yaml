@@ -11,6 +11,7 @@ experiment_prefix: 'experiment_sample'
 offload_stategy: vanilla
 profiling_time: 100
 deadline: 500
+warmup_round: true
 output_location: 'output'
 tensor_board_active: true
 clients_per_round: 2

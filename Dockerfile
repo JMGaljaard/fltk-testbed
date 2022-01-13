@@ -46,4 +46,5 @@ COPY fltk ./fltk
 COPY configs ./configs
 #CMD python3 ./fltk/__main__.py single configs/experiment.yaml --rank=$RANK
 CMD python3 -m fltk single configs/experiment_vanilla.yaml --rank=$RANK
+CMD python3 -m fltk single $EXP_CONFIG --rank=$RANK
 #CMD python3 setup.py

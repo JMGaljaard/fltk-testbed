@@ -15,6 +15,7 @@ from sklearn.metrics import classification_report
 from torch.distributed.rpc import RRef
 
 from fltk.schedulers import MinCapableStepLR
+from fltk.strategy.aggregation import FedAvg
 from fltk.strategy.offloading import OffloadingStrategy
 from fltk.util.arguments import Arguments
 from fltk.util.fed_avg import average_nn_parameters
@@ -25,10 +26,15 @@ import yaml
 from fltk.util.profiler import Profiler
 from fltk.util.results import EpochData
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(
+    level=logging.DEBUG,
+
+    format='%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s',
+)
 
 global_dict = {}
 global_model_weights = {}
+global_model_data_size = 0
 global_offload_received = False
 
 
@@ -76,9 +82,10 @@ class Client:
         logging.info(f'Welcome to client {id}')
         self.id = id
         global_dict['id'] = id
-        global global_model_weights, global_offload_received
+        global global_model_weights, global_offload_received, global_model_data_size
         global_model_weights = None
         global_offload_received = False
+        global_model_data_size = 0
         self.log_rref = log_rref
         self.rank = rank
         self.world_size = world_size
@@ -262,10 +269,11 @@ class Client:
         return _remote_method_async(Federator.perf_est_endpoint, self.server_ref, self.id, performance_data)
 
     @staticmethod
-    def offload_receive_endpoint(model_weights):
+    def offload_receive_endpoint(model_weights, num_train_samples):
         print(f'Got the offload_receive_endpoint endpoint')
-        global global_model_weights, global_offload_received
+        global global_model_weights, global_offload_received, global_model_data_size
         global_model_weights = copy.deepcopy(model_weights.copy())
+        global_model_data_size = num_train_samples
         global_offload_received = True
 
     @staticmethod
@@ -294,7 +302,7 @@ class Client:
         for param in self.net.parameters():
             param.requires_grad = True
 
-    def train(self, epoch, deadline: int = None):
+    def train(self, epoch, deadline: int = None, warmup=False):
         """
 
         Different modes:
@@ -318,12 +326,10 @@ class Client:
         :type epoch: int
         """
         start_time = time.time()
-        deadline_threshold = 5
+        deadline_threshold = 10
         train_stop_time = None
         if self.deadline_enabled and deadline is not None:
             train_stop_time = start_time + deadline - deadline_threshold
-
-        strategy = OffloadingStrategy.VANILLA
 
         # Ignore profiler for now
         # p = Profiler()
@@ -356,13 +362,13 @@ class Client:
         for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
             start_train_time = time.time()
 
-            if self.offload_enabled:
+            if self.offload_enabled and not warmup:
                 # Check if there is a call to offload
                 if self.call_to_offload:
                     self.args.get_logger().info('Got call to offload model')
                     model_weights = self.get_nn_parameters()
 
-                    ret = rpc.rpc_sync(self.client_to_offload_to, Client.offload_receive_endpoint, args=([model_weights]))
+                    ret = rpc.rpc_sync(self.client_to_offload_to, Client.offload_receive_endpoint, args=([model_weights, i]))
                     print(f'Result of rref: {ret}')
 
                     self.call_to_offload = False
@@ -375,13 +381,15 @@ class Client:
                 if global_offload_received:
                     self.args.get_logger().info('Merging offloaded model')
                     self.args.get_logger().info('FedAvg locally with offloaded model')
-                    updated_weights = average_nn_parameters([self.get_nn_parameters(), global_model_weights])
+                    updated_weights = FedAvg({'own': self.get_nn_parameters(), 'remote': global_model_weights}, {'own': i, 'remote': global_model_data_size})
+
+                    # updated_weights = average_nn_parameters([self.get_nn_parameters(), global_model_weights])
                     self.args.get_logger().info('Updating local weights due to offloading')
                     self.update_nn_parameters(updated_weights)
                     global_offload_received = False
                     global_model_weights = None
 
-            if self.deadline_enabled:
+            if self.deadline_enabled and not warmup:
                 # Deadline
                 if train_stop_time is not None:
                     if time.time() >= train_stop_time:
@@ -435,7 +443,7 @@ class Client:
                     logging.info(f'Estimated training time is {est_total_time}')
                     self.report_performance_estimate((time_per_batch, est_total_time, number_of_training_samples))
 
-                    if self.freeze_layers_enabled:
+                    if self.freeze_layers_enabled  and not warmup:
                         logging.info(f'Checking if need to freeze layers ? {est_total_time} > {deadline}')
                         if est_total_time > deadline:
                             logging.info('Will freeze layers to speed up computation')
@@ -445,7 +453,7 @@ class Client:
             # logging.info(f'Batch time is {batch_duration}')
 
             # Break away from loop for debug purposes
-            # if i > 50:
+            # if i > 5:
             #     break
 
         control_end_time = time.time()
@@ -453,8 +461,8 @@ class Client:
         logging.info(f'Measure end time is {(control_end_time - control_start_time)}')
         logging.info(f'Trained on {training_process} samples')
 
-
-        self.scheduler.step()
+        if not warmup:
+            self.scheduler.step()
 
         # Reset the layers
         self.unfreeze_layers()
@@ -502,13 +510,14 @@ class Client:
 
         return accuracy, loss, class_precision, class_recall
 
-    def run_epochs(self, num_epoch, deadline: int = None):
+    def run_epochs(self, num_epoch, deadline: int = None, warmup=False):
         start_time_train = datetime.datetime.now()
 
         self.dataset.get_train_sampler().set_epoch_size(num_epoch)
         # Train locally
-        loss, weights, training_process = self.train(self.epoch_counter, deadline)
-        self.epoch_counter += num_epoch
+        loss, weights, training_process = self.train(self.epoch_counter, deadline, warmup)
+        if not warmup:
+            self.epoch_counter += num_epoch
         elapsed_time_train = datetime.datetime.now() - start_time_train
         train_time_ms = int(elapsed_time_train.total_seconds()*1000)
 

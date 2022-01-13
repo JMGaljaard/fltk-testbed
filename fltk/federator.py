@@ -26,11 +26,14 @@ from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 import logging
 
-from fltk.util.profile_plots import stability_plot, parse_stability_data
+# from fltk.util.profile_plots import stability_plot, parse_stability_data
 from fltk.util.results import EpochData
 from fltk.util.tensor_converter import convert_distributed_data_into_numpy
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s',
+)
 
 
 def _call_method(method, rref, *args, **kwargs):
@@ -119,6 +122,9 @@ class Federator:
     swyh_enabled = False
     freeze_layers_enabled = False
     offload_enabled = False
+    warmup_active = False
+
+    exp_start_time = 0
 
     strategy = OffloadingStrategy.VANILLA
 
@@ -278,10 +284,15 @@ class Federator:
         _remote_method(Client.call_to_offload_endpoint, client1_ref, client2_ref)
         logging.info(f'Done with call to offload')
 
-    def remote_run_epoch(self, epochs):
+    def remote_run_epoch(self, epochs, warmup=False, first_epoch=False):
+        if warmup:
+            logging.info('This is a WARMUP round')
         start_epoch_time = time.time()
         deadline = self.config.deadline
         deadline_time = self.config.deadline
+        if first_epoch:
+            deadline = self.config.first_deadline
+            deadline_time = self.config.first_deadline
         """
         1. Client selection
         2. Run local updates
@@ -318,7 +329,7 @@ class Federator:
             deadline = 0
         responses: List[ClientResponse] = []
         for client in selected_clients:
-            cr = ClientResponse(self.response_id, client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, deadline=deadline))
+            cr = ClientResponse(self.response_id, client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, deadline=deadline, warmup=warmup))
             self.response_id += 1
             self.response_list.append(cr)
             responses.append(cr)
@@ -343,7 +354,7 @@ class Federator:
         has_not_called = True
 
         show_perf_data = True
-        while not all_finished and not (self.deadline_enabled and reached_deadline()):
+        while not all_finished and not ((self.deadline_enabled and reached_deadline()) or warmup):
             # if self.deadline_enabled and reached_deadline()
             # if has_not_called and (time.time() -start) > 10:
             #     logging.info('Sending call to offload')
@@ -376,7 +387,7 @@ class Federator:
                     #         weak_client = k
                     #     else:
                     #         strong_client = k
-                    if self.offload_enabled:
+                    if self.offload_enabled and not warmup:
                         weak_client = est_keys[0]
                         strong_client = est_keys[1]
                         if self.performance_estimate[est_keys[1]][1] > self.performance_estimate[est_keys[0]][1]:
@@ -398,9 +409,9 @@ class Federator:
                     all_finished = False
             time.sleep(0.1)
         logging.info(f'Stopped waiting due to all_finished={all_finished} and deadline={reached_deadline()}')
-
         for client_response in responses:
-
+            if warmup:
+                break
             client = client_response.client
             logging.info(f'{client} had a exec time of {client_response.duration()} dropped?={client_response.dropped}')
             if client_response.dropped:
@@ -415,6 +426,7 @@ class Federator:
                 logging.info(f'{client} had a loss of {epoch_data.loss}')
                 logging.info(f'{client} had a epoch data of {epoch_data}')
                 logging.info(f'{client} has trained on {epoch_data.training_process} samples')
+                elapsed_time = client_response.end_time - self.exp_start_time
 
                 client.tb_writer.add_scalar('training loss',
                                             epoch_data.loss_train,  # for every 1000 minibatches
@@ -424,6 +436,9 @@ class Federator:
                                             epoch_data.accuracy,  # for every 1000 minibatches
                                             self.epoch_counter * client.data_size)
 
+                client.tb_writer.add_scalar('accuracy wall time',
+                                            epoch_data.accuracy,  # for every 1000 minibatches
+                                            elapsed_time)
                 client.tb_writer.add_scalar('training loss per epoch',
                                             epoch_data.loss_train,  # for every 1000 minibatches
                                             self.epoch_counter)
@@ -448,6 +463,10 @@ class Federator:
         # self.tb_writer.add_scalar('training loss', loss, self.epoch_counter * self.test_data.get_client_datasize()) # does not seem to work :( )
         self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
         self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
+        elapsed_time = time.time() - self.exp_start_time
+        self.tb_writer.add_scalar('accuracy wall time',
+                                    accuracy,  # for every 1000 minibatches
+                                    elapsed_time)
         end_epoch_time = time.time()
         duration = end_epoch_time - start_epoch_time
 
@@ -523,6 +542,12 @@ class Federator:
         addition = 0
         epoch_to_run = self.config.epochs
         epoch_size = self.config.epochs_per_cycle
+
+        if self.config.warmup_round:
+            logging.info('Running warmup round')
+            self.remote_run_epoch(epoch_size, warmup=True)
+
+        self.exp_start_time = time.time()
         for epoch in range(epoch_to_run):
             self.process_response_list()
             logging.info(f'Running epoch {epoch}')
