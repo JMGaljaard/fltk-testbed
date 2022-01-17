@@ -1,5 +1,6 @@
 client_name: # name can be anything
 #    container_name: federation-lab-client2 # what the name for this container would be
+    cpuset: {cpu_set}
     restart: "no" # if it crashes for example
     build: . # look for the docker file where this file is currently located
     volumes:
@@ -20,4 +21,4 @@ client_name: # name can be anything
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '0.75'

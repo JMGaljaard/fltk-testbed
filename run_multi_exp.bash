@@ -1,7 +1,9 @@
 #!/bin/bash
 
 ## declare an array variable
-declare -a arr=("configs/experiment_vanilla.yaml"
+declare -a arr=(
+              "configs/exp_p2_vanilla.yaml"
+              # "configs/experiment_vanilla.yaml"
                 # "configs/experiment_deadline.yaml"
                 # "configs/experiment_swyh.yaml"
                 # "configs/experiment_freeze.yaml"
