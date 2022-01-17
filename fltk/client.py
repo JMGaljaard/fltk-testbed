@@ -389,7 +389,7 @@ class Client:
                     global_offload_received = False
                     global_model_weights = None
 
-            if self.deadline_enabled and not warmup:
+            if self.swyh_enabled and not warmup:
                 # Deadline
                 if train_stop_time is not None:
                     if time.time() >= train_stop_time:
@@ -457,12 +457,17 @@ class Client:
             #     break
 
         control_end_time = time.time()
-
         logging.info(f'Measure end time is {(control_end_time - control_start_time)}')
         logging.info(f'Trained on {training_process} samples')
 
         if not warmup:
             self.scheduler.step()
+        # logging.info(self.optimizer.param_groups)
+        scheduler_data = {
+            'lr': self.scheduler.optimizer.param_groups[0]['lr'],
+            'momentum': self.scheduler.optimizer.param_groups[0]['momentum'],
+            'wd': self.scheduler.optimizer.param_groups[0]['weight_decay'],
+        }
 
         # Reset the layers
         self.unfreeze_layers()
@@ -471,7 +476,7 @@ class Client:
         if self.args.should_save_model(epoch):
             self.save_model(epoch, self.args.get_epoch_save_end_suffix())
 
-        return final_running_loss, self.get_nn_parameters(), training_process
+        return final_running_loss, self.get_nn_parameters(), training_process, scheduler_data
 
     def test(self):
         self.net.eval()
@@ -515,7 +520,7 @@ class Client:
 
         self.dataset.get_train_sampler().set_epoch_size(num_epoch)
         # Train locally
-        loss, weights, training_process = self.train(self.epoch_counter, deadline, warmup)
+        loss, weights, training_process, scheduler_data = self.train(self.epoch_counter, deadline, warmup)
         if not warmup:
             self.epoch_counter += num_epoch
         elapsed_time_train = datetime.datetime.now() - start_time_train
@@ -532,7 +537,7 @@ class Client:
         # Copy GPU tensors to CPU
         for k, v in weights.items():
             weights[k] = v.cpu()
-        return data, weights
+        return data, weights, scheduler_data
 
     def save_model(self, epoch, suffix):
         """

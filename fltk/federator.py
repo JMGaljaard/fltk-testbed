@@ -90,6 +90,7 @@ class ClientResponse:
         self.end_time = time.time()
         self.done = True
         self.dropped = False
+        print(f'>>>> \t\tClient {self.id} has a duration of {self.duration()}')
 
     def duration(self):
         return self.end_time - self.start_time
@@ -330,6 +331,7 @@ class Federator:
         responses: List[ClientResponse] = []
         for client in selected_clients:
             cr = ClientResponse(self.response_id, client, _remote_method_async(Client.run_epochs, client.ref, num_epoch=epochs, deadline=deadline, warmup=warmup))
+            cr.start_time = time.time()
             self.response_id += 1
             self.response_list.append(cr)
             responses.append(cr)
@@ -421,7 +423,7 @@ class Federator:
 
             if not client_response.dropped:
                 client.available = True
-                epoch_data, weights = client_response.future.wait()
+                epoch_data, weights, scheduler_data = client_response.future.wait()
                 self.client_data[epoch_data.client_id].append(epoch_data)
                 logging.info(f'{client} had a loss of {epoch_data.loss}')
                 logging.info(f'{client} had a epoch data of {epoch_data}')
@@ -445,6 +447,22 @@ class Federator:
 
                 client.tb_writer.add_scalar('accuracy per epoch',
                                             epoch_data.accuracy,  # for every 1000 minibatches
+                                            self.epoch_counter)
+
+                client.tb_writer.add_scalar('Client time per epoch',
+                                            client_response.duration(),  # for every 1000 minibatches
+                                            self.epoch_counter)
+
+                client.tb_writer.add_scalar('learning rate',
+                                            scheduler_data['lr'],
+                                            self.epoch_counter)
+
+                client.tb_writer.add_scalar('momentum',
+                                            scheduler_data['momentum'],
+                                            self.epoch_counter)
+
+                client.tb_writer.add_scalar('weight decay',
+                                            scheduler_data['wd'],
                                             self.epoch_counter)
 
                 client_weights.append(weights)

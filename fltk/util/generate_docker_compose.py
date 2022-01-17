@@ -14,7 +14,7 @@ def load_client_template(type='default'):
         documents = yaml.full_load(file)
         return documents
 
-def generate_client(id, template: dict, world_size: int, type='default'):
+def generate_client(id, template: dict, world_size: int, type='default', cpu_set=''):
     local_template = copy.deepcopy(template)
     key_name = list(local_template.keys())[0]
     container_name = f'client_{type}_{id}'
@@ -24,28 +24,48 @@ def generate_client(id, template: dict, world_size: int, type='default'):
             local_template[container_name]['environment'][key] = item.format(rank=id)
         if item == 'WORLD_SIZE={world_size}':
             local_template[container_name]['environment'][key] = item.format(world_size=world_size)
+    # for key, item in enumerate(local_template[container_name]):
+    #     if item == 'cpuset: {cpu_set}':
+    #         local_template[container_name][key] = item.format(cpu_set=cpu_set)
 
     local_template[container_name]['ports'] = [f'{5000+id}:5000']
+    local_template[container_name]['cpuset'] = f'{cpu_set}'
     return local_template, container_name
 
 
 def generate_offload_exp():
-    num_clients = 2
+    num_clients = 4
+    cpu_per_client = 1
+    num_cpus = 20
     world_size = num_clients + 1
     system_template: dict = load_system_template()
 
     for key, item in enumerate(system_template['services']['fl_server']['environment']):
         if item == 'WORLD_SIZE={world_size}':
             system_template['services']['fl_server']['environment'][key] = item.format(world_size=world_size)
-
+    cpu_set = 0
+    cpu_idx = 1
     for client_id in range(1, num_clients + 1):
+        # client_type = 'medium'
         client_type = 'default'
-        if client_id == 1:
+        if client_id == 1 or client_id == 2:
             client_type = 'medium'
-        # if client_id == 2:
-        #     client_type = 'slow'
+            cpu_set = f'{cpu_idx}-{cpu_idx+1}'
+            cpu_idx += 2
+        elif client_id == 3:
+            client_type = 'slow'
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+        elif client_id == 4:
+            client_type = 'fast'
+            cpu_set = f'{cpu_idx}-{cpu_idx + 2}'
+            cpu_idx += 3
+        else:
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+
         client_template: dict = load_client_template(type=client_type)
-        client_definition, container_name = generate_client(client_id, client_template, world_size, type=client_type)
+        client_definition, container_name = generate_client(client_id, client_template, world_size, type=client_type, cpu_set=cpu_set)
         system_template['services'].update(client_definition)
 
     with open(r'./docker-compose.yml', 'w') as file:
