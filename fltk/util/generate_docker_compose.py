@@ -32,6 +32,8 @@ def generate_client(id, template: dict, world_size: int, type='default', cpu_set
     local_template[container_name]['cpuset'] = f'{cpu_set}'
     return local_template, container_name
 
+def generate_compose_file():
+    print()
 
 def generate_offload_exp():
     num_clients = 4
@@ -44,25 +46,25 @@ def generate_offload_exp():
         if item == 'WORLD_SIZE={world_size}':
             system_template['services']['fl_server']['environment'][key] = item.format(world_size=world_size)
     cpu_set = 0
-    cpu_idx = 1
+    cpu_idx = 3
     for client_id in range(1, num_clients + 1):
         # client_type = 'medium'
         client_type = 'default'
-        if client_id == 1 or client_id == 2:
-            client_type = 'medium'
-            cpu_set = f'{cpu_idx}-{cpu_idx+1}'
-            cpu_idx += 2
-        elif client_id == 3:
-            client_type = 'slow'
-            cpu_set = f'{cpu_idx}'
-            cpu_idx += 1
-        elif client_id == 4:
-            client_type = 'fast'
-            cpu_set = f'{cpu_idx}-{cpu_idx + 2}'
-            cpu_idx += 3
-        else:
-            cpu_set = f'{cpu_idx}'
-            cpu_idx += 1
+        # if client_id == 1 or client_id == 2:
+        #     client_type = 'medium'
+        #     cpu_set = f'{cpu_idx}-{cpu_idx+1}'
+        #     cpu_idx += 2
+        # elif client_id == 3:
+        #     client_type = 'slow'
+        #     cpu_set = f'{cpu_idx}'
+        #     cpu_idx += 1
+        # elif client_id == 4:
+        client_type = 'fast'
+        cpu_set = f'{cpu_idx}-{cpu_idx + 2}'
+        cpu_idx += 3
+        # else:
+        #     cpu_set = f'{cpu_idx}'
+        #     cpu_idx += 1
 
         client_template: dict = load_client_template(type=client_type)
         client_definition, container_name = generate_client(client_id, client_template, world_size, type=client_type, cpu_set=cpu_set)
