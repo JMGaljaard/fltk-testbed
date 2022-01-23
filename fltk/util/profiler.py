@@ -145,7 +145,7 @@ class Profiler:
 
         print(module)
         for k in kids:
-            print(f'Registrating hooks for layer {k}')
+            # print(f'Registrating hooks for layer {k}')
             h1 = k.register_forward_hook(self.forward)
             self.hook_handles.append(h1)
             h2 = k.register_forward_pre_hook(self.pre_forward)

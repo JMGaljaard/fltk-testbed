@@ -66,12 +66,14 @@ class ClientRef:
     name = ""
     data_size = 0
     tb_writer = None
+    tb_writer_offload = None
     available = False
 
-    def __init__(self, name, ref, tensorboard_writer):
+    def __init__(self, name, ref, tensorboard_writer, tensorboard_writer_offload):
         self.name = name
         self.ref = ref
         self.tb_writer = tensorboard_writer
+        self.tb_writer_offload = tensorboard_writer_offload
 
     def __repr__(self):
         return self.name
@@ -193,7 +195,8 @@ class Federator:
         for id, rank, world_size in client_id_triple:
             client = rpc.remote(id, Client, kwargs=dict(id=id, log_rref=self.log_rref, rank=rank, world_size=world_size, config=self.config))
             writer = SummaryWriter(f'{self.tb_path}/{self.config.experiment_prefix}_client_{id}')
-            self.clients.append(ClientRef(id, client, tensorboard_writer=writer))
+            writer_offload = SummaryWriter(f'{self.tb_path}/{self.config.experiment_prefix}_client_{id}_offload')
+            self.clients.append(ClientRef(id, client, tensorboard_writer=writer, tensorboard_writer_offload=writer_offload))
             self.client_data[id] = []
 
     def select_clients(self, n = 2):
@@ -324,6 +327,10 @@ class Federator:
             res[1].wait()
         logging.info('Weights are updated')
 
+        ### Clients train locally
+        # Structure of the async message:
+        # - Client will respond with two messages:
+
         # Let clients train locally
 
         if not self.deadline_enabled:
@@ -389,16 +396,49 @@ class Federator:
                     #         weak_client = k
                     #     else:
                     #         strong_client = k
-                    if self.offload_enabled and not warmup:
-                        weak_client = est_keys[0]
-                        strong_client = est_keys[1]
-                        if self.performance_estimate[est_keys[1]][1] > self.performance_estimate[est_keys[0]][1]:
-                            weak_client = est_keys[1]
-                            strong_client = est_keys[0]
 
-                        logging.info(f'Offloading from {weak_client} -> {strong_client} due to {self.performance_estimate[weak_client]} and {self.performance_estimate[strong_client]}')
+                    # (time_per_batch, est_total_time, number_of_training_samples)
+                    if self.offload_enabled and not warmup:
+                        first = True
+                        weakest = 0
+                        strongest = 0
+                        weak_performance = 0
+                        strong_performance = 0
+                        for k, v in self.performance_estimate.items():
+                            # print(v)
+                            if first:
+                                first = False
+                                est_total_time = v[1]
+                                weakest = k
+                                strongest = k
+                                weak_performance = est_total_time
+                                strong_performance = est_total_time
+                            else:
+                                est_total_time = v[1]
+                                if est_total_time > weak_performance:
+                                    weak_performance = est_total_time
+                                    weakest = k
+                                if est_total_time < strong_performance:
+                                    strong_performance = est_total_time
+                                    strongest = k
+                        logging.info(
+                            f'Offloading from {weakest} -> {strongest} due to {self.performance_estimate[weakest]} and {self.performance_estimate[strongest]}')
                         logging.info('Sending call to offload')
-                        self.ask_client_to_offload(self.reference_lookup[selected_clients[0].name], selected_clients[1].name)
+                        self.ask_client_to_offload(self.reference_lookup[weakest],
+                                                   strongest)
+
+                    # if self.offload_enabled and not warmup:
+                    #     logging.info(f'self.performance_estimate={self.performance_estimate}')
+                    #     logging.info(f'est_keys={est_keys}')
+                    #     weak_client = est_keys[0]
+                    #     strong_client = est_keys[1]
+                    #     if self.performance_estimate[est_keys[1]][1] > self.performance_estimate[est_keys[0]][1]:
+                    #         weak_client = est_keys[1]
+                    #         strong_client = est_keys[0]
+                    #
+                    #     logging.info(f'Offloading from {weak_client} -> {strong_client} due to {self.performance_estimate[weak_client]} and {self.performance_estimate[strong_client]}')
+                    #     logging.info('Sending call to offload')
+                    #     self.ask_client_to_offload(self.reference_lookup[selected_clients[0].name], selected_clients[1].name)
 
                 # selected_clients[0]
             # logging.info(f'Status of all_finished={all_finished} and deadline={reached_deadline()}')
@@ -423,11 +463,15 @@ class Federator:
 
             if not client_response.dropped:
                 client.available = True
-                epoch_data, weights, scheduler_data = client_response.future.wait()
+                logging.info(f'Fetching response for client: {client}')
+                response_obj = client_response.future.wait()
+
+                epoch_data, weights, scheduler_data, perf_data = response_obj['own']
                 self.client_data[epoch_data.client_id].append(epoch_data)
                 logging.info(f'{client} had a loss of {epoch_data.loss}')
                 logging.info(f'{client} had a epoch data of {epoch_data}')
                 logging.info(f'{client} has trained on {epoch_data.training_process} samples')
+                # logging.info(f'{client} has perf data: {perf_data}')
                 elapsed_time = client_response.end_time - self.exp_start_time
 
                 client.tb_writer.add_scalar('training loss',
@@ -464,13 +508,87 @@ class Federator:
                 client.tb_writer.add_scalar('weight decay',
                                             scheduler_data['wd'],
                                             self.epoch_counter)
+                total_time_t1 = perf_data['total_duration']
+                loop_duration = perf_data['loop_duration']
+                p_v1_time = perf_data['p_v1_data'].mean() * perf_data['n_batches']
+                p_v1_time_sum = perf_data['p_v1_data'].sum()
+                p_v1_pre_loop = perf_data['p_v1_pre_loop']
+                p_v1_post_loop = perf_data['p_v1_post_loop']
+                pre_train_loop_data = perf_data['pre_train_loop_data']
+                post_train_loop_data = perf_data['post_train_loop_data']
+                p_v2_forwards = (perf_data['p_v2_data'][0].mean() + perf_data['p_v2_data'][1].mean()) * perf_data['n_batches']
+                p_v2_backwards = (perf_data['p_v2_data'][2].mean() + perf_data['p_v2_data'][3].mean()) * perf_data['n_batches']
+                p_v3_forwards = (perf_data['p_v3_data'][0].mean() + perf_data['p_v3_data'][1].mean()) * perf_data[
+                    'n_batches']
+                p_v3_backwards = (perf_data['p_v3_data'][2].mean() + perf_data['p_v3_data'][3].mean()) * perf_data[
+                    'n_batches']
+                p_v2_time = sum([x.mean() for x in perf_data['p_v2_data']]) * perf_data['n_batches']
+                p_v1_forwards = perf_data['p_v1_forwards'].mean() * perf_data['n_batches']
+                p_v1_backwards = perf_data['p_v1_backwards'].mean() * perf_data['n_batches']
+                logging.info(f'{client} has time estimates: {[total_time_t1, loop_duration, p_v1_time_sum, p_v1_time, p_v2_time, [p_v1_forwards, p_v1_backwards], [p_v2_forwards, p_v2_backwards]]}')
+                logging.info(f'{client} combined times pre post loop stuff: {[p_v1_pre_loop, loop_duration, p_v1_post_loop]} = {sum([p_v1_pre_loop, loop_duration, p_v1_post_loop])} ? {total_time_t1}')
+                logging.info(f'{client} p3 time = {p_v3_forwards} + {p_v3_backwards} = {p_v3_forwards+ p_v3_backwards}')
+                logging.info(f'{client} Pre train loop time = {pre_train_loop_data.mean()}, post train loop time = {post_train_loop_data.mean()}')
+                # logging.info(f'{client} p_v1 data: {perf_data["p_v1_data"]}')
+
+
+
+                client.tb_writer.add_scalar('train_time_estimate_delta', loop_duration - (p_v3_forwards+ p_v3_backwards), self.epoch_counter)
+                client.tb_writer.add_scalar('train_time_estimate_delta_2', loop_duration - (p_v2_forwards+ p_v2_backwards), self.epoch_counter)
 
                 client_weights.append(weights)
                 client_weights_dict[client.name] = weights
                 client_training_process_dict[client.name] = epoch_data.training_process
 
+                if 'offload' in response_obj:
+                    epoch_data_offload, weights_offload, scheduler_data_offload, perf_data_offload, sender_id = response_obj['offload']
+                    if epoch_data_offload.client_id not in self.client_data:
+                        self.client_data[epoch_data_offload.client_id] = []
+                    self.client_data[epoch_data_offload.client_id].append(epoch_data_offload)
+
+                    writer = client.tb_writer_offload
+
+                    writer.add_scalar('training loss',
+                                                epoch_data_offload.loss_train,  # for every 1000 minibatches
+                                                self.epoch_counter * client.data_size)
+
+                    writer.add_scalar('accuracy',
+                                                epoch_data_offload.accuracy,  # for every 1000 minibatches
+                                                self.epoch_counter * client.data_size)
+
+                    writer.add_scalar('accuracy wall time',
+                                                epoch_data_offload.accuracy,  # for every 1000 minibatches
+                                                elapsed_time)
+                    writer.add_scalar('training loss per epoch',
+                                                epoch_data_offload.loss_train,  # for every 1000 minibatches
+                                                self.epoch_counter)
+
+                    writer.add_scalar('accuracy per epoch',
+                                                epoch_data_offload.accuracy,  # for every 1000 minibatches
+                                                self.epoch_counter)
+
+                    writer.add_scalar('Client time per epoch',
+                                                client_response.duration(),  # for every 1000 minibatches
+                                                self.epoch_counter)
+
+                    writer.add_scalar('learning rate',
+                                                scheduler_data_offload['lr'],
+                                                self.epoch_counter)
+
+                    writer.add_scalar('momentum',
+                                                scheduler_data_offload['momentum'],
+                                                self.epoch_counter)
+
+                    writer.add_scalar('weight decay',
+                                                scheduler_data_offload['wd'],
+                                                self.epoch_counter)
+                    client_weights.append(weights_offload)
+                    client_weights_dict[epoch_data_offload.client_id] = weights_offload
+                    client_training_process_dict[epoch_data_offload.client_id] = epoch_data_offload.training_process
+
         self.performance_estimate = {}
         if len(client_weights):
+            logging.info(f'Aggregating {len(client_weights)} models')
             updated_model = FedAvg(client_weights_dict, client_training_process_dict)
             # updated_model = average_nn_parameters(client_weights)
 
