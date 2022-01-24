@@ -6,7 +6,7 @@ import seaborn as sns
 
 
 if __name__ == '__main__':
-    exp_name = 'output/exp_offload_vanilla'
+    exp_name = 'output/exp_p3_w4_s4_deadline'
 
     general_file = f'{exp_name}-general_data.csv'
     print(f'Loading data file: {general_file}')
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     plt.show()
 
     dfs = []
-    for file in [f'{exp_name}_client1_epochs.csv', f'{exp_name}_client2_epochs.csv']:
+    for file in [f'{exp_name}_client1_epochs.csv', f'{exp_name}_client2_epochs.csv', f'{exp_name}_client3_epochs.csv', f'{exp_name}_client4_epochs.csv']:
         dfs.append(pd.read_csv(file))
     client_df = pd.concat(dfs, ignore_index=True)
 

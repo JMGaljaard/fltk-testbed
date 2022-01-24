@@ -3,14 +3,14 @@
 total_epochs: 20
 epochs_per_cycle: 1
 wait_for_clients: true
-net: Cifar10CNN
-dataset: cifar10
+net: FashionMNISTCNN
+dataset: fashion-mnist
 # Use cuda is available; setting to false will force CPU
 cuda: false
-experiment_prefix: 'experiment_sample'
-offload_stategy: deadline
-profiling_time: -1
-deadline: 1000
+experiment_prefix: 'experiment_fmnist'
+offload_stategy: vanilla
+profiling_time: 100
+deadline: 500
 warmup_round: false
 output_location: 'output'
 tensor_board_active: true

@@ -1,5 +1,8 @@
 import os
+import random
 import sys
+import time
+
 import torch.distributed.rpc as rpc
 import logging
 
@@ -55,6 +58,8 @@ def main():
         run_single(rank=args.rank, world_size=world_size, host=master_address, args=None, nic=nic)
     else:
         with open(args.config) as file:
+            sleep_time = random.uniform(0, 5.0)
+            time.sleep(sleep_time)
             cfg = BareConfig()
             yaml_data = yaml.load(file, Loader=yaml.FullLoader)
             cfg.merge_yaml(yaml_data)
