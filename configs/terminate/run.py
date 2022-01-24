@@ -1,10 +1,10 @@
 from fltk.util.generate_docker_compose import run as generate_docker
 import os
 if __name__ == '__main__':
-    name = 'dev'
-    generate_docker(name, 10, True)
-    base_path = 'configs/effect-freezing'
-    exp_list = ['p_freezing-iid_freeze.yaml','p_freezing-iid_vanilla.yaml']
+    name = 'terminate'
+    generate_docker(name, 16, True)
+    base_path = 'configs/terminate'
+    exp_list = ['p_terminate_terminate_swyh.yaml', 'p_terminate_terminate.yaml', 'p_terminate_vanilla.yaml']
     exp_list = [f'{base_path}/{x}' for x in exp_list]
     first_prefix = '--build'
     for exp_cfg_file in exp_list:
