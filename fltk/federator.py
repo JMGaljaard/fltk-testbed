@@ -14,7 +14,7 @@ from fltk.client import Client
 from fltk.datasets.data_distribution import distribute_batches_equally
 from fltk.strategy.aggregation import FedAvg
 from fltk.strategy.client_selection import random_selection, tifl_update_probs, tifl_select_tier_and_decrement
-from fltk.strategy.offloading import OffloadingStrategy
+from fltk.strategy.offloading import OffloadingStrategy, parse_strategy
 from fltk.util.arguments import Arguments
 from fltk.util.base_config import BareConfig
 from fltk.util.data_loader_utils import load_train_data_loader, load_test_data_loader, \
@@ -128,6 +128,8 @@ class Federator:
     swyh_enabled = False
     freeze_layers_enabled = False
     offload_enabled = False
+    dyn_terminate = False
+    dyn_terminate_swyh = False
     warmup_active = False
     node_groups = {}
     tifl_tier_data = []
@@ -180,44 +182,58 @@ class Federator:
                 residue -= t[3]
             self.tifl_tier_data[0][3] += residue
 
+    # def configure_strategy(self, strategy : OffloadingStrategy):
+    #     if strategy == OffloadingStrategy.VANILLA:
+    #         logging.info('Running with offloading strategy: VANILLA')
+    #         self.deadline_enabled = False
+    #         self.swyh_enabled = False
+    #         self.freeze_layers_enabled = False
+    #         self.offload_enabled = False
+    #     if strategy == OffloadingStrategy.DEADLINE:
+    #         logging.info('Running with offloading strategy: DEADLINE')
+    #         self.deadline_enabled = True
+    #         self.swyh_enabled = False
+    #         self.freeze_layers_enabled = False
+    #         self.offload_enabled = False
+    #     if strategy == OffloadingStrategy.SWYH:
+    #         logging.info('Running with offloading strategy: SWYH')
+    #         self.deadline_enabled = True
+    #         self.swyh_enabled = True
+    #         self.freeze_layers_enabled = False
+    #         self.offload_enabled = False
+    #     if strategy == OffloadingStrategy.FREEZE:
+    #         logging.info('Running with offloading strategy: FREEZE')
+    #         self.deadline_enabled = True
+    #         self.swyh_enabled = False
+    #         self.freeze_layers_enabled = True
+    #         self.offload_enabled = False
+    #     if strategy == OffloadingStrategy.MODEL_OFFLOAD:
+    #         logging.info('Running with offloading strategy: MODEL_OFFLOAD')
+    #         self.deadline_enabled = True
+    #         self.swyh_enabled = False
+    #         self.freeze_layers_enabled = True
+    #         self.offload_enabled = True
+    #     if strategy == OffloadingStrategy.TIFL_BASIC:
+    #         logging.info('Running with offloading strategy: TIFL_BASIC')
+    #         self.deadline_enabled = False
+    #         self.swyh_enabled = False
+    #         self.freeze_layers_enabled = False
+    #         self.offload_enabled = False
+    #     logging.info(f'Offload strategy params: deadline={self.deadline_enabled}, swyh={self.swyh_enabled}, freeze={self.freeze_layers_enabled}, offload={self.offload_enabled}')
+    #
     def configure_strategy(self, strategy : OffloadingStrategy):
-        if strategy == OffloadingStrategy.VANILLA:
-            logging.info('Running with offloading strategy: VANILLA')
-            self.deadline_enabled = False
-            self.swyh_enabled = False
-            self.freeze_layers_enabled = False
-            self.offload_enabled = False
-        if strategy == OffloadingStrategy.DEADLINE:
-            logging.info('Running with offloading strategy: DEADLINE')
-            self.deadline_enabled = True
-            self.swyh_enabled = False
-            self.freeze_layers_enabled = False
-            self.offload_enabled = False
-        if strategy == OffloadingStrategy.SWYH:
-            logging.info('Running with offloading strategy: SWYH')
-            self.deadline_enabled = True
-            self.swyh_enabled = True
-            self.freeze_layers_enabled = False
-            self.offload_enabled = False
-        if strategy == OffloadingStrategy.FREEZE:
-            logging.info('Running with offloading strategy: FREEZE')
-            self.deadline_enabled = True
-            self.swyh_enabled = False
-            self.freeze_layers_enabled = True
-            self.offload_enabled = False
-        if strategy == OffloadingStrategy.MODEL_OFFLOAD:
-            logging.info('Running with offloading strategy: MODEL_OFFLOAD')
-            self.deadline_enabled = True
-            self.swyh_enabled = False
-            self.freeze_layers_enabled = True
-            self.offload_enabled = True
-        if strategy == OffloadingStrategy.TIFL_BASIC:
-            logging.info('Running with offloading strategy: TIFL_BASIC')
-            self.deadline_enabled = False
-            self.swyh_enabled = False
-            self.freeze_layers_enabled = False
-            self.offload_enabled = False
-        logging.info(f'Offload strategy params: deadline={self.deadline_enabled}, swyh={self.swyh_enabled}, freeze={self.freeze_layers_enabled}, offload={self.offload_enabled}')
+        deadline_enabled, swyh_enabled, freeze_layers_enabled, offload_enabled, dyn_terminate, dyn_terminate_swyh = parse_strategy(strategy)
+        self.deadline_enabled = deadline_enabled
+        self.swyh_enabled = swyh_enabled
+        self.freeze_layers_enabled = freeze_layers_enabled
+        self.offload_enabled = offload_enabled
+        self.dyn_terminate = dyn_terminate
+        self.dyn_terminate_swyh = dyn_terminate_swyh
+        logging.info(f'Offloading strategy={strategy}')
+        logging.info(f'Offload strategy params: deadline={self.deadline_enabled}, '
+                     f'swyh={self.swyh_enabled}, freeze={self.freeze_layers_enabled}, '
+                     f'offload={self.offload_enabled}, dyn_terminate={self.dyn_terminate}, '
+                     f'dyn_terminate_swyh={self.dyn_terminate_swyh}')
 
     def create_clients(self, client_id_triple):
         for id, rank, world_size in client_id_triple:
@@ -489,12 +505,16 @@ class Federator:
                 # selected_clients[0]
             # logging.info(f'Status of all_finished={all_finished} and deadline={reached_deadline()}')
             all_finished = True
+
             for client_response in responses:
                 if client_response.future.done():
                     if not client_response.done:
                         client_response.finish()
                 else:
                     all_finished = False
+            num_finished_responses = sum([1 for x in responses if x.done])
+            percentage = num_finished_responses / len(responses)
+            logging.info(f'Percentage of finished responses: {percentage}, do terminate ? {percentage} > {self.config.termination_percentage} = {percentage > self.config.termination_percentage}')
             time.sleep(0.1)
         logging.info(f'Stopped waiting due to all_finished={all_finished} and deadline={reached_deadline()}')
         client_accuracies = []

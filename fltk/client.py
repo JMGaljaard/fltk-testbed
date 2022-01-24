@@ -16,7 +16,7 @@ from torch.distributed.rpc import RRef
 
 from fltk.schedulers import MinCapableStepLR
 from fltk.strategy.aggregation import FedAvg
-from fltk.strategy.offloading import OffloadingStrategy
+from fltk.strategy.offloading import OffloadingStrategy, parse_strategy
 from fltk.util.arguments import Arguments
 from fltk.util.fed_avg import average_nn_parameters
 from fltk.util.log import FLLogger
@@ -83,6 +83,14 @@ class Client:
 
     strategy = OffloadingStrategy.VANILLA
 
+    deadline_enabled = False
+    swyh_enabled = False
+    freeze_layers_enabled = False
+    offload_enabled = False
+    dyn_terminate = False
+    dyn_terminate_swyh = False
+
+    terminate_training = False
 
     def __init__(self, id, log_rref, rank, world_size, config = None):
         # logging.info(f'Welcome to client {id}')
@@ -121,51 +129,19 @@ class Client:
         logging.info('Parameters of offloaded model updated')
         self.offloaded_model_ready = True
 
-
-    def parse_strategy(self, strategy: OffloadingStrategy):
-        deadline_enabled = False
-        swyh_enabled = False
-        freeze_layers_enabled = False
-        offload_enabled = False
-        if strategy == OffloadingStrategy.VANILLA:
-            logging.info('Running with offloading strategy: VANILLA')
-            deadline_enabled = False
-            swyh_enabled = False
-            freeze_layers_enabled = False
-            offload_enabled = False
-        if strategy == OffloadingStrategy.DEADLINE:
-            logging.info('Running with offloading strategy: DEADLINE')
-            deadline_enabled = True
-            swyh_enabled = False
-            freeze_layers_enabled = False
-            offload_enabled = False
-        if strategy == OffloadingStrategy.SWYH:
-            logging.info('Running with offloading strategy: SWYH')
-            deadline_enabled = True
-            swyh_enabled = True
-            freeze_layers_enabled = False
-            offload_enabled = False
-        if strategy == OffloadingStrategy.FREEZE:
-            logging.info('Running with offloading strategy: FREEZE')
-            deadline_enabled = True
-            swyh_enabled = False
-            freeze_layers_enabled = True
-            offload_enabled = False
-        if strategy == OffloadingStrategy.MODEL_OFFLOAD:
-            logging.info('Running with offloading strategy: MODEL_OFFLOAD')
-            deadline_enabled = True
-            swyh_enabled = False
-            freeze_layers_enabled = True
-            offload_enabled = True
-        return deadline_enabled, swyh_enabled, freeze_layers_enabled, offload_enabled
-
     def configure_strategy(self, strategy : OffloadingStrategy):
-        deadline_enabled, swyh_enabled, freeze_layers_enabled, offload_enabled = self.parse_strategy(strategy)
+        deadline_enabled, swyh_enabled, freeze_layers_enabled, offload_enabled, dyn_terminate, dyn_terminate_swyh = parse_strategy(strategy)
         self.deadline_enabled = deadline_enabled
         self.swyh_enabled = swyh_enabled
         self.freeze_layers_enabled = freeze_layers_enabled
         self.offload_enabled = offload_enabled
-        logging.info(f'Offload strategy params: deadline={self.deadline_enabled}, swyh={self.swyh_enabled}, freeze={self.freeze_layers_enabled}, offload={self.offload_enabled}')
+        self.dyn_terminate = dyn_terminate
+        self.dyn_terminate_swyh = dyn_terminate_swyh
+        logging.info(f'Offloading strategy={strategy}')
+        logging.info(f'Offload strategy params: deadline={self.deadline_enabled}, '
+                     f'swyh={self.swyh_enabled}, freeze={self.freeze_layers_enabled}, '
+                     f'offload={self.offload_enabled}, dyn_terminate={self.dyn_terminate}, '
+                     f'dyn_terminate_swyh={self.dyn_terminate_swyh}')
 
 
     def init_device(self):
@@ -177,6 +153,11 @@ class Client:
     def send_reference(self, server_ref):
         self.local_log(f'Got worker_info from server {server_ref}')
         self.server_ref = server_ref
+
+
+    def terminate_training_endpoint(self):
+        self.terminate_training = True
+
 
     @staticmethod
     def static_ping():
@@ -466,6 +447,11 @@ class Client:
             loop_pre_train_start = time.time()
             start_train_time = time.time()
 
+            if self.dyn_terminate_swyh or self.dyn_terminate:
+                if self.terminate_training:
+                    logging.info('Got a call to terminate training')
+                    break
+
             if self.offload_enabled and not warmup:
                 # Check if there is a call to offload
                 if self.call_to_offload:
@@ -690,6 +676,13 @@ class Client:
         self.dataset.get_train_sampler().set_epoch_size(num_epoch)
         # Train locally
         loss, weights, training_process, scheduler_data, perf_data = self.train(self.epoch_counter, deadline, warmup)
+        if self.dyn_terminate:
+            logging.info('Not testing data due to termination call')
+            self.dyn_terminate = False
+            return {'own': []}
+        elif self.dyn_terminate_swyh:
+            self.dyn_terminate_swyh = False
+            logging.info('Sending back weights due to terminate with swyh')
         if not warmup:
             self.epoch_counter += num_epoch
         elapsed_time_train = datetime.datetime.now() - start_time_train

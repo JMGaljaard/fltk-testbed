@@ -52,6 +52,9 @@ class BareConfig:
         # FLTK options
         self.node_groups = None
 
+        # Termination policy data
+        self.termination_percentage = 1
+
         self.federator_host = '0.0.0.0'
         self.rank = 0
         self.world_size = 0
@@ -159,6 +162,8 @@ class BareConfig:
 
         if 'node_groups' in cfg:
             self.node_groups = cfg['node_groups']
+        if 'termination_percentage' in cfg:
+            self.termination_percentage = cfg['termination_percentage']
             
 
 

@@ -41,6 +41,31 @@ def generate_client(id, template: dict, world_size: int, type='default', cpu_set
 def generate_compose_file():
     print()
 
+def generate_terminate(num_clients = 16, medium=False):
+    template_path = get_deploy_path('terminate')
+    world_size = num_clients + 1
+    system_template: dict = load_system_template(template_path=template_path)
+
+    for key, item in enumerate(system_template['services']['fl_server']['environment']):
+        if item == 'WORLD_SIZE={world_size}':
+            system_template['services']['fl_server']['environment'][key] = item.format(world_size=world_size)
+    cpu_idx = 2
+    for client_id in range(1, num_clients + 1):
+        if client_id < 5:
+            client_type = 'slow'
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+        else:
+            client_type = 'medium'
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+        client_template: dict = load_client_template(type=client_type, template_path=template_path)
+        client_definition, container_name = generate_client(client_id, client_template, world_size, type=client_type,
+                                                            cpu_set=cpu_set)
+        system_template['services'].update(client_definition)
+
+    with open(r'./docker-compose.yml', 'w') as file:
+        yaml.dump(system_template, file, sort_keys=False)
 
 def generate_dev(num_clients = 2, medium=False):
     template_path = get_deploy_path('dev')
@@ -203,8 +228,8 @@ def generate(num_clients: int):
 def run(name, num_clients = None, medium=False):
     exp_dict = {
         'tifl-15': generate_tifl_15,
-        'dev': generate_dev
-
+        'dev': generate_dev,
+        'terminate': generate_terminate
     }
     if num_clients:
         exp_dict[name](num_clients, medium)

@@ -8,7 +8,9 @@ class OffloadingStrategy(Enum):
     FREEZE = 4
     MODEL_OFFLOAD = 5,
     TIFL_BASIC = 6,
-    TIFL_ADAPTIVE = 7
+    TIFL_ADAPTIVE = 7,
+    DYN_TERMINATE = 8,
+    DYN_TERMINATE_SWYH = 9
 
     @classmethod
     def Parse(cls, string_value):
@@ -26,3 +28,54 @@ class OffloadingStrategy(Enum):
             return OffloadingStrategy.TIFL_BASIC
         if string_value == 'tifl-adaptive':
             return OffloadingStrategy.TIFL_ADAPTIVE
+        if string_value == 'dynamic-terminate':
+            return OffloadingStrategy.DYN_TERMINATE
+        if string_value == 'dynamic-terminate-swyh':
+            return OffloadingStrategy.DYN_TERMINATE_SWYH
+
+
+def parse_strategy(strategy: OffloadingStrategy):
+    deadline_enabled = False
+    swyh_enabled = False
+    freeze_layers_enabled = False
+    offload_enabled = False
+    dyn_terminate = False
+    dyn_terminate_swyh = False
+    if strategy == OffloadingStrategy.VANILLA:
+        deadline_enabled = False
+        swyh_enabled = False
+        freeze_layers_enabled = False
+        offload_enabled = False
+    if strategy == OffloadingStrategy.DEADLINE:
+        deadline_enabled = True
+        swyh_enabled = False
+        freeze_layers_enabled = False
+        offload_enabled = False
+    if strategy == OffloadingStrategy.SWYH:
+        deadline_enabled = True
+        swyh_enabled = True
+        freeze_layers_enabled = False
+        offload_enabled = False
+    if strategy == OffloadingStrategy.FREEZE:
+        deadline_enabled = True
+        swyh_enabled = False
+        freeze_layers_enabled = True
+        offload_enabled = False
+    if strategy == OffloadingStrategy.MODEL_OFFLOAD:
+        deadline_enabled = True
+        swyh_enabled = False
+        freeze_layers_enabled = True
+        offload_enabled = True
+    if strategy == OffloadingStrategy.DYN_TERMINATE:
+        deadline_enabled = False
+        swyh_enabled = False
+        freeze_layers_enabled = False
+        offload_enabled = False
+        dyn_terminate = True
+    if strategy == OffloadingStrategy.DYN_TERMINATE:
+        deadline_enabled = False
+        swyh_enabled = False
+        freeze_layers_enabled = False
+        offload_enabled = False
+        dyn_terminate_swyh = True
+    return deadline_enabled, swyh_enabled, freeze_layers_enabled, offload_enabled, dyn_terminate, dyn_terminate_swyh
