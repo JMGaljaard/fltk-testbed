@@ -667,13 +667,13 @@ class Client:
 
         class_precision = self.calculate_class_precision(confusion_mat)
         class_recall = self.calculate_class_recall(confusion_mat)
-
-        self.args.get_logger().debug('Test set: Accuracy: {}/{} ({:.0f}%)'.format(correct, total, accuracy))
-        self.args.get_logger().debug('Test set: Loss: {}'.format(loss))
-        self.args.get_logger().debug("Classification Report:\n" + classification_report(targets_, pred_))
-        self.args.get_logger().debug("Confusion Matrix:\n" + str(confusion_mat))
-        self.args.get_logger().debug("Class precision: {}".format(str(class_precision)))
-        self.args.get_logger().debug("Class recall: {}".format(str(class_recall)))
+        if False:
+            self.args.get_logger().debug('Test set: Accuracy: {}/{} ({:.0f}%)'.format(correct, total, accuracy))
+            self.args.get_logger().debug('Test set: Loss: {}'.format(loss))
+            self.args.get_logger().debug("Classification Report:\n" + classification_report(targets_, pred_))
+            self.args.get_logger().debug("Confusion Matrix:\n" + str(confusion_mat))
+            self.args.get_logger().debug("Class precision: {}".format(str(class_precision)))
+            self.args.get_logger().debug("Class recall: {}".format(str(class_recall)))
 
         return accuracy, loss, class_precision, class_recall, accuracy_per_class
 

@@ -7,18 +7,14 @@ net: FashionMNISTCNN
 dataset: fashion-mnist
 # Use cuda is available; setting to false will force CPU
 cuda: false
-experiment_prefix: 'exp_p3_tifl-basic'
-offload_stategy: tifl-adaptive
-profiling_time: 100
-deadline: 500
+experiment_prefix: 'experiment_p18_full'
+offload_stategy: deadline
+profiling_time: -1
+deadline: 1000
 warmup_round: false
 output_location: 'output'
 tensor_board_active: true
-clients_per_round: 1
-node_groups:
-  slow: [1, 1]
-  medium: [2, 2]
-  fast: [3, 3]
+clients_per_round: 18
 sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
 #sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
 sampler_args:
@@ -26,9 +22,7 @@ sampler_args:
   - 42    # random seed || random seed || random seed || unused
 system:
   federator:
-    # hostname: '131.180.203.94'
     hostname: '10.5.0.11'
     nic: 'eth0'
-    # nic: 'enp3s0'
   clients:
-    amount: 3
+    amount: 18

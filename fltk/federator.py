@@ -142,6 +142,8 @@ class Federator:
     # Keep track of the experiment data
     exp_data_general = []
 
+    epoch_events = []
+
     def __init__(self, client_id_triple, num_epochs = 3, config=None):
         log_rref = rpc.RRef(FLLogger())
         self.log_rref = log_rref
@@ -162,7 +164,7 @@ class Federator:
         self.reference_lookup[get_worker_info().name] = RRef(self)
         self.strategy = OffloadingStrategy.Parse(config.offload_strategy)
         self.configure_strategy(self.strategy)
-        if self.strategy == OffloadingStrategy.TIFL_BASIC or OffloadingStrategy.TIFL_ADAPTIVE:
+        if self.strategy == OffloadingStrategy.TIFL_BASIC or self.strategy == OffloadingStrategy.TIFL_ADAPTIVE:
             for k, v in self.config.node_groups.items():
                 self.node_groups[k] = list(range(v[0], v[1]+1))
                 self.tifl_tier_names.append(k)
@@ -224,6 +226,9 @@ class Federator:
             writer_offload = SummaryWriter(f'{self.tb_path}/{self.config.experiment_prefix}_client_{id}_offload')
             self.clients.append(ClientRef(id, client, tensorboard_writer=writer, tensorboard_writer_offload=writer_offload, rank=rank))
             self.client_data[id] = []
+
+    def record_epoch_event(self, event: str):
+        self.epoch_events.append(f'{time.time()} - [{self.epoch_counter}] - {event}')
 
     def select_clients(self, n = 2):
         available_clients = list(filter(lambda x : x.available, self.clients))
@@ -345,6 +350,9 @@ class Federator:
 
         client_weights_dict = {}
         client_training_process_dict = {}
+
+
+        self.record_epoch_event('Starting new round')
         while self.num_available_clients() < self.config.clients_per_round:
             logging.warning(f'Waiting for enough clients to become available. # Available Clients = {self.num_available_clients()}, but need {self.config.clients_per_round}')
             self.process_response_list()
@@ -458,6 +466,7 @@ class Federator:
                                 if est_total_time < strong_performance:
                                     strong_performance = est_total_time
                                     strongest = k
+                                    self.record_epoch_event(f'Offloading from {weakest} -> {strongest} due to {self.performance_estimate[weakest]} and {self.performance_estimate[strongest]}')
                         logging.info(
                             f'Offloading from {weakest} -> {strongest} due to {self.performance_estimate[weakest]} and {self.performance_estimate[strongest]}')
                         logging.info('Sending call to offload')
@@ -506,9 +515,12 @@ class Federator:
 
                 epoch_data, weights, scheduler_data, perf_data = response_obj['own']
                 self.client_data[epoch_data.client_id].append(epoch_data)
-                logging.info(f'{client} had a loss of {epoch_data.loss}')
-                logging.info(f'{client} had a epoch data of {epoch_data}')
-                logging.info(f'{client} has trained on {epoch_data.training_process} samples')
+
+                # logging.info(f'{client} had a loss of {epoch_data.loss}')
+                # logging.info(f'{client} had a epoch data of {epoch_data}')
+                # logging.info(f'{client} has trained on {epoch_data.training_process} samples')
+                self.record_epoch_event(f'{client} had an accuracy of {epoch_data.accuracy}')
+                self.record_epoch_event(f'{client} had an duration of {client_response.duration()}')
                 client_accuracies.append(epoch_data.accuracy)
                 # logging.info(f'{client} has perf data: {perf_data}')
                 elapsed_time = client_response.end_time - self.exp_start_time
@@ -564,10 +576,11 @@ class Federator:
                 p_v2_time = sum([x.mean() for x in perf_data['p_v2_data']]) * perf_data['n_batches']
                 p_v1_forwards = perf_data['p_v1_forwards'].mean() * perf_data['n_batches']
                 p_v1_backwards = perf_data['p_v1_backwards'].mean() * perf_data['n_batches']
-                logging.info(f'{client} has time estimates: {[total_time_t1, loop_duration, p_v1_time_sum, p_v1_time, p_v2_time, [p_v1_forwards, p_v1_backwards], [p_v2_forwards, p_v2_backwards]]}')
-                logging.info(f'{client} combined times pre post loop stuff: {[p_v1_pre_loop, loop_duration, p_v1_post_loop]} = {sum([p_v1_pre_loop, loop_duration, p_v1_post_loop])} ? {total_time_t1}')
-                logging.info(f'{client} p3 time = {p_v3_forwards} + {p_v3_backwards} = {p_v3_forwards+ p_v3_backwards}')
-                logging.info(f'{client} Pre train loop time = {pre_train_loop_data.mean()}, post train loop time = {post_train_loop_data.mean()}')
+
+                # logging.info(f'{client} has time estimates: {[total_time_t1, loop_duration, p_v1_time_sum, p_v1_time, p_v2_time, [p_v1_forwards, p_v1_backwards], [p_v2_forwards, p_v2_backwards]]}')
+                # logging.info(f'{client} combined times pre post loop stuff: {[p_v1_pre_loop, loop_duration, p_v1_post_loop]} = {sum([p_v1_pre_loop, loop_duration, p_v1_post_loop])} ? {total_time_t1}')
+                # logging.info(f'{client} p3 time = {p_v3_forwards} + {p_v3_backwards} = {p_v3_forwards+ p_v3_backwards}')
+                # logging.info(f'{client} Pre train loop time = {pre_train_loop_data.mean()}, post train loop time = {post_train_loop_data.mean()}')
                 # logging.info(f'{client} p_v1 data: {perf_data["p_v1_data"]}')
 
 
@@ -642,12 +655,13 @@ class Federator:
             logging.info("Testing on global test set")
             self.test_data.update_nn_parameters(updated_model)
         accuracy, loss, class_precision, class_recall, accuracy_per_class = self.test_data.test()
-        logging.info('Class precision')
-        logging.warning(accuracy_per_class)
-        logging.info('Class names')
-        logging.info(self.test_data.dataset.test_dataset.class_to_idx)
+        # logging.info('Class precision')
+        # logging.warning(accuracy_per_class)
+        # logging.info('Class names')
+        # logging.info(self.test_data.dataset.test_dataset.class_to_idx)
         # self.tb_writer.add_scalar('training loss', loss, self.epoch_counter * self.test_data.get_client_datasize()) # does not seem to work :( )
         self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
+        self.record_epoch_event(f'Global accuracy is {accuracy}')
         self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
         elapsed_time = time.time() - self.exp_start_time
         self.tb_writer.add_scalar('accuracy wall time',
@@ -658,6 +672,7 @@ class Federator:
         for idx, acc in enumerate(accuracy_per_class):
             class_acc_dict[f'{idx}'] = acc
         self.tb_writer.add_scalars('accuracy per class', class_acc_dict, self.epoch_counter)
+        self.record_epoch_event(f'Accuracy per class is {class_acc_dict}')
         end_epoch_time = time.time()
         duration = end_epoch_time - start_epoch_time
 
@@ -691,6 +706,19 @@ class Federator:
         for res in responses:
             accuracy, loss, class_precision, class_recall = res[1].wait()
             logging.info(f'{res[0]} had a result of accuracy={accuracy}')
+
+    def flush_epoch_events(self):
+        file_output = f'./{self.config.output_location}'
+        exp_prefix = self.config.experiment_prefix
+        file_epoch_events = f'{file_output}/{exp_prefix}_federator_events.txt'
+        self.ensure_path_exists(file_output)
+
+        with open(file_epoch_events, 'a') as f:
+            for ev in self.epoch_events:
+                f.write(f'{ev}\n')
+            f.flush()
+
+        self.epoch_events = []
 
     def save_epoch_data(self):
         file_output = f'./{self.config.output_location}'
@@ -743,6 +771,7 @@ class Federator:
             self.process_response_list()
             logging.info(f'Running epoch {epoch}')
             self.remote_run_epoch(epoch_size)
+            self.flush_epoch_events()
             addition += 1
 
 
