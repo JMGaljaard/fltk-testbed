@@ -49,7 +49,7 @@ def generate_tifl_15():
     for key, item in enumerate(system_template['services']['fl_server']['environment']):
         if item == 'WORLD_SIZE={world_size}':
             system_template['services']['fl_server']['environment'][key] = item.format(world_size=world_size)
-    cpu_idx = 3
+    cpu_idx = 2
     for client_id in range(1, num_clients + 1):
         client_type = 'default'
         if 0 < client_id <= 6:
@@ -178,7 +178,7 @@ if __name__ == '__main__':
     # num_clients = int(sys.argv[1])
     # generate(num_clients)
     # generate_offload_exp()
-    # generate_tifl_15()
-    generate_tifl_3()
+    generate_tifl_15()
+    # generate_tifl_3()
     print('Done')
 

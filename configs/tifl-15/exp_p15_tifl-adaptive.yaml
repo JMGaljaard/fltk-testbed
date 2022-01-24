@@ -1,14 +1,14 @@
 ---
 # Experiment configuration
-total_epochs: 250
+total_epochs: 50
 epochs_per_cycle: 1
 wait_for_clients: true
 net: FashionMNISTCNN
 dataset: fashion-mnist
 # Use cuda is available; setting to false will force CPU
 cuda: false
-experiment_prefix: 'exp_p15_tifl-basic'
-offload_stategy: tifl-basic
+experiment_prefix: 'exp_p15_tifl-adaptive'
+offload_stategy: tifl-adaptive
 profiling_time: 100
 deadline: 500
 warmup_round: false
