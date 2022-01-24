@@ -6,7 +6,9 @@ class OffloadingStrategy(Enum):
     DEADLINE = 2
     SWYH = 3
     FREEZE = 4
-    MODEL_OFFLOAD = 5
+    MODEL_OFFLOAD = 5,
+    TIFL_BASIC = 6,
+    TIFL_ADAPTIVE = 7
 
     @classmethod
     def Parse(cls, string_value):
@@ -20,3 +22,7 @@ class OffloadingStrategy(Enum):
             return OffloadingStrategy.FREEZE
         if string_value == 'offload':
             return OffloadingStrategy.MODEL_OFFLOAD
+        if string_value == 'tifl-basic':
+            return OffloadingStrategy.TIFL_BASIC
+        if string_value == 'tifl-adaptive':
+            return OffloadingStrategy.TIFL_ADAPTIVE

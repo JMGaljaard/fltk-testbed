@@ -2,17 +2,22 @@ import sys
 import yaml
 import copy
 
-template_path = './deploy/templates'
+global_template_path = './deploy/templates'
 
-def load_system_template():
+def load_system_template(template_path = global_template_path):
+
     with open(f'{template_path}/system_stub.yml') as file:
         documents = yaml.full_load(file)
         return documents
 
-def load_client_template(type='default'):
+def load_client_template(type='default', template_path = global_template_path):
     with open(f'{template_path}/client_stub_{type}.yml') as file:
         documents = yaml.full_load(file)
         return documents
+
+def get_deploy_path(name: str):
+    return f'./deploy/{name}'
+
 
 def generate_client(id, template: dict, world_size: int, type='default', cpu_set=''):
     local_template = copy.deepcopy(template)
@@ -34,6 +39,79 @@ def generate_client(id, template: dict, world_size: int, type='default', cpu_set
 
 def generate_compose_file():
     print()
+
+def generate_tifl_15():
+    template_path = get_deploy_path('tifl-15')
+    num_clients= 18
+    world_size = num_clients + 1
+    system_template: dict = load_system_template(template_path=template_path)
+
+    for key, item in enumerate(system_template['services']['fl_server']['environment']):
+        if item == 'WORLD_SIZE={world_size}':
+            system_template['services']['fl_server']['environment'][key] = item.format(world_size=world_size)
+    cpu_idx = 3
+    for client_id in range(1, num_clients + 1):
+        client_type = 'default'
+        if 0 < client_id <= 6:
+            client_type = 'slow'
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+        elif 6 < client_id <= 12:
+            client_type = 'medium'
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+        elif 12 < client_id <= 18:
+            client_type = 'fast'
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+        else:
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+
+        client_template: dict = load_client_template(type=client_type, template_path=template_path)
+        client_definition, container_name = generate_client(client_id, client_template, world_size, type=client_type,
+                                                            cpu_set=cpu_set)
+        system_template['services'].update(client_definition)
+
+    with open(r'./docker-compose.yml', 'w') as file:
+        yaml.dump(system_template, file, sort_keys=False)
+
+
+def generate_tifl_3():
+    template_path = get_deploy_path('tifl-15')
+    num_clients= 3
+    world_size = num_clients + 1
+    system_template: dict = load_system_template(template_path=template_path)
+
+    for key, item in enumerate(system_template['services']['fl_server']['environment']):
+        if item == 'WORLD_SIZE={world_size}':
+            system_template['services']['fl_server']['environment'][key] = item.format(world_size=world_size)
+    cpu_idx = 3
+    for client_id in range(1, num_clients + 1):
+        client_type = 'default'
+        if 0 < client_id <= 1:
+            client_type = 'slow'
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+        elif 1 < client_id <= 2:
+            client_type = 'medium'
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+        elif 2 < client_id <= 3:
+            client_type = 'fast'
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+        else:
+            cpu_set = f'{cpu_idx}'
+            cpu_idx += 1
+
+        client_template: dict = load_client_template(type=client_type, template_path=template_path)
+        client_definition, container_name = generate_client(client_id, client_template, world_size, type=client_type,
+                                                            cpu_set=cpu_set)
+        system_template['services'].update(client_definition)
+
+    with open(r'./docker-compose.yml', 'w') as file:
+        yaml.dump(system_template, file, sort_keys=False)
 
 def generate_offload_exp():
     num_clients = 4
@@ -99,6 +177,8 @@ if __name__ == '__main__':
 
     # num_clients = int(sys.argv[1])
     # generate(num_clients)
-    generate_offload_exp()
+    # generate_offload_exp()
+    # generate_tifl_15()
+    generate_tifl_3()
     print('Done')
 

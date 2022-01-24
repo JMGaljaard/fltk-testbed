@@ -663,6 +663,7 @@ class Client:
 
         accuracy = 100 * correct / total
         confusion_mat = confusion_matrix(targets_, pred_)
+        accuracy_per_class = confusion_mat.diagonal() / confusion_mat.sum(1)
 
         class_precision = self.calculate_class_precision(confusion_mat)
         class_recall = self.calculate_class_recall(confusion_mat)
@@ -674,7 +675,7 @@ class Client:
         self.args.get_logger().debug("Class precision: {}".format(str(class_precision)))
         self.args.get_logger().debug("Class recall: {}".format(str(class_recall)))
 
-        return accuracy, loss, class_precision, class_recall
+        return accuracy, loss, class_precision, class_recall, accuracy_per_class
 
 
     def run_epochs(self, num_epoch, deadline: int = None, warmup=False):
@@ -696,7 +697,7 @@ class Client:
         post_training_time = time.time()
 
         start_time_test = datetime.datetime.now()
-        accuracy, test_loss, class_precision, class_recall = self.test()
+        accuracy, test_loss, class_precision, class_recall, _accuracy_per_class = self.test()
         elapsed_time_test = datetime.datetime.now() - start_time_test
         test_time_ms = int(elapsed_time_test.total_seconds()*1000)
         post_test_time = time.time()
@@ -720,7 +721,7 @@ class Client:
             self.load_offloaded_model()
             self.copy_offloaded_model_weights()
             loss_offload, weights_offload, training_process_offload, scheduler_data_offload, perf_data_offload = self.train(self.epoch_counter, deadline, warmup, use_offloaded_model=True)
-            accuracy, test_loss, class_precision, class_recall = self.test(use_offloaded_model=True)
+            accuracy, test_loss, class_precision, class_recall, _accuracy_per_class = self.test(use_offloaded_model=True)
             global global_sender_id
             data_offload = EpochData(self.epoch_counter, num_epoch, train_time_ms, test_time_ms, loss_offload, accuracy, test_loss,
                                      class_precision, class_recall, training_process, f'{global_sender_id}-offload')

@@ -10,18 +10,19 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s',
 )
-dist_settings = {
-    'uniform':{},
-    'limit labels': {'seed': 1, 'range':[0.1, 1, 0.1]},
-    'q sampler': {'seed': 1, 'range':[0.1, 1, 0.1]},
-    'dirichlet': {'seed': 1, 'range':[0.1, 1, 0.1]},
-}
+# dist_settings = {
+#     'uniform':{},
+#     'limit labels': {'seed': 1, 'range':[0.1, 1, 0.1]},
+#     'q sampler': {'seed': 1, 'range':[0.1, 1, 0.1]},
+#     'dirichlet': {'seed': 1, 'range':[0.1, 1, 0.1]},
+# }
 
 dist_settings = {
-    'uniform':{},
-    'limit labels flex': {'seed': 1, 'range':[0.1, 1, 0.1]},
+    # 'uniform':{},
+    # 'limit labels flex': {'seed': 1, 'range':[0.1, 1, 0.1]},
+    'n labels': {'seed': 1, 'range':[0.1, 1, 0.1]},
     # 'q sampler': {'seed': 1, 'range':[0.1, 1, 0.1]},
-    'dirichlet': {'seed': 1, 'range':[0.1, 1, 0.1]},
+    # 'dirichlet': {'seed': 1, 'range':[0.1, 1, 0.1]},
 }
 
 num_clients = 4
@@ -29,10 +30,11 @@ class dummy_args:
     net = 'Cifar10CNN'
     dataset_name = 'cifar10'
     # data_sampler = "uniform" #s = "dirichlet"  # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
-    data_sampler = "limit labels flex"
+    # data_sampler = "limit labels flex"
+    data_sampler = "n labels"
     # sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
     # data_sampler_args = [0.07, 42]  # random seed || random seed || random seed || unused
-    data_sampler_args = [0.07 , 42]  # random seed || random seed || random seed || unused
+    data_sampler_args = [7 , 42]  # random seed || random seed || random seed || unused
     DistDatasets = {
         'cifar10': DistCIFAR10Dataset,
         'cifar100': DistCIFAR100Dataset,

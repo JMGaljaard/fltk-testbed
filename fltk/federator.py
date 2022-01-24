@@ -13,7 +13,7 @@ from torch.utils.data._utils.worker import WorkerInfo
 from fltk.client import Client
 from fltk.datasets.data_distribution import distribute_batches_equally
 from fltk.strategy.aggregation import FedAvg
-from fltk.strategy.client_selection import random_selection
+from fltk.strategy.client_selection import random_selection, tifl_update_probs, tifl_select_tier_and_decrement
 from fltk.strategy.offloading import OffloadingStrategy
 from fltk.util.arguments import Arguments
 from fltk.util.base_config import BareConfig
@@ -25,6 +25,7 @@ from torchsummary import summary
 from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 import logging
+import numpy as np
 
 # from fltk.util.profile_plots import stability_plot, parse_stability_data
 from fltk.util.results import EpochData
@@ -68,12 +69,14 @@ class ClientRef:
     tb_writer = None
     tb_writer_offload = None
     available = False
+    rank=None
 
-    def __init__(self, name, ref, tensorboard_writer, tensorboard_writer_offload):
+    def __init__(self, name, ref, tensorboard_writer, tensorboard_writer_offload, rank):
         self.name = name
         self.ref = ref
         self.tb_writer = tensorboard_writer
         self.tb_writer_offload = tensorboard_writer_offload
+        self.rank = rank
 
     def __repr__(self):
         return self.name
@@ -126,6 +129,10 @@ class Federator:
     freeze_layers_enabled = False
     offload_enabled = False
     warmup_active = False
+    node_groups = {}
+    tifl_tier_data = []
+    tifl_tier_names = []
+    tifl_selected_tier = ''
 
     exp_start_time = 0
 
@@ -155,8 +162,21 @@ class Federator:
         self.reference_lookup[get_worker_info().name] = RRef(self)
         self.strategy = OffloadingStrategy.Parse(config.offload_strategy)
         self.configure_strategy(self.strategy)
+        if self.strategy == OffloadingStrategy.TIFL_BASIC or OffloadingStrategy.TIFL_ADAPTIVE:
+            for k, v in self.config.node_groups.items():
+                self.node_groups[k] = list(range(v[0], v[1]+1))
+                self.tifl_tier_names.append(k)
 
-
+        if self.strategy == OffloadingStrategy.TIFL_ADAPTIVE:
+            num_tiers = len(self.tifl_tier_names) * 1.0
+            start_credits = np.ceil(self.config.epochs / num_tiers)
+            logging.info(f'Tifl starting credits is {start_credits}')
+            for tier_name in self.tifl_tier_names:
+                self.tifl_tier_data.append([tier_name, 0, start_credits, 1 / num_tiers])
+            residue = 1
+            for t in self.tifl_tier_data:
+                residue -= t[3]
+            self.tifl_tier_data[0][3] += residue
 
     def configure_strategy(self, strategy : OffloadingStrategy):
         if strategy == OffloadingStrategy.VANILLA:
@@ -189,6 +209,12 @@ class Federator:
             self.swyh_enabled = False
             self.freeze_layers_enabled = True
             self.offload_enabled = True
+        if strategy == OffloadingStrategy.TIFL_BASIC:
+            logging.info('Running with offloading strategy: TIFL_BASIC')
+            self.deadline_enabled = False
+            self.swyh_enabled = False
+            self.freeze_layers_enabled = False
+            self.offload_enabled = False
         logging.info(f'Offload strategy params: deadline={self.deadline_enabled}, swyh={self.swyh_enabled}, freeze={self.freeze_layers_enabled}, offload={self.offload_enabled}')
 
     def create_clients(self, client_id_triple):
@@ -196,11 +222,22 @@ class Federator:
             client = rpc.remote(id, Client, kwargs=dict(id=id, log_rref=self.log_rref, rank=rank, world_size=world_size, config=self.config))
             writer = SummaryWriter(f'{self.tb_path}/{self.config.experiment_prefix}_client_{id}')
             writer_offload = SummaryWriter(f'{self.tb_path}/{self.config.experiment_prefix}_client_{id}_offload')
-            self.clients.append(ClientRef(id, client, tensorboard_writer=writer, tensorboard_writer_offload=writer_offload))
+            self.clients.append(ClientRef(id, client, tensorboard_writer=writer, tensorboard_writer_offload=writer_offload, rank=rank))
             self.client_data[id] = []
 
     def select_clients(self, n = 2):
         available_clients = list(filter(lambda x : x.available, self.clients))
+        if self.strategy == OffloadingStrategy.TIFL_ADAPTIVE:
+            tifl_update_probs(self.tifl_tier_data)
+            self.tifl_selected_tier = tifl_select_tier_and_decrement(self.tifl_tier_data)
+            client_subset = self.node_groups[self.tifl_selected_tier]
+            available_clients = list(filter(lambda x: x.rank in client_subset, self.clients))
+        if self.strategy == OffloadingStrategy.TIFL_BASIC:
+            self.tifl_selected_tier = np.random.choice(list(self.node_groups.keys()), 1, replace=False)[0]
+            logging.info(f'TIFL: Sampling from group {self.tifl_selected_tier} out of{list(self.node_groups.keys())}')
+            client_subset = self.node_groups[self.tifl_selected_tier]
+            available_clients = list(filter(lambda x : x.rank in client_subset, self.clients))
+            logging.info(f'TIFL: Sampling subgroup {available_clients}')
         return random_selection(available_clients, n)
 
     def ping_all(self):
@@ -451,6 +488,7 @@ class Federator:
                     all_finished = False
             time.sleep(0.1)
         logging.info(f'Stopped waiting due to all_finished={all_finished} and deadline={reached_deadline()}')
+        client_accuracies = []
         for client_response in responses:
             if warmup:
                 break
@@ -471,6 +509,7 @@ class Federator:
                 logging.info(f'{client} had a loss of {epoch_data.loss}')
                 logging.info(f'{client} had a epoch data of {epoch_data}')
                 logging.info(f'{client} has trained on {epoch_data.training_process} samples')
+                client_accuracies.append(epoch_data.accuracy)
                 # logging.info(f'{client} has perf data: {perf_data}')
                 elapsed_time = client_response.end_time - self.exp_start_time
 
@@ -540,6 +579,13 @@ class Federator:
                 client_weights_dict[client.name] = weights
                 client_training_process_dict[client.name] = epoch_data.training_process
 
+                if self.strategy == OffloadingStrategy.TIFL_ADAPTIVE:
+                    mean_tier_accuracy = np.mean(client_accuracies)
+                    logging.info(f'TIFL:: the mean accuracy is {mean_tier_accuracy}')
+                    for t in self.tifl_tier_data:
+                        if t[0] == self.tifl_selected_tier:
+                            t[1] = mean_tier_accuracy
+
                 if 'offload' in response_obj:
                     epoch_data_offload, weights_offload, scheduler_data_offload, perf_data_offload, sender_id = response_obj['offload']
                     if epoch_data_offload.client_id not in self.client_data:
@@ -595,7 +641,11 @@ class Federator:
             # test global model
             logging.info("Testing on global test set")
             self.test_data.update_nn_parameters(updated_model)
-        accuracy, loss, class_precision, class_recall = self.test_data.test()
+        accuracy, loss, class_precision, class_recall, accuracy_per_class = self.test_data.test()
+        logging.info('Class precision')
+        logging.warning(accuracy_per_class)
+        logging.info('Class names')
+        logging.info(self.test_data.dataset.test_dataset.class_to_idx)
         # self.tb_writer.add_scalar('training loss', loss, self.epoch_counter * self.test_data.get_client_datasize()) # does not seem to work :( )
         self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
         self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)
@@ -603,6 +653,11 @@ class Federator:
         self.tb_writer.add_scalar('accuracy wall time',
                                     accuracy,  # for every 1000 minibatches
                                     elapsed_time)
+
+        class_acc_dict = {}
+        for idx, acc in enumerate(accuracy_per_class):
+            class_acc_dict[f'{idx}'] = acc
+        self.tb_writer.add_scalars('accuracy per class', class_acc_dict, self.epoch_counter)
         end_epoch_time = time.time()
         duration = end_epoch_time - start_epoch_time
 

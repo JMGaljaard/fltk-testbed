@@ -49,6 +49,9 @@ class BareConfig:
         self.first_deadline = 400
         self.warmup_round = False
 
+        # FLTK options
+        self.node_groups = None
+
         self.federator_host = '0.0.0.0'
         self.rank = 0
         self.world_size = 0
@@ -153,6 +156,9 @@ class BareConfig:
             self.data_sampler = cfg['sampler']
         if 'sampler_args' in cfg:
             self.data_sampler_args = cfg['sampler_args']
+
+        if 'node_groups' in cfg:
+            self.node_groups = cfg['node_groups']
             
 
 
