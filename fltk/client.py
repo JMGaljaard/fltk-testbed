@@ -154,10 +154,9 @@ class Client:
         self.local_log(f'Got worker_info from server {server_ref}')
         self.server_ref = server_ref
 
-
     def terminate_training_endpoint(self):
+        logging.info('I got a call for training termination!')
         self.terminate_training = True
-
 
     @staticmethod
     def static_ping():
@@ -669,6 +668,7 @@ class Client:
         Timing data to measure:
         Total execution tim:
         """
+        self.terminate_training = False
         start = time.time()
 
         start_time_train = datetime.datetime.now()

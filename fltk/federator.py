@@ -512,9 +512,15 @@ class Federator:
                         client_response.finish()
                 else:
                     all_finished = False
-            num_finished_responses = sum([1 for x in responses if x.done])
-            percentage = num_finished_responses / len(responses)
-            logging.info(f'Percentage of finished responses: {percentage}, do terminate ? {percentage} > {self.config.termination_percentage} = {percentage > self.config.termination_percentage}')
+            if self.dyn_terminate or self.dyn_terminate_swyh:
+                num_finished_responses = sum([1 for x in responses if x.done])
+                percentage = num_finished_responses / len(responses)
+                if percentage > self.config.termination_percentage:
+                    logging.info('Sending termination signal')
+                    for cr in responses:
+                        if not cr.done:
+                            _remote_method_async(Client.terminate_training_endpoint, cr.client.ref)
+                logging.info(f'Percentage of finished responses: {percentage}, do terminate ? {percentage} > {self.config.termination_percentage} = {percentage > self.config.termination_percentage}')
             time.sleep(0.1)
         logging.info(f'Stopped waiting due to all_finished={all_finished} and deadline={reached_deadline()}')
         client_accuracies = []
