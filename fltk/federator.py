@@ -712,6 +712,15 @@ class Federator:
         self.exp_data_general.append([self.epoch_counter, duration, accuracy, loss, class_precision, class_recall])
 
 
+    def set_tau_eff(self):
+        total = sum(client.data_size for client in self.clients)
+        responses = []
+        for client in self.clients:
+            responses.append((client, _remote_method_async(Client.set_tau_eff, client.ref, total)))
+        torch.futures.wait_all([x[1] for x in responses])
+        # for client in self.clients:
+        #     client.set_tau_eff(total)
+
     def save_experiment_data(self):
         p = Path(f'./{self.config.output_location}')
         # file_output = f'./{self.config.output_location}'
@@ -789,6 +798,7 @@ class Federator:
         self.ping_all()
         self.clients_ready()
         self.update_client_data_sizes()
+        self.set_tau_eff()
 
         epoch_to_run = self.num_epoch
         addition = 0

@@ -5,6 +5,9 @@ import json
 
 from fltk.datasets.distributed import DistCIFAR10Dataset, DistCIFAR100Dataset, DistFashionMNISTDataset
 from fltk.nets import Cifar10CNN, FashionMNISTCNN, Cifar100ResNet, FashionMNISTResNet, Cifar10ResNet, Cifar100VGG
+from fltk.strategy.FedNova import FedNova
+from fltk.strategy.fedprox import FedProx
+from fltk.util.definitions import Optimizations
 
 SEED = 1
 torch.manual_seed(SEED)
@@ -31,6 +34,20 @@ class BareConfig:
         self.scheduler_step_size = 50
         self.scheduler_gamma = 0.5
         self.min_lr = 1e-10
+
+        self.loss_function = torch.nn.CrossEntropyLoss
+        self.optimizer = torch.optim.SGD
+
+        self.optimizers = {
+            Optimizations.sgd: torch.optim.SGD,
+            Optimizations.fedprox: FedProx,
+            Optimizations.fednova: FedNova
+        }
+
+        self.optimizer_args = {
+            'lr': self.lr,
+            'momentum': self.momentum
+        }
 
         self.round_worker_selection_strategy = None
         self.round_worker_selection_strategy_kwargs = None
@@ -157,6 +174,11 @@ class BareConfig:
                 self.cuda = True
             else:
                 self.cuda = False
+        if 'optimizer' in cfg:
+            self.optimizer = self.optimizers[cfg['optimizer']]
+        if 'optimizer_args' in cfg:
+            for k, v in cfg['optimizer_args'].items():
+                self.optimizer_args[k] = v
         if 'sampler' in cfg:
             self.data_sampler = cfg['sampler']
         if 'sampler_args' in cfg:
@@ -186,6 +208,9 @@ class BareConfig:
 
     def get_sampler(self):
         return self.data_sampler
+
+    def get_optimizer(self):
+        return self.optimizer
     
     def get_sampler_args(self):
         return tuple(self.data_sampler_args)

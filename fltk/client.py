@@ -109,9 +109,8 @@ class Client:
         self.device = self.init_device()
         self.set_net(self.load_default_model())
         self.loss_function = self.args.get_loss_function()()
-        self.optimizer = torch.optim.SGD(self.net.parameters(),
-                                         lr=self.args.get_learning_rate(),
-                                         momentum=self.args.get_momentum())
+        self.optimizer = self.args.get_optimizer()(self.net.parameters(),
+                                                 **self.args.optimizer_args)
         self.scheduler = MinCapableStepLR(self.args.get_logger(), self.optimizer,
                                           self.args.get_scheduler_step_size(),
                                           self.args.get_scheduler_gamma(),
@@ -143,6 +142,14 @@ class Client:
                      f'offload={self.offload_enabled}, dyn_terminate={self.dyn_terminate}, '
                      f'dyn_terminate_swyh={self.dyn_terminate_swyh}')
 
+    def set_tau_eff(self, total):
+        client_weight = self.get_client_datasize() / total
+        n = self.get_client_datasize()
+        E = self.args.epochs_per_round
+        B = 16  # nicely hardcoded :)
+        tau_eff = int(E * n / B) * client_weight
+        if hasattr(self.optimizer, 'set_tau_eff'):
+            self.optimizer.set_tau_eff(tau_eff)
 
     def init_device(self):
         if self.args.cuda and torch.cuda.is_available():
@@ -718,6 +725,9 @@ class Client:
             global global_sender_id
             data_offload = EpochData(self.epoch_counter, num_epoch, train_time_ms, test_time_ms, loss_offload, accuracy, test_loss,
                                      class_precision, class_recall, training_process, f'{global_sender_id}-offload')
+
+            if hasattr(self.optimizer, 'pre_communicate'):  # aka fednova or fedprox
+                self.optimizer.pre_communicate()
             # Copy GPU tensors to CPU
             for k, v in weights_offload.items():
                 weights_offload[k] = v.cpu()
