@@ -17,8 +17,10 @@ class BareConfig:
         self.batch_size = 1
         self.test_batch_size = 1000
         self.epochs = 1
-        self.lr = 0.001
-        self.momentum = 0.9
+        # self.lr = 0.001
+        self.lr = 0.0001
+        # self.momentum = 0.9
+        self.momentum = 0.1
         self.cuda = False
         self.shuffle = False
         self.log_interval = 10

@@ -676,12 +676,12 @@ class Client:
         self.dataset.get_train_sampler().set_epoch_size(num_epoch)
         # Train locally
         loss, weights, training_process, scheduler_data, perf_data = self.train(self.epoch_counter, deadline, warmup)
-        if self.dyn_terminate:
+        if self.terminate_training and self.dyn_terminate:
             logging.info('Not testing data due to termination call')
-            self.dyn_terminate = False
+            self.terminate_training = False
             return {'own': []}
-        elif self.dyn_terminate_swyh:
-            self.dyn_terminate_swyh = False
+        elif self.terminate_training and self.dyn_terminate_swyh:
+            self.terminate_training = False
             logging.info('Sending back weights due to terminate with swyh')
         if not warmup:
             self.epoch_counter += num_epoch

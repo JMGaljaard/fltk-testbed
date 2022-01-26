@@ -72,7 +72,7 @@ def parse_strategy(strategy: OffloadingStrategy):
         freeze_layers_enabled = False
         offload_enabled = False
         dyn_terminate = True
-    if strategy == OffloadingStrategy.DYN_TERMINATE:
+    if strategy == OffloadingStrategy.DYN_TERMINATE_SWYH:
         deadline_enabled = False
         swyh_enabled = False
         freeze_layers_enabled = False

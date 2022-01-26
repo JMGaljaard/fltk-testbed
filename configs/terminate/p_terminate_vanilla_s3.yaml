@@ -7,8 +7,8 @@ net: FashionMNISTCNN
 dataset: fashion-mnist
 # Use cuda is available; setting to false will force CPU
 cuda: false
-experiment_prefix: 'exp_p_terminate_terminate_swyh'
-offload_stategy: dynamic-terminate-swyh
+experiment_prefix: 'exp_p_terminate_vanilla_s3'
+offload_stategy: vanilla
 profiling_time: 100
 deadline: 1
 warmup_round: false

@@ -90,6 +90,7 @@ class ClientResponse:
     end_time: float = 0
     done: bool = False
     dropped = True
+    terminated = False
 
     def finish(self):
         self.end_time = time.time()
@@ -424,6 +425,7 @@ class Federator:
         has_not_called = True
 
         show_perf_data = True
+        has_send_terminate = False
         while not all_finished and not ((self.deadline_enabled and reached_deadline()) or warmup):
             # if self.deadline_enabled and reached_deadline()
             # if has_not_called and (time.time() -start) > 10:
@@ -512,14 +514,17 @@ class Federator:
                         client_response.finish()
                 else:
                     all_finished = False
-            if self.dyn_terminate or self.dyn_terminate_swyh:
+            if not has_send_terminate and (self.dyn_terminate or self.dyn_terminate_swyh):
                 num_finished_responses = sum([1 for x in responses if x.done])
                 percentage = num_finished_responses / len(responses)
                 if percentage > self.config.termination_percentage:
                     logging.info('Sending termination signal')
                     for cr in responses:
                         if not cr.done:
+                            if self.dyn_terminate:
+                                cr.terminated = True
                             _remote_method_async(Client.terminate_training_endpoint, cr.client.ref)
+                    has_send_terminate = True
                 logging.info(f'Percentage of finished responses: {percentage}, do terminate ? {percentage} > {self.config.termination_percentage} = {percentage > self.config.termination_percentage}')
             time.sleep(0.1)
         logging.info(f'Stopped waiting due to all_finished={all_finished} and deadline={reached_deadline()}')
@@ -534,7 +539,7 @@ class Federator:
                 logging.info(
                     f'{client} had a exec time of {client_response.duration()} dropped?={client_response.dropped}')
 
-            if not client_response.dropped:
+            if not client_response.dropped and not client_response.terminated:
                 client.available = True
                 logging.info(f'Fetching response for client: {client}')
                 response_obj = client_response.future.wait()
@@ -686,6 +691,8 @@ class Federator:
         # logging.info('Class names')
         # logging.info(self.test_data.dataset.test_dataset.class_to_idx)
         # self.tb_writer.add_scalar('training loss', loss, self.epoch_counter * self.test_data.get_client_datasize()) # does not seem to work :( )
+        self.tb_writer.add_scalar('Number of clients dropped', sum([1 for x in responses if x.dropped or x.terminated]), self.epoch_counter)
+
         self.tb_writer.add_scalar('accuracy', accuracy, self.epoch_counter * self.test_data.get_client_datasize())
         self.record_epoch_event(f'Global accuracy is {accuracy}')
         self.tb_writer.add_scalar('accuracy per epoch', accuracy, self.epoch_counter)

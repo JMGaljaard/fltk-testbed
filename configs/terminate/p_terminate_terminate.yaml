@@ -14,7 +14,7 @@ deadline: 1
 warmup_round: false
 output_location: 'output'
 tensor_board_active: true
-clients_per_round: 4
+clients_per_round: 12
 node_groups:
   slow: [1, 1]
   medium: [2, 2]
