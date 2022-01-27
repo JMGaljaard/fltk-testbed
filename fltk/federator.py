@@ -726,7 +726,8 @@ class Federator:
         end_epoch_time = time.time()
         duration = end_epoch_time - start_epoch_time
 
-        self.exp_data_general.append([self.epoch_counter, duration, accuracy, loss, class_precision, class_recall])
+
+        self.exp_data_general.append([self.epoch_counter, end_epoch_time, duration, accuracy, loss, class_precision, class_recall])
 
 
     def set_tau_eff(self):
@@ -745,7 +746,7 @@ class Federator:
         self.ensure_path_exists(p)
         p /= f'{exp_prefix}-general_data.csv'
         # general_filename = f'{file_output}/general_data.csv'
-        df = pd.DataFrame(self.exp_data_general, columns=['epoch', 'duration', 'accuracy', 'loss', 'class_precision', 'class_recall'])
+        df = pd.DataFrame(self.exp_data_general, columns=['epoch', 'wall_time', 'duration', 'accuracy', 'loss', 'class_precision', 'class_recall'])
         df.to_csv(p)
 
     def update_client_data_sizes(self):
