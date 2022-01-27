@@ -14,6 +14,9 @@ class EpochData:
     class_recall: Any
     training_process: int
     client_id: str = None
+    client_wall_time: float = 0
+    global_wall_time: float = 0
+    global_epoch_id: int = 0
 
     def to_csv_line(self):
         delimeter = ','
