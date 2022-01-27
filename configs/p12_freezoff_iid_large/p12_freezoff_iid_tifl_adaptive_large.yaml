@@ -1,24 +1,24 @@
 ---
 # Experiment configuration
-total_epochs: 5
+total_epochs: 50
 epochs_per_cycle: 1
 wait_for_clients: true
 net: FashionMNISTCNN
 dataset: fashion-mnist
 # Use cuda is available; setting to false will force CPU
 cuda: false
-experiment_prefix: 'exp_dev_p2'
-offload_stategy: offload
-profiling_time: 100
-deadline: 500
+experiment_prefix: 'p12_freezoff_iid_tifl_adaptive'
+offload_stategy: tifl-adaptive
+profiling_time: 30
+deadline: 50000
 warmup_round: false
-output_location: 'output'
+output_location: 'output/p12'
 tensor_board_active: true
-clients_per_round: 2
+clients_per_round: 6
 node_groups:
-  slow: [1, 1]
-  medium: [2, 2]
-  fast: [3, 3]
+  slow: [1, 6]
+  medium: [7, 12]
+  fast: [13, 18]
 sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
 #sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
 sampler_args:
@@ -31,4 +31,4 @@ system:
     nic: 'eth0'
     # nic: 'enp3s0'
   clients:
-    amount: 2
+    amount: 18

@@ -30,6 +30,7 @@ class BareConfig:
         self.kwargs = {}
         self.contribution_measurement_round = 1
         self.contribution_measurement_metric = 'Influence'
+        self.epochs_per_round = 1
 
         self.scheduler_step_size = 50
         self.scheduler_gamma = 0.5
@@ -63,7 +64,7 @@ class BareConfig:
         # self.num_poisoned_workers = 10
 
         self.offload_strategy = 'vanilla'
-        self.profiling_size = 100
+        self.profiling_size = 30
         self.deadline = 400
         self.first_deadline = 400
         self.warmup_round = False
@@ -188,6 +189,9 @@ class BareConfig:
             self.node_groups = cfg['node_groups']
         if 'termination_percentage' in cfg:
             self.termination_percentage = cfg['termination_percentage']
+        
+        if 'epochs_per_round' in cfg:
+            self.epochs_per_round = cfg['epochs_per_round']
             
 
 

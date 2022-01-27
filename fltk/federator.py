@@ -26,6 +26,7 @@ from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 import logging
 import numpy as np
+import copy
 
 # from fltk.util.profile_plots import stability_plot, parse_stability_data
 from fltk.util.results import EpochData
@@ -152,9 +153,11 @@ class Federator:
         self.log_rref = log_rref
         self.num_epoch = num_epochs
         self.config = config
-        self.tb_path = config.output_location
+        self.tb_path = f'{config.output_location}/{config.experiment_prefix}'
         self.ensure_path_exists(self.tb_path)
         self.tb_writer = SummaryWriter(f'{self.tb_path}/{config.experiment_prefix}_federator')
+        self.strategy = OffloadingStrategy.Parse(config.offload_strategy)
+        self.configure_strategy(self.strategy)
         self.create_clients(client_id_triple)
         self.config.init_logger(logging)
         self.performance_data = {}
@@ -165,8 +168,7 @@ class Federator:
         self.test_data = Client("test", None, 1, 2, config)
         config.data_sampler = copy_sampler
         self.reference_lookup[get_worker_info().name] = RRef(self)
-        self.strategy = OffloadingStrategy.Parse(config.offload_strategy)
-        self.configure_strategy(self.strategy)
+        
         if self.strategy == OffloadingStrategy.TIFL_BASIC or self.strategy == OffloadingStrategy.TIFL_ADAPTIVE:
             for k, v in self.config.node_groups.items():
                 self.node_groups[k] = list(range(v[0], v[1]+1))
@@ -240,7 +242,9 @@ class Federator:
         for id, rank, world_size in client_id_triple:
             client = rpc.remote(id, Client, kwargs=dict(id=id, log_rref=self.log_rref, rank=rank, world_size=world_size, config=self.config))
             writer = SummaryWriter(f'{self.tb_path}/{self.config.experiment_prefix}_client_{id}')
-            writer_offload = SummaryWriter(f'{self.tb_path}/{self.config.experiment_prefix}_client_{id}_offload')
+            writer_offload = None
+            if self.offload_enabled:
+                writer_offload = SummaryWriter(f'{self.tb_path}/{self.config.experiment_prefix}_client_{id}_offload')
             self.clients.append(ClientRef(id, client, tensorboard_writer=writer, tensorboard_writer_offload=writer_offload, rank=rank))
             self.client_data[id] = []
 
@@ -339,12 +343,12 @@ class Federator:
                 resp.client.available = True
         self.response_list = list(filter(lambda x: not x.done, self.response_list))
 
-    def ask_client_to_offload(self, client1_ref, client2_ref):
+    def ask_client_to_offload(self, client1_ref, client2_ref, soft_deadline):
         logging.info(f'Offloading call from {client1_ref} to {client2_ref}')
         # args = [method, rref] + list(args)
         # rpc.rpc_sync(client1_ref, Client.call_to_offload_endpoint, args=(client2_ref))
         # print(_remote_method_async_by_name(Client.client_to_offload_to, client1_ref, client2_ref))
-        _remote_method(Client.call_to_offload_endpoint, client1_ref, client2_ref)
+        _remote_method(Client.call_to_offload_endpoint, client1_ref, client2_ref, soft_deadline)
         logging.info(f'Done with call to offload')
 
     def remote_run_epoch(self, epochs, warmup=False, first_epoch=False):
@@ -467,29 +471,42 @@ class Federator:
                         strongest = 0
                         weak_performance = 0
                         strong_performance = 0
-                        for k, v in self.performance_estimate.items():
-                            # print(v)
-                            if first:
-                                first = False
-                                est_total_time = v[1]
-                                weakest = k
-                                strongest = k
-                                weak_performance = est_total_time
-                                strong_performance = est_total_time
-                            else:
-                                est_total_time = v[1]
-                                if est_total_time > weak_performance:
-                                    weak_performance = est_total_time
+                        summed_time = 0
+                        perf_estimate_copy = copy.deepcopy(self.performance_estimate)
+                        offload_calls = []
+                        for i in range(int(np.floor(len(self.performance_estimate)/2))):
+                            for k, v in perf_estimate_copy.items():
+                                summed_time += v[1]
+                                # print(v)
+                                if first:
+                                    first = False
+                                    est_total_time = v[1]
                                     weakest = k
-                                if est_total_time < strong_performance:
-                                    strong_performance = est_total_time
                                     strongest = k
-                                    self.record_epoch_event(f'Offloading from {weakest} -> {strongest} due to {self.performance_estimate[weakest]} and {self.performance_estimate[strongest]}')
-                        logging.info(
-                            f'Offloading from {weakest} -> {strongest} due to {self.performance_estimate[weakest]} and {self.performance_estimate[strongest]}')
+                                    weak_performance = est_total_time
+                                    strong_performance = est_total_time
+                                else:
+                                    est_total_time = v[1]
+                                    if est_total_time > weak_performance:
+                                        weak_performance = est_total_time
+                                        weakest = k
+                                    if est_total_time < strong_performance:
+                                        strong_performance = est_total_time
+                                        strongest = k
+                            self.record_epoch_event(f'Offloading from {weakest} -> {strongest} due to {self.performance_estimate[weakest]} and {self.performance_estimate[strongest]}')
+                            logging.info(
+                                f'Offloading from {weakest} -> {strongest} due to {self.performance_estimate[weakest]} and {self.performance_estimate[strongest]}')
+                            offload_calls.append([weakest, strongest])
+                            perf_estimate_copy.pop(weakest, None)
+                            perf_estimate_copy.pop(strongest, None)
+                        mean_time_est_time = (summed_time * 1.0) / len(self.performance_estimate.items())
+                        logging.info(f'Mean time for offloading={mean_time_est_time}')
                         logging.info('Sending call to offload')
-                        self.ask_client_to_offload(self.reference_lookup[weakest],
-                                                   strongest)
+                        for weak_node, strong_node in offload_calls:
+                            self.ask_client_to_offload(self.reference_lookup[weak_node], strong_node, mean_time_est_time)
+                        logging.info('Releasing clients')
+                        for client in selected_clients:
+                            _remote_method_async(Client.release_from_offloading_endpoint, client.ref)
 
                     # if self.offload_enabled and not warmup:
                     #     logging.info(f'self.performance_estimate={self.performance_estimate}')
@@ -722,7 +739,7 @@ class Federator:
         #     client.set_tau_eff(total)
 
     def save_experiment_data(self):
-        p = Path(f'./{self.config.output_location}')
+        p = Path(f'./{self.tb_path}')
         # file_output = f'./{self.config.output_location}'
         exp_prefix = self.config.experiment_prefix
         self.ensure_path_exists(p)
@@ -750,7 +767,7 @@ class Federator:
             logging.info(f'{res[0]} had a result of accuracy={accuracy}')
 
     def flush_epoch_events(self):
-        file_output = f'./{self.config.output_location}'
+        file_output = f'./{self.tb_path}'
         exp_prefix = self.config.experiment_prefix
         file_epoch_events = f'{file_output}/{exp_prefix}_federator_events.txt'
         self.ensure_path_exists(file_output)
@@ -763,7 +780,7 @@ class Federator:
         self.epoch_events = []
 
     def save_epoch_data(self):
-        file_output = f'./{self.config.output_location}'
+        file_output = f'./{self.tb_path}'
         exp_prefix = self.config.experiment_prefix
         self.ensure_path_exists(file_output)
         for key in self.client_data:

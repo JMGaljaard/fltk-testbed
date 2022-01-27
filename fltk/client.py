@@ -40,6 +40,7 @@ global_model_weights = {}
 global_model_data_size = 0
 global_sender_id = ""
 global_offload_received = False
+global_local_updates_left = 0
 
 
 def _call_method(method, rref, *args, **kwargs):
@@ -91,14 +92,16 @@ class Client:
     dyn_terminate_swyh = False
 
     terminate_training = False
+    offload_release = False
 
     def __init__(self, id, log_rref, rank, world_size, config = None):
         # logging.info(f'Welcome to client {id}')
         self.id = id
         global_dict['id'] = id
-        global global_model_weights, global_offload_received, global_model_data_size
+        global global_model_weights, global_offload_received, global_model_data_size, global_local_updates_left
         global_model_weights = None
         global_offload_received = False
+        global_local_updates_left = 0
         global_model_data_size = 0
         self.log_rref = log_rref
         self.rank = rank
@@ -288,12 +291,13 @@ class Client:
         return _remote_method_async(Federator.perf_est_endpoint, self.server_ref, self.id, performance_data)
 
     @staticmethod
-    def offload_receive_endpoint(model_weights, num_train_samples, sender_id):
+    def offload_receive_endpoint(model_weights, num_train_samples, sender_id, local_updates_left):
         print(f'Got the offload_receive_endpoint endpoint')
-        global global_model_weights, global_offload_received, global_model_data_size, global_sender_id
+        global global_model_weights, global_offload_received, global_model_data_size, global_sender_id, global_local_updates_left
         global_model_weights = copy.deepcopy(model_weights.copy())
         global_model_data_size = num_train_samples
         global_sender_id = sender_id
+        global_local_updates_left = local_updates_left
         global_offload_received = True
 
     @staticmethod
@@ -305,10 +309,14 @@ class Client:
         # global_offload_received = True
 
 
-    def call_to_offload_endpoint(self, client_to_offload: RRef):
+    def call_to_offload_endpoint(self, client_to_offload: RRef, soft_deadline):
         self.local_log(f'Got the call to offload endpoint to {client_to_offload}')
         self.client_to_offload_to = client_to_offload
         self.call_to_offload = True
+    
+    def release_from_offloading_endpoint(self):
+        logging.info('Got a release signal')
+        self.offload_release = True
 
     def freeze_layers2(self, until, net):
 
@@ -457,14 +465,17 @@ class Client:
                 if self.terminate_training:
                     logging.info('Got a call to terminate training')
                     break
-
+            
+            if use_offloaded_model and i > global_local_updates_left:
+                logging.info(f'Stoppinng training of offloaded model; no local updates left; Was {global_local_updates_left}')
+                break
             if self.offload_enabled and not warmup:
                 # Check if there is a call to offload
                 if self.call_to_offload:
                     self.args.get_logger().info('Got call to offload model')
                     model_weights = self.get_nn_parameters()
-
-                    ret = rpc.rpc_async(self.client_to_offload_to, Client.offload_receive_endpoint, args=([model_weights, i, self.id]))
+                    local_updates_left = number_of_training_samples - i
+                    ret = rpc.rpc_async(self.client_to_offload_to, Client.offload_receive_endpoint, args=([model_weights, i, self.id, local_updates_left]))
                     print(f'Result of rref: {ret}')
                     #
                     self.call_to_offload = False
@@ -679,7 +690,7 @@ class Client:
         start = time.time()
 
         start_time_train = datetime.datetime.now()
-
+        self.call_to_offload = False
         self.dataset.get_train_sampler().set_epoch_size(num_epoch)
         # Train locally
         loss, weights, training_process, scheduler_data, perf_data = self.train(self.epoch_counter, deadline, warmup)
@@ -710,13 +721,21 @@ class Client:
         data = EpochData(self.epoch_counter, num_epoch, train_time_ms, test_time_ms, loss, accuracy, test_loss,
                          class_precision, class_recall, training_process, self.id)
         self.epoch_results.append(data)
+        if hasattr(self.optimizer, 'pre_communicate'):  # aka fednova or fedprox
+            self.optimizer.pre_communicate()
         for k, v in weights.items():
             weights[k] = v.cpu()
         response_obj = {'own': [data, weights, scheduler_data, perf_data]}
 
         global global_offload_received
+        if self.offload_enabled:
+            logging.info('Waiting to receive offload or being released')
+            while not (global_offload_received or self.offload_release):
+                time.sleep(0.1)
+            logging.info(f'Continuing after global_offload_received={global_offload_received} and offload_release={self.offload_release}')
         if self.offload_enabled and global_offload_received:
-            self.configure_strategy(OffloadingStrategy.SWYH)
+            # self.configure_strategy(OffloadingStrategy.SWYH)
+            self.configure_strategy(OffloadingStrategy.VANILLA)
             logging.info('Processing offloaded model')
             self.load_offloaded_model()
             self.copy_offloaded_model_weights()
@@ -726,8 +745,6 @@ class Client:
             data_offload = EpochData(self.epoch_counter, num_epoch, train_time_ms, test_time_ms, loss_offload, accuracy, test_loss,
                                      class_precision, class_recall, training_process, f'{global_sender_id}-offload')
 
-            if hasattr(self.optimizer, 'pre_communicate'):  # aka fednova or fedprox
-                self.optimizer.pre_communicate()
             # Copy GPU tensors to CPU
             for k, v in weights_offload.items():
                 weights_offload[k] = v.cpu()
