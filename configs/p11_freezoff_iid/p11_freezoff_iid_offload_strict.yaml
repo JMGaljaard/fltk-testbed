@@ -10,10 +10,10 @@ cuda: false
 experiment_prefix: 'p11_freezoff_iid_offload_strict'
 offload_stategy: offload
 profiling_time: 30
-deadline: 5
+deadline: 26
 deadline_threshold: 1
 warmup_round: false
-output_location: 'output'
+output_location: 'output/p11'
 tensor_board_active: true
 clients_per_round: 3
 node_groups:

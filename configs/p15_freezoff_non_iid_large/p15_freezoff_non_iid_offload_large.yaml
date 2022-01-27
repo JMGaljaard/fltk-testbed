@@ -7,23 +7,22 @@ net: FashionMNISTCNN
 dataset: fashion-mnist
 # Use cuda is available; setting to false will force CPU
 cuda: false
-experiment_prefix: 'p12_freezoff_iid_dyn_terminate_swyh'
-offload_stategy: dynamic-terminate-swyh
+experiment_prefix: 'p15_freezoff_non_iid_offload'
+offload_stategy: offload
 profiling_time: 30
 deadline: 50000
 warmup_round: false
-output_location: 'output/p12'
+output_location: 'output/p15'
 tensor_board_active: true
 clients_per_round: 6
-termination_percentage: 0.7
 node_groups:
-  slow: [1, 6]
-  medium: [7, 12]
-  fast: [13, 18]
-sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
+  slow: [1, 2]
+  medium: [3, 4]
+  fast: [5, 6]
+sampler: "n labels" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
 #sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
 sampler_args:
-  - 0.07     # label limit || q probability || alpha || unused
+  - 2     # label limit || q probability || alpha || unused
   - 42    # random seed || random seed || random seed || unused
 system:
   federator:

@@ -3,17 +3,17 @@ import os
 if __name__ == '__main__':
     name = 'p11_freezoff'
     generate_docker(name)
-    base_path = 'configs/p12_freezoff_iid_large'
+    base_path = 'configs/p11A_freezoff_iid'
     exp_list = [
-        'p12_freezoff_iid_offload_strict_large.yaml',
-        'p12_freezoff_iid_offload_large.yaml',
-        'p12_freezoff_iid_fedprox_large.yaml',
-        'p12_freezoff_iid_fednova_large.yaml',
-        'p12_freezoff_iid_dyn_terminate_swyh_large.yaml',
-        'p12_freezoff_iid_fedavg_large.yaml',
-        'p12_freezoff_iid_tifl_adaptive_large.yaml',
-        'p12_freezoff_iid_dyn_terminate_large.yaml',
-        'p12_freezoff_iid_tifl_basic_large.yaml'
+        # 'p11A_freezoff_iid_fedprox.yaml',
+        # 'p11A_freezoff_iid_fednova.yaml',
+        # 'p11A_freezoff_iid_offload.yaml',
+        'p11A_freezoff_iid_offload_strict.yaml',
+        # 'p11A_freezoff_iid_dyn_terminate_swyh.yaml',
+        'p11A_freezoff_iid_fedavg.yaml',
+        'p11A_freezoff_iid_tifl_adaptive.yaml',
+        # 'p11A_freezoff_iid_dyn_terminate.yaml',
+        'p11A_freezoff_iid_tifl_basic.yaml'
         ]
     exp_list = [f'{base_path}/{x}' for x in exp_list]
     first_prefix = '--build'

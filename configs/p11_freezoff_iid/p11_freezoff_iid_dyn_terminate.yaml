@@ -12,9 +12,10 @@ offload_stategy: dynamic-terminate
 profiling_time: 30
 deadline: 50000
 warmup_round: false
-output_location: 'output'
+output_location: 'output/p11'
 tensor_board_active: true
 clients_per_round: 3
+termination_percentage: 0.7
 node_groups:
   slow: [1, 6]
   medium: [7, 12]

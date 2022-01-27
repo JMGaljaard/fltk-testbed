@@ -7,15 +7,15 @@ net: FashionMNISTCNN
 dataset: fashion-mnist
 # Use cuda is available; setting to false will force CPU
 cuda: false
-experiment_prefix: 'p12_freezoff_iid_dyn_terminate_swyh'
-offload_stategy: dynamic-terminate-swyh
+experiment_prefix: 'p11A_freezoff_iid_fedprox'
+offload_stategy: vanilla
+optimizer: FedProx
 profiling_time: 30
 deadline: 50000
 warmup_round: false
-output_location: 'output/p12'
+output_location: 'output/p11A'
 tensor_board_active: true
-clients_per_round: 6
-termination_percentage: 0.7
+clients_per_round: 3
 node_groups:
   slow: [1, 6]
   medium: [7, 12]

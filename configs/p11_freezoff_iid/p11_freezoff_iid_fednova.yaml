@@ -13,7 +13,7 @@ optimizer: FedNova
 profiling_time: 30
 deadline: 50000
 warmup_round: false
-output_location: 'output'
+output_location: 'output/p11'
 tensor_board_active: true
 clients_per_round: 3
 node_groups:

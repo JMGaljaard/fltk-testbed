@@ -15,6 +15,7 @@ warmup_round: false
 output_location: 'output/p12'
 tensor_board_active: true
 clients_per_round: 6
+termination_percentage: 0.7
 node_groups:
   slow: [1, 6]
   medium: [7, 12]
