@@ -388,7 +388,7 @@ class Client:
         if use_offloaded_model:
             for param in self.offloaded_net.parameters():
                 param.requires_grad = True
-        deadline_threshold = 10
+        deadline_threshold = self.args.deadline_threshold
         train_stop_time = None
         if self.deadline_enabled and deadline is not None:
             train_stop_time = start_time + deadline - deadline_threshold

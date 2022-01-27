@@ -67,6 +67,7 @@ class BareConfig:
         self.profiling_size = 30
         self.deadline = 400
         self.first_deadline = 400
+        self.deadline_threshold = 10
         self.warmup_round = False
 
         # FLTK options
@@ -159,6 +160,8 @@ class BareConfig:
             self.profiling_size = cfg['profiling_size']
         if 'deadline' in cfg:
             self.deadline = cfg['deadline']
+        if 'deadline_threshold' in cfg:
+            self.deadline_threshold = cfg['deadline_threshold']
         if 'first_deadline' in cfg:
             self.first_deadline = cfg['first_deadline']
         if 'warmup_round' in cfg:

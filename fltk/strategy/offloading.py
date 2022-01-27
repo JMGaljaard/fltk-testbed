@@ -10,7 +10,8 @@ class OffloadingStrategy(Enum):
     TIFL_BASIC = 6,
     TIFL_ADAPTIVE = 7,
     DYN_TERMINATE = 8,
-    DYN_TERMINATE_SWYH = 9
+    DYN_TERMINATE_SWYH = 9,
+    MODEL_OFFLOAD_STRICT = 10
 
     @classmethod
     def Parse(cls, string_value):
@@ -32,6 +33,8 @@ class OffloadingStrategy(Enum):
             return OffloadingStrategy.DYN_TERMINATE
         if string_value == 'dynamic-terminate-swyh':
             return OffloadingStrategy.DYN_TERMINATE_SWYH
+        if string_value == 'offload-strict':
+            return OffloadingStrategy.MODEL_OFFLOAD_STRICT
 
 
 def parse_strategy(strategy: OffloadingStrategy):
@@ -78,4 +81,9 @@ def parse_strategy(strategy: OffloadingStrategy):
         freeze_layers_enabled = False
         offload_enabled = False
         dyn_terminate_swyh = True
+    if strategy == OffloadingStrategy.MODEL_OFFLOAD_STRICT:
+        deadline_enabled = True
+        swyh_enabled = True
+        freeze_layers_enabled = True
+        offload_enabled = True
     return deadline_enabled, swyh_enabled, freeze_layers_enabled, offload_enabled, dyn_terminate, dyn_terminate_swyh
