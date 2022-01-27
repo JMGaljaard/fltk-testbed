@@ -560,8 +560,10 @@ class Federator:
                 client.available = True
                 logging.info(f'Fetching response for client: {client}')
                 response_obj = client_response.future.wait()
-
+                epoch_data : EpochData
                 epoch_data, weights, scheduler_data, perf_data = response_obj['own']
+                epoch_data.global_epoch_id = self.epoch_counter
+                epoch_data.global_wall_time = client_response.end_time
                 self.client_data[epoch_data.client_id].append(epoch_data)
 
                 # logging.info(f'{client} had a loss of {epoch_data.loss}')
@@ -651,6 +653,8 @@ class Federator:
                     epoch_data_offload, weights_offload, scheduler_data_offload, perf_data_offload, sender_id = response_obj['offload']
                     if epoch_data_offload.client_id not in self.client_data:
                         self.client_data[epoch_data_offload.client_id] = []
+                    epoch_data_offload.global_epoch_id = self.epoch_counter
+                    epoch_data_offload.global_wall_time = client_response.end_time
                     self.client_data[epoch_data_offload.client_id].append(epoch_data_offload)
 
                     writer = client.tb_writer_offload
@@ -726,7 +730,8 @@ class Federator:
         end_epoch_time = time.time()
         duration = end_epoch_time - start_epoch_time
 
-        self.exp_data_general.append([self.epoch_counter, duration, accuracy, loss, class_precision, class_recall])
+
+        self.exp_data_general.append([self.epoch_counter, end_epoch_time, duration, accuracy, loss, class_precision, class_recall])
 
 
     def set_tau_eff(self):
@@ -745,7 +750,7 @@ class Federator:
         self.ensure_path_exists(p)
         p /= f'{exp_prefix}-general_data.csv'
         # general_filename = f'{file_output}/general_data.csv'
-        df = pd.DataFrame(self.exp_data_general, columns=['epoch', 'duration', 'accuracy', 'loss', 'class_precision', 'class_recall'])
+        df = pd.DataFrame(self.exp_data_general, columns=['epoch', 'wall_time', 'duration', 'accuracy', 'loss', 'class_precision', 'class_recall'])
         df.to_csv(p)
 
     def update_client_data_sizes(self):

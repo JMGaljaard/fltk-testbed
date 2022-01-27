@@ -722,7 +722,7 @@ class Client:
         logging.info(
             f'Time for training={duration_train}, time for testing={duration_test}, total time={duration_train + duration_test}')
         data = EpochData(self.epoch_counter, num_epoch, train_time_ms, test_time_ms, loss, accuracy, test_loss,
-                         class_precision, class_recall, training_process, self.id)
+                         class_precision, class_recall, training_process, self.id, client_wall_time=time.time())
         self.epoch_results.append(data)
         if hasattr(self.optimizer, 'pre_communicate'):  # aka fednova or fedprox
             self.optimizer.pre_communicate()
@@ -746,7 +746,7 @@ class Client:
             accuracy, test_loss, class_precision, class_recall, _accuracy_per_class = self.test(use_offloaded_model=True)
             global global_sender_id
             data_offload = EpochData(self.epoch_counter, num_epoch, train_time_ms, test_time_ms, loss_offload, accuracy, test_loss,
-                                     class_precision, class_recall, training_process, f'{global_sender_id}-offload')
+                                     class_precision, class_recall, training_process, f'{global_sender_id}-offload', client_wall_time=time.time())
 
             # Copy GPU tensors to CPU
             for k, v in weights_offload.items():
