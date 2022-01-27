@@ -560,8 +560,10 @@ class Federator:
                 client.available = True
                 logging.info(f'Fetching response for client: {client}')
                 response_obj = client_response.future.wait()
-
+                epoch_data : EpochData
                 epoch_data, weights, scheduler_data, perf_data = response_obj['own']
+                epoch_data.global_epoch_id = self.epoch_counter
+                epoch_data.global_wall_time = client_response.end_time
                 self.client_data[epoch_data.client_id].append(epoch_data)
 
                 # logging.info(f'{client} had a loss of {epoch_data.loss}')
@@ -651,6 +653,8 @@ class Federator:
                     epoch_data_offload, weights_offload, scheduler_data_offload, perf_data_offload, sender_id = response_obj['offload']
                     if epoch_data_offload.client_id not in self.client_data:
                         self.client_data[epoch_data_offload.client_id] = []
+                    epoch_data_offload.global_epoch_id = self.epoch_counter
+                    epoch_data_offload.global_wall_time = client_response.end_time
                     self.client_data[epoch_data_offload.client_id].append(epoch_data_offload)
 
                     writer = client.tb_writer_offload
