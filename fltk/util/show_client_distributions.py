@@ -25,7 +25,7 @@ dist_settings = {
     # 'dirichlet': {'seed': 1, 'range':[0.1, 1, 0.1]},
 }
 
-num_clients = 4
+num_clients = 6
 class dummy_args:
     net = 'Cifar10CNN'
     dataset_name = 'cifar10'
@@ -34,7 +34,7 @@ class dummy_args:
     data_sampler = "n labels"
     # sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
     # data_sampler_args = [0.07, 42]  # random seed || random seed || random seed || unused
-    data_sampler_args = [7 , 42]  # random seed || random seed || random seed || unused
+    data_sampler_args = [2 , 42]  # random seed || random seed || random seed || unused
     DistDatasets = {
         'cifar10': DistCIFAR10Dataset,
         'cifar100': DistCIFAR100Dataset,
