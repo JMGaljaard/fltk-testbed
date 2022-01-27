@@ -425,8 +425,9 @@ class Client:
         pre_train_loop_data = np.zeros(profiling_size)
         post_train_loop_data = np.zeros(profiling_size)
         active_profiling = True
-        p = P2(profiling_size, 7)
-        p3 = P3(profiling_size, 7)
+        split_point = self.args.nets_split_point[self.args.net_name]
+        p = P2(profiling_size, split_point - 1)
+        p3 = P3(profiling_size, split_point - 1)
         if use_offloaded_model:
             p.attach(self.offloaded_net)
             p3.attach(self.offloaded_net)
@@ -483,8 +484,9 @@ class Client:
                     # This number only works for cifar10cnn
                     # @TODO: Make this dynamic for other networks
                     # self.freeze_layers(5)
-                    self.freeze_layers2(8, self.net)
-
+                    split_point = self.args.nets_split_point[self.args.net_name]
+                    self.freeze_layers2(split_point, self.net)
+    
                 # Check if there is a model to incorporate
                 # Disable for now to offloading testing
                 # if global_offload_received:
@@ -589,7 +591,8 @@ class Client:
                             # This number only works for cifar10cnn
                             # @TODO: Make this dynamic for other networks
                             # self.freeze_layers(5)
-                            self.freeze_layers2(8, self.net)
+                            split_point = self.args.nets_split_point[self.args.net_name]
+                            self.freeze_layers2(split_point, self.net)
             # logging.info(f'Batch time is {batch_duration}')
 
             # Break away from loop for debug purposes

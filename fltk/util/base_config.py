@@ -90,8 +90,19 @@ class BareConfig:
             "FashionMNISTResNet": FashionMNISTResNet
 
         }
+
+        self.nets_split_point = {
+            "Cifar100ResNet": 48,
+            "Cifar100VGG": 28,
+            "Cifar10CNN": 15,
+            "Cifar10ResNet": 39,
+            "FashionMNISTCNN": 7,
+            "FashionMNISTResNet": 7
+
+        }
         self.net = None
-        self.set_net_by_name('Cifar10CNN')
+        self.net_name = 'Cifar10CNN'
+        self.set_net_by_name(self.net_name)
         self.dataset_name = 'cifar10'
 
         self.DistDatasets = {
@@ -138,6 +149,7 @@ class BareConfig:
         if 'wait_for_clients' in cfg:
             self.wait_for_clients = cfg['wait_for_clients']
         if 'net' in cfg:
+            self.net_name = cfg['net']
             self.set_net_by_name(cfg['net'])
         if 'dataset' in cfg:
             self.dataset_name = cfg['dataset']
@@ -259,7 +271,8 @@ class BareConfig:
         return self.test_data_loader_pickle_path[self.dataset_name]
 
     def set_net_by_name(self, name: str):
-        self.net = self.available_nets[name]
+        self.net_name = name
+        self.net = self.available_nets[self.net_name]
 
     def get_cuda(self):
         return self.cuda
