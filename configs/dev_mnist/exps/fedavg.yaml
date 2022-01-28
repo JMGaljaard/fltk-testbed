@@ -1,0 +1,35 @@
+---
+# Experiment configuration
+total_epochs: 3
+epochs_per_cycle: 1
+wait_for_clients: true
+net: MNISTCNN
+dataset: mnist
+# Use cuda is available; setting to false will force CPU
+cuda: false
+profiling_time: 100
+warmup_round: false
+output_location: 'output/dev_p2'
+tensor_board_active: true
+clients_per_round: 2
+node_groups:
+  slow: [1, 1]
+  medium: [2, 2]
+  fast: [3, 3]
+sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
+#sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
+sampler_args:
+  - 0.07     # label limit || q probability || alpha || unused
+  - 42    # random seed || random seed || random seed || unused
+system:
+  federator:
+    # hostname: '131.180.203.94'
+    hostname: '10.5.0.11'
+    nic: 'eth0'
+    # nic: 'enp3s0'
+  clients:
+    amount: 2
+# Individual configuration
+offload_stategy: vanilla
+deadline: 500
+experiment_prefix: 'dev_mnist_fedavg'

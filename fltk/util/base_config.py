@@ -4,7 +4,9 @@ import torch
 import json
 
 from fltk.datasets.distributed import DistCIFAR10Dataset, DistCIFAR100Dataset, DistFashionMNISTDataset
+from fltk.datasets.distributed.mnist import DistMNISTDataset
 from fltk.nets import Cifar10CNN, FashionMNISTCNN, Cifar100ResNet, FashionMNISTResNet, Cifar10ResNet, Cifar100VGG
+from fltk.nets.mnist_cnn import MNIST_CNN
 from fltk.strategy.FedNova import FedNova
 from fltk.strategy.fedprox import FedProx
 from fltk.util.definitions import Optimizations
@@ -88,7 +90,8 @@ class BareConfig:
             "Cifar10CNN": Cifar10CNN,
             "Cifar10ResNet": Cifar10ResNet,
             "FashionMNISTCNN": FashionMNISTCNN,
-            "FashionMNISTResNet": FashionMNISTResNet
+            "FashionMNISTResNet": FashionMNISTResNet,
+            "MNISTCNN": MNIST_CNN,
 
         }
 
@@ -98,8 +101,8 @@ class BareConfig:
             "Cifar10CNN": 15,
             "Cifar10ResNet": 39,
             "FashionMNISTCNN": 7,
-            "FashionMNISTResNet": 7
-
+            "FashionMNISTResNet": 7,
+            "MNISTCNN": 2,
         }
         self.net = None
         self.net_name = 'Cifar10CNN'
@@ -110,17 +113,21 @@ class BareConfig:
             'cifar10': DistCIFAR10Dataset,
             'cifar100': DistCIFAR100Dataset,
             'fashion-mnist': DistFashionMNISTDataset,
+            'mnist': DistMNISTDataset
         }
         self.train_data_loader_pickle_path = {
             'cifar10': 'data_loaders/cifar10/train_data_loader.pickle',
             'fashion-mnist': 'data_loaders/fashion-mnist/train_data_loader.pickle',
             'cifar100': 'data_loaders/cifar100/train_data_loader.pickle',
+            'mnist' : 'data_loaders/mnist/train_data_loader.pickle',
         }
 
         self.test_data_loader_pickle_path = {
             'cifar10': 'data_loaders/cifar10/test_data_loader.pickle',
             'fashion-mnist': 'data_loaders/fashion-mnist/test_data_loader.pickle',
             'cifar100': 'data_loaders/cifar100/test_data_loader.pickle',
+            'mnist' : 'data_loaders/mnist/test_data_loader.pickle',
+
         }
         self.loss_function = torch.nn.CrossEntropyLoss
         self.default_model_folder_path = "default_models"
