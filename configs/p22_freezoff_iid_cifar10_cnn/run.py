@@ -8,14 +8,14 @@ if __name__ == '__main__':
     base_path = f'configs/{Path(__file__).parent.name}'
     exp_list = [
         'fedavg.yaml',
-        'offload_strict.yaml',
-        'fednova.yaml',
-        'fedprox.yaml',
-        'offload.yaml',
-        'tifl_adaptive.yaml',
-        'tifl_basic.yaml',
-        'dyn_terminate_swyh.yaml',
-        'dyn_terminate.yaml',
+        # 'offload_strict.yaml',
+        # 'fednova.yaml',
+        # 'fedprox.yaml',
+        # 'offload.yaml',
+        # 'tifl_adaptive.yaml',
+        # 'tifl_basic.yaml',
+        # 'dyn_terminate_swyh.yaml',
+        # 'dyn_terminate.yaml',
         ]
     exp_list = [f'{base_path}/exps/{x}' for x in exp_list]
     first_prefix = '--build'

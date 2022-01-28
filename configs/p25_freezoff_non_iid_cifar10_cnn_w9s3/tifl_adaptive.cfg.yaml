@@ -1,0 +1,3 @@
+# Individual configuration
+offload_stategy: tifl-adaptive
+deadline: 500000

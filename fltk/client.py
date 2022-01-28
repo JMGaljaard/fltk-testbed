@@ -602,7 +602,8 @@ class Client:
             if active_profiling:
                 pre_train_loop_data[i] = loop_pre_train_end - loop_pre_train_start
                 post_train_loop_data[i] = loop_post_train_end - loop_post_train_start
-
+        p.remove_all_handles()
+        p3.remove_all_handles()
         control_end_time = time.time()
         end_loop_time = time.time()
         logging.info(f'Measure end time is {(control_end_time - control_start_time)}')
@@ -737,11 +738,13 @@ class Client:
                 time.sleep(0.1)
             logging.info(f'Continuing after global_offload_received={global_offload_received} and offload_release={self.offload_release}')
         if self.offload_enabled and global_offload_received:
-            # self.configure_strategy(OffloadingStrategy.SWYH)
-            self.configure_strategy(OffloadingStrategy.VANILLA)
+            self.configure_strategy(OffloadingStrategy.SWYH)
+            # self.configure_strategy(OffloadingStrategy.VANILLA)
             logging.info('Processing offloaded model')
             self.load_offloaded_model()
             self.copy_offloaded_model_weights()
+            elapsed_time = time.time() - start
+            deadline -= elapsed_time
             loss_offload, weights_offload, training_process_offload, scheduler_data_offload, perf_data_offload = self.train(self.epoch_counter, deadline, warmup, use_offloaded_model=True)
             accuracy, test_loss, class_precision, class_recall, _accuracy_per_class = self.test(use_offloaded_model=True)
             global global_sender_id
