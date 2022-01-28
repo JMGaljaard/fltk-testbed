@@ -1,0 +1,8 @@
+# Individual configuration
+offload_stategy: vanilla
+deadline: 500000
+sampler: "n labels" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default) || "n labels"
+sampler_args:
+  - 2     # label limit || q probability || alpha || unused
+  - 42    # random seed || random seed || random seed || unused
+freeze_clients: [1, 2]

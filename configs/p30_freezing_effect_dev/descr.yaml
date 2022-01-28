@@ -9,7 +9,7 @@ dataset: mnist
 cuda: false
 profiling_time: 30
 warmup_round: false
-output_location: 'output/p28'
+output_location: 'output/p30'
 tensor_board_active: true
 termination_percentage: 0.7
 clients_per_round: 2

@@ -133,6 +133,9 @@ class BareConfig:
         self.default_model_folder_path = "default_models"
         self.data_path = "data"
 
+        # For freezing effect experiment
+        self.freeze_clients = []
+
     ###########
     # Methods #
     ###########
@@ -214,6 +217,8 @@ class BareConfig:
         
         if 'epochs_per_round' in cfg:
             self.epochs_per_round = cfg['epochs_per_round']
+        if 'freeze_clients' in cfg:
+            self.freeze_clients = cfg['freeze_clients']
             
 
 

@@ -375,7 +375,6 @@ class Client:
         :type epoch: int
         """
 
-
         perf_data = {
             'total_duration': 0,
             'p_v2_data': None,
@@ -428,13 +427,21 @@ class Client:
         split_point = self.args.nets_split_point[self.args.net_name]
         p = P2(profiling_size, split_point - 1)
         p3 = P3(profiling_size, split_point - 1)
-        if use_offloaded_model:
-            p.attach(self.offloaded_net)
-            p3.attach(self.offloaded_net)
+
+        profiler_active = False
+        # Freezing effect experiment
+        if self.rank in self.args.freeze_clients:
+            logging.info('I need to freeze!')
+            split_point = self.args.nets_split_point[self.args.net_name]
+            self.freeze_layers2(split_point, self.net)
         else:
-            p.attach(self.net)
-            p3.attach(self.net)
-        profiler_active = True
+            if use_offloaded_model:
+                p.attach(self.offloaded_net)
+                p3.attach(self.offloaded_net)
+            else:
+                p.attach(self.net)
+                p3.attach(self.net)
+            profiler_active = True
 
         control_start_time = time.time()
         training_process = 0
