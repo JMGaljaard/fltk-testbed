@@ -1,0 +1,35 @@
+---
+# Experiment configuration
+total_epochs: 50
+epochs_per_cycle: 1
+wait_for_clients: true
+net: MNISTCNN
+dataset: mnist
+# Use cuda is available; setting to false will force CPU
+cuda: false
+profiling_time: 30
+warmup_round: false
+output_location: 'output/p23'
+tensor_board_active: true
+termination_percentage: 0.7
+clients_per_round: 6
+node_groups:
+  slow: [1, 6]
+  medium: [7, 12]
+  fast: [13, 18]
+system:
+  federator:
+    # hostname: '131.180.203.94'
+    hostname: '10.5.0.11'
+    nic: 'eth0'
+    # nic: 'enp3s0'
+  clients:
+    amount: 18
+# Individual configuration
+offload_stategy: vanilla
+deadline: 500000
+sampler: "n labels" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default) || "n labels"
+sampler_args:
+  - 9     # label limit || q probability || alpha || unused
+  - 42    # random seed || random seed || random seed || unused
+experiment_prefix: 'p28_effect_of_non_iid_ness_mnist_fedavg-non-iid-9'
