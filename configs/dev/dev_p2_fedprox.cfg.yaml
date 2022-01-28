@@ -1,0 +1,4 @@
+# Individual configuration
+offload_stategy: vanilla
+deadline: 500
+optimizer: FedProx

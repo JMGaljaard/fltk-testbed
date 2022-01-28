@@ -1,12 +1,21 @@
+from pathlib import Path
+
 from fltk.util.generate_docker_compose import run as generate_docker
 import os
 if __name__ == '__main__':
-    name = 'dev'
+    name = 'p11_freezoff'
     generate_docker(name)
-    base_path = 'configs/dev'
+    base_path = f'configs/{Path(__file__).parent.name}'
     exp_list = [
-        'dev_p2_fedavg.yaml',
-        'dev_p2_fedprox.yaml',
+        'fedavg.yaml',
+        'offload_strict.yaml',
+        'fednova.yaml',
+        'fedprox.yaml',
+        'offload.yaml',
+        'tifl_adaptive.yaml',
+        'tifl_basic.yaml',
+        'dyn_terminate_swyh.yaml',
+        'dyn_terminate.yaml',
         ]
     exp_list = [f'{base_path}/exps/{x}' for x in exp_list]
     first_prefix = '--build'
