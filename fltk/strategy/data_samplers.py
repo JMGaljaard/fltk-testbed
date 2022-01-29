@@ -130,12 +130,18 @@ class N_Labels(DistributedSamplerWrapper):
                 else:
                     indices_per_client[client_key].append(split_part)
             # for split_part in splitted:
-        rest_indices = np.concatenate(rest_indices)
-        rest_splitted = np.array_split(rest_indices, len(indices_per_client))
+        # @TODO: Fix this part in terms of code cleanness. Could be written more cleanly
+        if len(rest_indices):
+            rest_indices = np.concatenate(rest_indices)
+            rest_splitted = np.array_split(rest_indices, len(indices_per_client))
 
-        for k, v in indices_per_client.items():
-            v.append(rest_splitted.pop())
-            indices_per_client[k] = np.concatenate(v)
+            for k, v in indices_per_client.items():
+                v.append(rest_splitted.pop())
+                indices_per_client[k] = np.concatenate(v)
+        else:
+            rest_indices = np.ndarray([])
+            for k, v in indices_per_client.items():
+                indices_per_client[k] = np.concatenate(v)
 
         indices = indices_per_client[self.client_id]
         random.seed(seed + self.client_id)  # give each client a unique shuffle
