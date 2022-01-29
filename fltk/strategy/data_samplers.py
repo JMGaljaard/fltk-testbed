@@ -74,11 +74,27 @@ class N_Labels(DistributedSamplerWrapper):
         for l in range(self.n_labels):
             label_dict[l] = num_copies
 
+        def get_least_used_labels(l_dict: dict):
+            label_list = [[k, v] for k, v in label_dict.items()]
+            label_list[-1][1] = 0
+            sorted_list = sorted(label_list, key=lambda x: x[1], reverse=True)
+            # print('d')
+            # label_list.sort(lambda x:x)
+
         def choice_n(l_dict: dict, n, seed_offset = 0):
+            # get_least_used_labels(l_dict)
             labels = [k for k, v in label_dict.items() if v]
-            # print(f'Available labels: {labels} choose {n}')
-            np.random.seed(seed + seed_offset)
+            # summed = sum([int(v) for k, v in label_dict.items() if v])
+            # amounts = [float(v) / float(summed) for k, v in label_dict.items() if v]
+            # # p = amounts / summed
+            print(f'Available labels: {labels} choose {n}')
+            # # np.random.seed(seed + seed_offset)
+            # # @TODO: Error is in this section!
+            # print(f'n={n}, labels={labels}, p={amounts}')
+            # print(amounts)
+
             selected = np.random.choice(labels, n, replace=False)
+            # print(selected)
             for k, v in l_dict.items():
                 if k in selected:
                     # v -= 1
@@ -91,16 +107,31 @@ class N_Labels(DistributedSamplerWrapper):
 
         clients = list(range(self.n_clients))  # keeps track of which clients should still be given a label
         client_label_dict = {}
+        ordered_list = list(range(self.n_labels)) * int(num_copies)
+
+        # Old code
+        # for idx, client_id in enumerate(clients):
+        #     # client_label_dict[client_id] = []
+        #     label_set = choice_n(label_dict, args[0], idx)
+        #     client_label_dict[client_id] = label_set
+
+        # Now code
         for idx, client_id in enumerate(clients):
-            # client_label_dict[client_id] = []
-            label_set = choice_n(label_dict, args[0], idx)
+            label_set = []
+            for _ in range(args[0]):
+                label_set.append(ordered_list.pop())
             client_label_dict[client_id] = label_set
 
         client_label_dict['rest'] = []
+        # New code
+        if len(ordered_list):
+            client_label_dict['rest'] = ordered_list
+
+        #     Old code
         # client_label_dict['rest'] = labels = [k for k, v in label_dict.items() if v]
-        for k, v in label_dict.items():
-            for x in range(int(v)):
-                client_label_dict['rest'].append(int(k))
+        # for k, v in label_dict.items():
+        #     for x in range(int(v)):
+        #         client_label_dict['rest'].append(int(k))
 
         # Order data by label; split into N buckets and select indices based on the order found in the client-label-dict
 
