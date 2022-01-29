@@ -1,8 +1,9 @@
 from pathlib import Path
-
+import time
 from fltk.util.generate_docker_compose import run as generate_docker
 import os
 if __name__ == '__main__':
+    EVENT_FILE="exp_events.txt"
     name = 'p30_dev'
     generate_docker(name)
     base_path = f'configs/{Path(__file__).parent.name}'
