@@ -12,7 +12,7 @@ warmup_round: false
 output_location: 'output/p28'
 tensor_board_active: true
 termination_percentage: 0.7
-clients_per_round: 2
+clients_per_round: 3
 node_groups:
   slow: [1, 6]
   medium: [7, 12]
@@ -24,4 +24,4 @@ system:
     nic: 'eth0'
     # nic: 'enp3s0'
   clients:
-    amount: 6
+    amount: 10

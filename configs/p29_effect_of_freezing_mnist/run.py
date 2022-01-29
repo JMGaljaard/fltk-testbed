@@ -7,15 +7,28 @@ if __name__ == '__main__':
     generate_docker(name)
     base_path = f'configs/{Path(__file__).parent.name}'
     exp_list = [
-        'fedavg.yaml',
-        'offload_strict.yaml',
-        'fednova.yaml',
-        'fedprox.yaml',
-        'offload.yaml',
-        'tifl_adaptive.yaml',
-        'tifl_basic.yaml',
-        'dyn_terminate_swyh.yaml',
-        'dyn_terminate.yaml',
+        'fedavg-iid-freeze-0.yaml',
+        'fedavg-iid-freeze-30.yaml',
+        'fedavg-iid-freeze-70.yaml',
+        'fedavg-non_iid-freeze-100.yaml',
+        'fedavg-non_iid-freeze-40.yaml',
+        'fedavg-non_iid-freeze-80.yaml',
+        'fedavg-iid-freeze-100.yaml',
+        'fedavg-iid-freeze-40.yaml',
+        'fedavg-iid-freeze-80.yaml',
+        'fedavg-non_iid-freeze-10.yaml',
+        'fedavg-non_iid-freeze-50.yaml',
+        'fedavg-non_iid-freeze-90.yaml',
+        'fedavg-iid-freeze-10.yaml',
+        'fedavg-iid-freeze-50.yaml',
+        'fedavg-iid-freeze-90.yaml',
+        'fedavg-non_iid-freeze-20.yaml',
+        'fedavg-non_iid-freeze-60.yaml',
+        'fedavg-iid-freeze-20.yaml',
+        'fedavg-iid-freeze-60.yaml',
+        'fedavg-non_iid-freeze-0.yaml',
+        'fedavg-non_iid-freeze-30.yaml',
+        'fedavg-non_iid-freeze-70.yaml',
         ]
     exp_list = [f'{base_path}/exps/{x}' for x in exp_list]
     first_prefix = '--build'
@@ -26,5 +39,4 @@ if __name__ == '__main__':
         first_prefix = ''
 
     print('Done')
-
 

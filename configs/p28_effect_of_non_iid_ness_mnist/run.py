@@ -7,15 +7,11 @@ if __name__ == '__main__':
     generate_docker(name)
     base_path = f'configs/{Path(__file__).parent.name}'
     exp_list = [
-        'fedavg.yaml',
-        'offload_strict.yaml',
-        'fednova.yaml',
-        'fedprox.yaml',
-        'offload.yaml',
-        'tifl_adaptive.yaml',
-        'tifl_basic.yaml',
-        'dyn_terminate_swyh.yaml',
-        'dyn_terminate.yaml',
+        'fedavg-iid-uniform.yaml',
+        'fedavg-non-iid-10.yaml',
+        'fedavg-non-iid-1.yaml',
+        'fedavg-non-iid-2.yaml',
+        'fedavg-non-iid-5.yaml',
         ]
     exp_list = [f'{base_path}/exps/{x}' for x in exp_list]
     first_prefix = '--build'
