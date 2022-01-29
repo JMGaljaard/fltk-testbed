@@ -34,9 +34,16 @@ if __name__ == '__main__':
     first_prefix = '--build'
     for exp_cfg_file in exp_list:
         cmd = f'export EXP_CONFIG_FILE="{exp_cfg_file}"; docker-compose --compatibility up {first_prefix};'
+        os.system(f'echo "[$(date +"%T")] Starting {exp_cfg_file}" >> {EVENT_FILE}')
+        start = time.time()
+
+
         print(f'Running cmd: "{cmd}"')
         os.system(cmd)
         first_prefix = ''
+        elapsed = time.time() - start
+        os.system(f'echo "[$(date +"%T")] Finished with {exp_cfg_file} in {elapsed} seconds" >> {EVENT_FILE}')
 
     print('Done')
+
 
