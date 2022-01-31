@@ -220,6 +220,53 @@ def generate_p13_w6():
         yaml.dump(system_template, file, sort_keys=False)
 
 
+def generate_check_w4():
+    template_path = get_deploy_path('p11_freezoff')
+    num_clients= 4
+    world_size = num_clients + 1
+    system_template: dict = load_system_template(template_path=template_path)
+
+    for key, item in enumerate(system_template['services']['fl_server']['environment']):
+        if item == 'WORLD_SIZE={world_size}':
+            system_template['services']['fl_server']['environment'][key] = item.format(world_size=world_size)
+    cpu_idx = 2
+    for client_id in range(1, num_clients + 1):
+        client_type = 'fast'
+        cpu_set = f'{cpu_idx}'
+        cpu_idx += 1
+
+        client_template: dict = load_client_template(type=client_type, template_path=template_path)
+        client_definition, container_name = generate_client(client_id, client_template, world_size, type=client_type,
+                                                            cpu_set=cpu_set)
+        system_template['services'].update(client_definition)
+
+    with open(r'./docker-compose.yml', 'w') as file:
+        yaml.dump(system_template, file, sort_keys=False)
+
+def generate_check_w18():
+    template_path = get_deploy_path('p11_freezoff')
+    num_clients= 18
+    world_size = num_clients + 1
+    system_template: dict = load_system_template(template_path=template_path)
+
+    for key, item in enumerate(system_template['services']['fl_server']['environment']):
+        if item == 'WORLD_SIZE={world_size}':
+            system_template['services']['fl_server']['environment'][key] = item.format(world_size=world_size)
+    cpu_idx = 2
+    for client_id in range(1, num_clients + 1):
+        client_type = 'fast'
+        cpu_set = f'{cpu_idx}'
+        cpu_idx += 1
+
+        client_template: dict = load_client_template(type=client_type, template_path=template_path)
+        client_definition, container_name = generate_client(client_id, client_template, world_size, type=client_type,
+                                                            cpu_set=cpu_set)
+        system_template['services'].update(client_definition)
+
+    with open(r'./docker-compose.yml', 'w') as file:
+        yaml.dump(system_template, file, sort_keys=False)
+
+
 def generate_p11_freezoff():
     template_path = get_deploy_path('p11_freezoff')
     num_clients= 18
@@ -399,6 +446,8 @@ def run(name, num_clients = None, medium=False):
         'p23_w9s3': generate_p23_freezoff_w9s3,
         'p28_non_iid_effect': generate_p28_non_iid_effect,
         'p30_dev': generate_p30_freezing_effect_dev,
+        'generate_check_w4': generate_check_w4,
+        'generate_check_w18': generate_check_w18
     }
     if num_clients:
         exp_dict[name](num_clients, medium)
