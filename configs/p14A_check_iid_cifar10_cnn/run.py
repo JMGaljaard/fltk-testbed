@@ -4,7 +4,7 @@ from fltk.util.generate_docker_compose import run as generate_docker
 import os
 if __name__ == '__main__':
     EVENT_FILE="exp_events.txt"
-    name = 'generate_check_w18'
+    name = 'generate_check_w18_fast'
     generate_docker(name)
     base_path = f'configs/{Path(__file__).parent.name}'
     exp_list = [

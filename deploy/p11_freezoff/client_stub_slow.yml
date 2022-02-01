@@ -22,4 +22,5 @@ client_name: # name can be anything
     deploy:
       resources:
         limits:
-          cpus: '0.1'
+          cpus: '0.5'
+          # cpus: '0.1'

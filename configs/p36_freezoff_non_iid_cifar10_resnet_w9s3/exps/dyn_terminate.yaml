@@ -1,0 +1,36 @@
+---
+# Experiment configuration
+total_epochs: 50
+epochs_per_cycle: 1
+wait_for_clients: true
+net: Cifar10ResNet
+dataset: cifar10
+# Use cuda is available; setting to false will force CPU
+cuda: false
+profiling_time: 30
+warmup_round: false
+output_location: 'output/p36'
+tensor_board_active: true
+termination_percentage: 0.7
+clients_per_round: 3
+node_groups:
+  slow: [1, 3]
+  medium: [4, 6]
+  fast: [7, 9]
+sampler: "n labels" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default) || "n labels"
+#sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default) || "n labels"
+sampler_args:
+  - 2     # label limit || q probability || alpha || unused
+  - 42    # random seed || random seed || random seed || unused
+system:
+  federator:
+    # hostname: '131.180.203.94'
+    hostname: '10.5.0.11'
+    nic: 'eth0'
+    # nic: 'enp3s0'
+  clients:
+    amount: 9
+# Individual configuration
+offload_stategy: dynamic-terminate
+deadline: 500000
+experiment_prefix: 'p36_freezoff_non_iid_cifar10_resnet_w9s3_dyn_terminate'
