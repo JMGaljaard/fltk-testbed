@@ -145,3 +145,5 @@ docker_data
 .idea
 *.tmp.txt
 docker-compose.yml
+
+refactor-notes.md
