@@ -23,4 +23,3 @@ client_name: # name can be anything
       resources:
         limits:
           cpus: '0.5'
-          # cpus: '0.1'

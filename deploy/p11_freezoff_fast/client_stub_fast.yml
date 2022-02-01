@@ -4,8 +4,8 @@ client_name: # name can be anything
     restart: "no" # if it crashes for example
     build: . # look for the docker file where this file is currently located
     volumes:
-      - ./data:/opt/federation-lab/data
 #      - ./docker_data:/opt/federation-lab/data
+      - ./data:/opt/federation-lab/data
       - ./default_models:/opt/federation-lab/default_models
       - ./data_loaders:/opt/federation-lab/data_loaders
       - ./fltk:/opt/federation-lab/fltk
@@ -14,7 +14,7 @@ client_name: # name can be anything
       - RANK={rank}
       - WORLD_SIZE={world_size}
       - EXP_CONFIG=${EXP_CONFIG_FILE}
-      - NODE_GROUP=slow
+      - NODE_GROUP=fast
     ports:
       - "5002:5000" # {machine-port}:{docker-port}
     depends_on:
@@ -22,5 +22,4 @@ client_name: # name can be anything
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          # cpus: '0.1'
+          cpus: '3'
