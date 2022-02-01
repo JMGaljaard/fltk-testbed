@@ -4,8 +4,12 @@ import sys
 import pandas as pd
 from tqdm import tqdm
 
+from fltk.client import Client
 from fltk.datasets import DistCIFAR10Dataset, DistCIFAR100Dataset, DistFashionMNISTDataset, DistDataset
 import logging
+
+from fltk.util.base_config import BareConfig
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s',
@@ -25,7 +29,7 @@ dist_settings = {
     # 'dirichlet': {'seed': 1, 'range':[0.1, 1, 0.1]},
 }
 
-num_clients = 6
+num_clients = 10
 class dummy_args:
     net = 'Cifar10CNN'
     dataset_name = 'cifar10'
@@ -45,6 +49,13 @@ class dummy_args:
     world_size = 2
     logger = logging.Logger(__name__)
     data_path = 'data'
+    cuda = False
+
+    def get_net(self):
+        return self.net
+
+    def init_logger(self, logger):
+        self.logger = logger
 
     def get_distributed(self):
         return self.distributed
@@ -75,22 +86,37 @@ def gen_distribution(name, params):
         if rank == 0:
             continue
         print(f'node {rank}')
-        args = dummy_args()
+        args = BareConfig()
+        args.init_logger(logging)
         args.data_sampler = name
+
+
+        # args.set_net_by_name('MNISTCNN')
+        # args.dataset_name = 'mnist'
+        args.set_net_by_name('FashionMNISTCNN')
+        args.dataset_name = 'fashion-mnist'
+        # data_sampler = "uniform" #s = "dirichlet"  # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
+        # data_sampler = "limit labels flex"
+        args.data_sampler = "n labels"
+        args.data_sampler_args = [2 , 42]
         args.world_size = world_size
         args.rank = rank
         dataset: DistDataset = args.DistDatasets[args.dataset_name](args)
         datasets.append((args, dataset))
-        test_loader = dataset.get_test_loader()
-        train_loader = dataset.get_train_loader()
-        class_dict = dataset.train_dataset.class_to_idx
+        # test_loader = dataset.get_test_loader()
+        # train_loader = dataset.get_train_loader()
+        # class_dict = dataset.train_dataset.class_to_idx
         print('Iterating over all items')
         batch_size = 16
         # for i, (inputs, labels) in enumerate(dataset.get_train_loader(), 0):
         #     print(labels)
         # print('d')
-        train_loader = dataset.get_train_loader()
-        test_loader = dataset.get_test_loader()
+        client = Client("test", None, rank, args.world_size, args)
+        client.init_dataloader()
+        train_loader = client.dataset.get_train_loader()
+        train_loader2 = dataset.get_train_loader()
+        test_loader = client.dataset.get_test_loader()
+        test_loader2 = dataset.get_test_loader()
         idx2class = {v: k for k, v in train_loader.dataset.class_to_idx.items()}
 
         count_dict = {k: 0 for k, v in train_loader.dataset.class_to_idx.items()}
