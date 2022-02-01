@@ -3,13 +3,15 @@ from fltk.datasets import DistDataset
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 # from fltk.strategy import get_sampler, get_augmentations, get_augmentations_tensor, UnifyingSampler
-from fltk.strategy.data_samplers import get_sampler
-
 from random import choice
 from PIL import Image
 
+
 # typing:
 from typing import TYPE_CHECKING, Tuple, Any, List
+
+from fltk.samplers import get_sampler
+
 if TYPE_CHECKING:
     from fltk.util import BareConfig
 

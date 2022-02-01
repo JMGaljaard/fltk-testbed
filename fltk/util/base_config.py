@@ -7,8 +7,7 @@ from fltk.datasets.distributed import DistCIFAR10Dataset, DistCIFAR100Dataset, D
 from fltk.datasets.distributed.mnist import DistMNISTDataset
 from fltk.nets import Cifar10CNN, FashionMNISTCNN, Cifar100ResNet, FashionMNISTResNet, Cifar10ResNet, Cifar100VGG
 from fltk.nets.mnist_cnn import MNIST_CNN
-from fltk.strategy.FedNova import FedNova
-from fltk.strategy.fedprox import FedProx
+from fltk.strategy.optimization import FedProx, FedNova
 from fltk.util.definitions import Optimizations
 
 SEED = 1
@@ -201,7 +200,7 @@ class BareConfig:
             else:
                 self.cuda = False
         if 'optimizer' in cfg:
-            self.optimizer = self.optimizers[cfg['optimizer']]
+            self.optimizer = self.optimizers[Optimizations(cfg['optimizer'])]
         if 'optimizer_args' in cfg:
             for k, v in cfg['optimizer_args'].items():
                 self.optimizer_args[k] = v

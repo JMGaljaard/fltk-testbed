@@ -1,9 +1,8 @@
 from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data import DataLoader, DistributedSampler
-
 from fltk.datasets.distributed.dataset import DistDataset
-from fltk.strategy.data_samplers import get_sampler
+from fltk.samplers import get_sampler
 
 
 class DistCIFAR100Dataset(DistDataset):
