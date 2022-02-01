@@ -8,7 +8,7 @@ from fltk.datasets.distributed.mnist import DistMNISTDataset
 from fltk.nets import Cifar10CNN, FashionMNISTCNN, Cifar100ResNet, FashionMNISTResNet, Cifar10ResNet, Cifar100VGG
 from fltk.nets.mnist_cnn import MNIST_CNN
 from fltk.strategy.optimization import FedProx, FedNova
-from fltk.util.definitions import Optimizations
+from fltk.util.definitions import Optimizations, DataSampler, Nets, Dataset
 
 SEED = 1
 torch.manual_seed(SEED)
@@ -80,52 +80,54 @@ class BareConfig:
         self.federator_host = '0.0.0.0'
         self.rank = 0
         self.world_size = 0
-        self.data_sampler = "uniform"
+        self.data_sampler = DataSampler.uniform
         self.data_sampler_args = None
         self.distributed = False
+
         self.available_nets = {
-            "Cifar100ResNet": Cifar100ResNet,
-            "Cifar100VGG": Cifar100VGG,
-            "Cifar10CNN": Cifar10CNN,
-            "Cifar10ResNet": Cifar10ResNet,
-            "FashionMNISTCNN": FashionMNISTCNN,
-            "FashionMNISTResNet": FashionMNISTResNet,
-            "MNISTCNN": MNIST_CNN,
+            Nets.cifar100_resnet: Cifar100ResNet,
+            Nets.cifar100_vgg: Cifar100VGG,
+            Nets.cifar10_cnn: Cifar10CNN,
+            Nets.cifar10_resnet: Cifar10ResNet,
+            Nets.fashion_mnist_cnn: FashionMNISTCNN,
+            Nets.fashion_mnist_resnet: FashionMNISTResNet,
+            Nets.mnist_cnn: MNIST_CNN,
 
         }
 
         self.nets_split_point = {
-            "Cifar100ResNet": 48,
-            "Cifar100VGG": 28,
-            "Cifar10CNN": 15,
-            "Cifar10ResNet": 39,
-            "FashionMNISTCNN": 7,
-            "FashionMNISTResNet": 7,
-            "MNISTCNN": 2,
+            Nets.cifar100_resnet: 48,
+            Nets.cifar100_vgg: 28,
+            Nets.cifar10_cnn: 15,
+            Nets.cifar10_resnet: 39,
+            Nets.fashion_mnist_cnn: 7,
+            Nets.fashion_mnist_resnet: 7,
+            Nets.mnist_cnn: 2,
         }
         self.net = None
-        self.net_name = 'Cifar10CNN'
-        self.set_net_by_name(self.net_name)
-        self.dataset_name = 'cifar10'
+        self.net_name = Nets.cifar10_cnn
+        self.set_net_by_name(self.net_name.value)
+        # self.dataset_name = 'cifar10'
+        self.dataset_name = Dataset.cifar10
 
         self.DistDatasets = {
-            'cifar10': DistCIFAR10Dataset,
-            'cifar100': DistCIFAR100Dataset,
-            'fashion-mnist': DistFashionMNISTDataset,
-            'mnist': DistMNISTDataset
+            Dataset.cifar10: DistCIFAR10Dataset,
+            Dataset.cifar100: DistCIFAR100Dataset,
+            Dataset.fashion_mnist: DistFashionMNISTDataset,
+            Dataset.mnist: DistMNISTDataset
         }
         self.train_data_loader_pickle_path = {
-            'cifar10': 'data_loaders/cifar10/train_data_loader.pickle',
-            'fashion-mnist': 'data_loaders/fashion-mnist/train_data_loader.pickle',
-            'cifar100': 'data_loaders/cifar100/train_data_loader.pickle',
-            'mnist' : 'data_loaders/mnist/train_data_loader.pickle',
+            Dataset.cifar10: 'data_loaders/cifar10/train_data_loader.pickle',
+            Dataset.fashion_mnist: 'data_loaders/fashion-mnist/train_data_loader.pickle',
+            Dataset.cifar100: 'data_loaders/cifar100/train_data_loader.pickle',
+            Dataset.mnist: 'data_loaders/mnist/train_data_loader.pickle',
         }
 
         self.test_data_loader_pickle_path = {
-            'cifar10': 'data_loaders/cifar10/test_data_loader.pickle',
-            'fashion-mnist': 'data_loaders/fashion-mnist/test_data_loader.pickle',
-            'cifar100': 'data_loaders/cifar100/test_data_loader.pickle',
-            'mnist' : 'data_loaders/mnist/test_data_loader.pickle',
+            Dataset.cifar10: 'data_loaders/cifar10/test_data_loader.pickle',
+            Dataset.fashion_mnist: 'data_loaders/fashion-mnist/test_data_loader.pickle',
+            Dataset.cifar100: 'data_loaders/cifar100/test_data_loader.pickle',
+            Dataset.mnist: 'data_loaders/mnist/test_data_loader.pickle',
 
         }
         self.loss_function = torch.nn.CrossEntropyLoss
@@ -159,10 +161,10 @@ class BareConfig:
         if 'wait_for_clients' in cfg:
             self.wait_for_clients = cfg['wait_for_clients']
         if 'net' in cfg:
-            self.net_name = cfg['net']
+            self.net_name = Nets(cfg['net'])
             self.set_net_by_name(cfg['net'])
         if 'dataset' in cfg:
-            self.dataset_name = cfg['dataset']
+            self.dataset_name = Dataset(cfg['dataset'])
         if 'offload_stategy' in cfg:
             self.offload_strategy = cfg['offload_stategy']
         if 'profiling_size' in cfg:
@@ -205,7 +207,7 @@ class BareConfig:
             for k, v in cfg['optimizer_args'].items():
                 self.optimizer_args[k] = v
         if 'sampler' in cfg:
-            self.data_sampler = cfg['sampler']
+            self.data_sampler = DataSampler(cfg['sampler'])
         if 'sampler_args' in cfg:
             self.data_sampler_args = cfg['sampler_args']
 
@@ -270,7 +272,7 @@ class BareConfig:
         return list(self.train_data_loader_pickle_path.keys())
 
     def get_nets_list(self):
-        return list(self.available_nets.keys())
+        return list(map(lambda c: c.value, Nets))
 
     def set_train_data_loader_pickle_path(self, path, name='cifar10'):
         self.train_data_loader_pickle_path[name] = path
@@ -285,7 +287,7 @@ class BareConfig:
         return self.test_data_loader_pickle_path[self.dataset_name]
 
     def set_net_by_name(self, name: str):
-        self.net_name = name
+        self.net_name = Nets(name)
         self.net = self.available_nets[self.net_name]
 
     def get_cuda(self):

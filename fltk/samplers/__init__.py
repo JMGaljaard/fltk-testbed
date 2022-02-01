@@ -5,6 +5,7 @@ from .q_sampler import Probability_q_Sampler
 from .dirichlet import DirichletSampler
 from .limit_labels import LimitLabelsSampler
 from .limit_labels_flex import LimitLabelsSamplerFlex
+from ..util.definitions import DataSampler
 
 
 def get_sampler(dataset, args):
@@ -14,21 +15,21 @@ def get_sampler(dataset, args):
         args.get_logger().info(
             "Using {} sampler method, with args: {}".format(method, args.get_sampler_args()))
 
-        if method == "uniform":
+        if method == DataSampler.uniform:
             sampler = UniformSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank())
-        elif method == "q sampler":
+        elif method == DataSampler.q_sampler:
             sampler = Probability_q_Sampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                             args=args.get_sampler_args())
-        elif method == "limit labels":
+        elif method == DataSampler.limit_labels:
             sampler = LimitLabelsSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                          args=args.get_sampler_args())
-        elif method == "limit labels flex":
+        elif method == DataSampler.limit_labels_flex:
             sampler = LimitLabelsSamplerFlex(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                              args=args.get_sampler_args())
-        elif method == "n labels":
+        elif method == DataSampler.n_labels:
             sampler = N_Labels(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                args=args.get_sampler_args())
-        elif method == "dirichlet":
+        elif method == DataSampler.dirichlet:
             sampler = DirichletSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                        args=args.get_sampler_args())
         else:  # default
