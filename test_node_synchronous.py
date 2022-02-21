@@ -16,7 +16,7 @@ if __name__ == '__main__':
     config.clients_per_round = 1
     config.epochs = 2
     config.rounds = 20
-    config.cuda = False
+    config.cuda = True
     config.single_machine = True
 
     fed = Federator('fed0', 0, world_size, config)

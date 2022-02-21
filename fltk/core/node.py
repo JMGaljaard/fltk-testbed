@@ -54,6 +54,7 @@ class Node:
         self.config.rank = self.rank
         self.config.world_size = self.world_size
         self.cuda = config.cuda
+        self.init_device()
         self.distributed = config.distributed
         self.set_net(self.load_default_model())
 
@@ -78,9 +79,13 @@ class Node:
     # def _lookup_reference(self, node_name: str):
 
     def init_device(self):
+        if self.cuda and not torch.cuda.is_available():
+            self.logger.warning('Unable to configure device for GPU because cuda.is_available() == False')
         if self.cuda and torch.cuda.is_available():
+            self.logger.info("Configure device for GPU (Cuda)")
             return torch.device("cuda:0")
         else:
+            self.logger.info("Configure device for CPU")
             return torch.device("cpu")
 
     def set_net(self, net):
