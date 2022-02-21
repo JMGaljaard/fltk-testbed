@@ -14,7 +14,7 @@ class DistCIFAR100Dataset(DistDataset):
 
     def init_train_dataset(self):
         dist_loader_text = "distributed" if self.args.get_distributed() else ""
-        self.get_args().get_logger().debug(f"Loading '{dist_loader_text}' CIFAR100 train data")
+        self.logger.debug(f"Loading '{dist_loader_text}' CIFAR100 train data")
         normalize = transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
         transform = transforms.Compose([
             transforms.RandomHorizontalFlip(),
@@ -29,7 +29,7 @@ class DistCIFAR100Dataset(DistDataset):
 
     def init_test_dataset(self):
         dist_loader_text = "distributed" if self.args.get_distributed() else ""
-        self.get_args().get_logger().debug(f"Loading '{dist_loader_text}' CIFAR100 test data")
+        self.logger.debug(f"Loading '{dist_loader_text}' CIFAR100 test data")
 
         normalize = transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
         transform = transforms.Compose([
@@ -44,7 +44,7 @@ class DistCIFAR100Dataset(DistDataset):
 
     def load_train_dataset(self):
         dist_loader_text = "distributed" if self.args.get_distributed() else ""
-        self.get_args().get_logger().debug(f"Loading '{dist_loader_text}' CIFAR100 train data")
+        self.logger.debug(f"Loading '{dist_loader_text}' CIFAR100 train data")
 
         normalize = transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
         transform = transforms.Compose([
@@ -63,12 +63,12 @@ class DistCIFAR100Dataset(DistDataset):
 
         train_data = self.get_tuple_from_data_loader(train_loader)
         dist_loader_text = "distributed" if self.args.get_distributed() else ""
-        self.get_args().get_logger().debug(f"Finished loading '{dist_loader_text}' CIFAR100 train data")
+        self.logger.debug(f"Finished loading '{dist_loader_text}' CIFAR100 train data")
 
         return train_data
 
     def load_test_dataset(self):
-        self.get_args().get_logger().debug("Loading CIFAR100 test data")
+        self.logger.debug("Loading CIFAR100 test data")
 
         normalize = transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
         transform = transforms.Compose([
@@ -83,7 +83,7 @@ class DistCIFAR100Dataset(DistDataset):
 
         test_data = self.get_tuple_from_data_loader(test_loader)
 
-        self.get_args().get_logger().debug("Finished loading CIFAR10 test data")
+        self.logger.debug("Finished loading CIFAR10 test data")
 
         return test_data
 

@@ -17,7 +17,8 @@ class DistCIFAR10Dataset(DistDataset):
 
     def init_train_dataset(self):
         dist_loader_text = "distributed" if self.args.get_distributed() else ""
-        self.get_args().get_logger().debug(f"Loading '{dist_loader_text}' CIFAR10 train data")
+        self.logger.debug(f"Loading '{dist_loader_text}' CIFAR10 train data")
+        # self.get_args().get_logger().debug(f"Loading '{dist_loader_text}' CIFAR10 train data")
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         transform = transforms.Compose([
             transforms.RandomHorizontalFlip(),
@@ -29,10 +30,12 @@ class DistCIFAR10Dataset(DistDataset):
                                          transform=transform)
         self.train_sampler = get_sampler(self.train_dataset, self.args)
         self.train_loader = DataLoader(self.train_dataset, batch_size=16, sampler=self.train_sampler)
-        logging.info("this client gets {} samples".format(len(self.train_sampler)))
+        self.logger.info("this client gets {} samples".format(len(self.train_sampler)))
+        # logging.info("this client gets {} samples".format(len(self.train_sampler)))
 
     def init_test_dataset(self):
-        self.get_args().get_logger().debug("Loading CIFAR10 test data")
+        self.logger.debug("Loading CIFAR10 test data")
+        # self.get_args().get_logger().debug("Loading CIFAR10 test data")
 
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         transform = transforms.Compose([

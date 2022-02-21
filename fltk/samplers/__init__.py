@@ -6,13 +6,15 @@ from .dirichlet import DirichletSampler
 from .limit_labels import LimitLabelsSampler
 from .limit_labels_flex import LimitLabelsSamplerFlex
 from ..util.definitions import DataSampler
+from ..util.log import getLogger
 
 
 def get_sampler(dataset, args):
+    logger = getLogger(__name__)
     sampler = None
     if args.get_distributed():
         method = args.get_sampler()
-        args.get_logger().info(
+        logger.info(
             "Using {} sampler method, with args: {}".format(method, args.get_sampler_args()))
 
         if method == DataSampler.uniform:
@@ -33,7 +35,7 @@ def get_sampler(dataset, args):
             sampler = DirichletSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                        args=args.get_sampler_args())
         else:  # default
-            args().get_logger().warning("Unknown sampler " + method + ", using uniform instead")
+            logger.warning("Unknown sampler " + method + ", using uniform instead")
             sampler = UniformSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank())
 
     return sampler
