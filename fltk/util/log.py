@@ -2,6 +2,9 @@ import logging
 
 from torch.distributed import rpc
 
+from fltk.util.definitions import LogLevel
+
+
 class FLLogger:
     @staticmethod
     @rpc.functions.async_execution
@@ -9,9 +12,9 @@ class FLLogger:
         logging.info(f'[{node_id}: {report_time}]: {log_line}')
 
 
-def getLogger(module_name):
+def getLogger(module_name, level: LogLevel = LogLevel.INFO):
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=level.value,
         format='%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s',
     )
     return logging.getLogger(module_name)

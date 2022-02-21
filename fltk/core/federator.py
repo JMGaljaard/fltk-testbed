@@ -9,14 +9,21 @@ from fltk.core.node import Node
 from fltk.datasets.loader_util import get_dataset
 from fltk.strategy import FedAvg, random_selection, average_nn_parameters, average_nn_parameters_simple
 from fltk.util.config import Config
-
+from dataclasses import dataclass
 
 NodeReference = Union[Node, str]
+@dataclass
+class LocalClient:
+    name: str
+    ref: NodeReference
+    data_size: int
 
 
 class Federator(Node):
-    clients: List[NodeReference] = []
+    clients: List[LocalClient] = []
+    # clients: List[NodeReference] = []
     num_rounds: int
+
 
     def __init__(self, id: int, rank: int, world_size: int, config: Config):
         super().__init__(id, rank, world_size, config)
@@ -32,12 +39,13 @@ class Federator(Node):
             world_size = self.config.num_clients + 1
             for client_id in range(1, self.config.num_clients+ 1):
                 client_name = f'client{client_id}'
-                self.clients.append(Client(client_name, client_id, world_size, copy.deepcopy(self.config)))
+                client = Client(client_name, client_id, world_size, copy.deepcopy(self.config))
+                self.clients.append(LocalClient(client_name, client, 0))
 
     def register_client(self, client_name, rank):
         if self.config.single_machine:
             self.logger.warning('This function should not be called when in single machine mode!')
-        self.clients.append(client_name)
+        self.clients.append(LocalClient(client_name, client_name, 0))
 
     def _num_clients_online(self) -> int:
         return len(self.clients)
@@ -55,7 +63,7 @@ class Federator(Node):
             responses = []
             all_ready = True
             for client in self.clients:
-                resp = self.message(client, Client.is_ready)
+                resp = self.message(client.ref, Client.is_ready)
                 if resp:
                     self.logger.info(f'Client {client} is ready')
                 else:
@@ -63,13 +71,21 @@ class Federator(Node):
                     all_ready = False
             time.sleep(2)
 
+    def get_client_data_sizes(self):
+        for client in self.clients:
+            client.data_size = self.message(client.ref, Client.get_client_datasize)
+
     def run(self):
-        self.init_dataloader()
+        # Load dataset with world size 2 to load the whole dataset.
+        # Caused by the fact that the dataloader subtracts 1 from the world size to exclude the federator by default.
+        self.init_dataloader(world_size=2)
+
         self.create_clients()
         while not self._all_clients_online():
             self.logger.info(f'Waiting for all clients to come online. Waiting for {self.world_size - 1 -self._num_clients_online()} clients')
             time.sleep(2)
         self.client_load_data()
+        self.get_client_data_sizes()
         self.clients_ready()
 
         for communications_round in range(self.config.rounds):
@@ -79,7 +95,15 @@ class Federator(Node):
 
     def client_load_data(self):
         for client in self.clients:
-            self.message(client, Client.init_dataloader)
+            self.message(client.ref, Client.init_dataloader)
+
+    def set_tau_eff(self):
+        total = sum(client.data_size for client in self.clients)
+        # responses = []
+        for client in self.clients:
+            self.message(client.ref, Client.set_tau_eff, client.ref, total)
+            # responses.append((client, _remote_method_async(Client.set_tau_eff, client.ref, total)))
+        # torch.futures.wait_all([x[1] for x in responses])
 
     def test(self, net):
         start_time = time.time()
@@ -103,7 +127,7 @@ class Federator(Node):
 
                 loss += self.loss_function(outputs, labels).item()
         loss /= len(self.dataset.get_test_loader().dataset)
-        accuracy = 100 * correct / total
+        accuracy = 100.0 * correct / total
         # confusion_mat = confusion_matrix(targets_, pred_)
         # accuracy_per_class = confusion_mat.diagonal() / confusion_mat.sum(1)
         #
@@ -119,20 +143,21 @@ class Federator(Node):
         num_epochs = self.config.epochs
 
         # Client selection
+        selected_clients: List[LocalClient]
         selected_clients = random_selection(self.clients, self.config.clients_per_round)
 
         last_model = self.get_nn_parameters()
         for client in selected_clients:
-            self.message(client, Client.update_nn_parameters, last_model)
+            self.message(client.ref, Client.update_nn_parameters, last_model)
 
         # Actual training calls
         client_weights = {}
         client_sizes = {}
         for client in selected_clients:
-            train_loss, weights, accuracy, test_loss = self.message(client, Client.exec_round, num_epochs)
-            client_weights[client] = weights
-            client_data_size = self.message(client, Client.get_client_datasize)
-            client_sizes[client] = client_data_size
+            train_loss, weights, accuracy, test_loss = self.message(client.ref, Client.exec_round, num_epochs)
+            client_weights[client.name] = weights
+            client_data_size = self.message(client.ref, Client.get_client_datasize)
+            client_sizes[client.name] = client_data_size
             self.logger.info(f'Client {client} has a accuracy of {accuracy}, train loss={train_loss}, test loss={test_loss},datasize={client_data_size}')
 
         # updated_model = FedAvg(client_weights, client_sizes)

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import torch
 
-from fltk.util.definitions import Dataset, Nets, DataSampler, Optimizations
+from fltk.util.definitions import Dataset, Nets, DataSampler, Optimizations, LogLevel
 
 
 @dataclass
@@ -25,6 +25,8 @@ class Config:
         'momentum': momentum
     }
     loss_function = torch.nn.CrossEntropyLoss
+
+    log_level: LogLevel = LogLevel.DEBUG
 
     num_clients: int = 10
     clients_per_round: int = 2

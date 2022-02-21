@@ -58,6 +58,15 @@ class Client(Node):
 
         return final_running_loss, self.get_nn_parameters(),
 
+    def set_tau_eff(self, total):
+        client_weight = self.get_client_datasize() / total
+        n = self.get_client_datasize()
+        E = self.config.epochs
+        B = 16  # nicely hardcoded :)
+        tau_eff = int(E * n / B) * client_weight
+        if hasattr(self.optimizer, 'set_tau_eff'):
+            self.optimizer.set_tau_eff(tau_eff)
+
     def test(self):
         start_time = time.time()
         correct = 0
@@ -80,7 +89,7 @@ class Client(Node):
 
                 loss += self.loss_function(outputs, labels).item()
         loss /= len(self.dataset.get_test_loader().dataset)
-        accuracy = 100 * correct / total
+        accuracy = 100.0 * correct / total
         # confusion_mat = confusion_matrix(targets_, pred_)
         # accuracy_per_class = confusion_mat.diagonal() / confusion_mat.sum(1)
         #
@@ -105,6 +114,11 @@ class Client(Node):
         end = time.time()
         duration = end - start
         # self.logger.info(f'Round duration is {duration} seconds')
+
+        if hasattr(self.optimizer, 'pre_communicate'):  # aka fednova or fedprox
+            self.optimizer.pre_communicate()
+        for k, v in weights.items():
+            weights[k] = v.cpu()
         return loss, weights, accuracy, test_loss
 
     def __del__(self):

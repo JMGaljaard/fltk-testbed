@@ -51,6 +51,7 @@ class Node:
         self._config(config)
 
     def _config(self, config: Config):
+        self.logger.setLevel(config.log_level.value)
         self.config.rank = self.rank
         self.config.world_size = self.world_size
         self.cuda = config.cuda
@@ -58,9 +59,12 @@ class Node:
         self.distributed = config.distributed
         self.set_net(self.load_default_model())
 
-    def init_dataloader(self):
-        self.logger.info(f'world size = {self.config.world_size} with rank={self.config.rank}')
-        self.dataset = get_dataset(self.config.dataset_name)(self.config)
+    def init_dataloader(self, world_size: int = None):
+        config = copy.deepcopy(self.config)
+        if world_size:
+            config.world_size = world_size
+        self.logger.info(f'world size = {config.world_size} with rank={config.rank}')
+        self.dataset = get_dataset(config.dataset_name)(config)
         self.finished_init = True
         self.logger.info('Done with init')
 
