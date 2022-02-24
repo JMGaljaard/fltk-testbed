@@ -1,8 +1,10 @@
 import copy
 import time
+from pathlib import Path
 from typing import List, Union
 
 import torch
+from tqdm import tqdm
 
 from fltk.core.client import Client
 from fltk.core.node import Node
@@ -11,25 +13,30 @@ from fltk.strategy import FedAvg, random_selection, average_nn_parameters, avera
 from fltk.util.config import Config
 from dataclasses import dataclass
 
+from fltk.util.data_container import DataContainer, FederatorRecord, ClientRecord
+
 NodeReference = Union[Node, str]
 @dataclass
 class LocalClient:
     name: str
     ref: NodeReference
     data_size: int
+    exp_data: DataContainer
+
 
 
 class Federator(Node):
     clients: List[LocalClient] = []
     # clients: List[NodeReference] = []
     num_rounds: int
-
+    exp_data: DataContainer
 
     def __init__(self, id: int, rank: int, world_size: int, config: Config):
         super().__init__(id, rank, world_size, config)
         self.loss_function = self.config.get_loss_function()()
         self.num_rounds = config.rounds
         self.config = config
+        self.exp_data = DataContainer('federator', config.output_path, FederatorRecord, config.save_data_append)
 
 
 
@@ -40,12 +47,14 @@ class Federator(Node):
             for client_id in range(1, self.config.num_clients+ 1):
                 client_name = f'client{client_id}'
                 client = Client(client_name, client_id, world_size, copy.deepcopy(self.config))
-                self.clients.append(LocalClient(client_name, client, 0))
+                self.clients.append(LocalClient(client_name, client, 0, DataContainer(client_name, self.config.output_path,
+                                                                                      ClientRecord, self.config.save_data_append)))
 
     def register_client(self, client_name, rank):
         if self.config.single_machine:
             self.logger.warning('This function should not be called when in single machine mode!')
-        self.clients.append(LocalClient(client_name, client_name, 0))
+        self.clients.append(LocalClient(client_name, client_name, 0, DataContainer(client_name, self.config.output_path,
+                                                                                      ClientRecord, self.config.save_data_append)))
 
     def _num_clients_online(self) -> int:
         return len(self.clients)
@@ -88,10 +97,17 @@ class Federator(Node):
         self.get_client_data_sizes()
         self.clients_ready()
 
-        for communications_round in range(self.config.rounds):
-            self.exec_round()
+        for communication_round in range(self.config.rounds):
+            self.exec_round(communication_round)
 
+        self.save_data()
         self.logger.info('Federator is stopping')
+
+
+    def save_data(self):
+        self.exp_data.save()
+        for client in self.clients:
+            client.exp_data.save()
 
     def client_load_data(self):
         for client in self.clients:
@@ -138,7 +154,7 @@ class Federator(Node):
         self.logger.info(f'Test duration is {duration} seconds')
         return accuracy, loss
 
-    def exec_round(self):
+    def exec_round(self, id: int):
         start_time = time.time()
         num_epochs = self.config.epochs
 
@@ -153,21 +169,25 @@ class Federator(Node):
         # Actual training calls
         client_weights = {}
         client_sizes = {}
-        for client in selected_clients:
-            train_loss, weights, accuracy, test_loss = self.message(client.ref, Client.exec_round, num_epochs)
+        pbar = tqdm(selected_clients)
+        for client in pbar:
+            pbar.set_description(f'[Round {id:>3}] Running clients')
+            train_loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration = self.message(client.ref, Client.exec_round, num_epochs)
             client_weights[client.name] = weights
             client_data_size = self.message(client.ref, Client.get_client_datasize)
             client_sizes[client.name] = client_data_size
-            self.logger.info(f'Client {client} has a accuracy of {accuracy}, train loss={train_loss}, test loss={test_loss},datasize={client_data_size}')
+            client.exp_data.append(ClientRecord(id, train_duration, test_duration, round_duration, num_epochs, 0, accuracy, train_loss, test_loss))
+            # self.logger.info(f'[Round {id:>3}] Client {client} has a accuracy of {accuracy}, train loss={train_loss}, test loss={test_loss},datasize={client_data_size}')
 
         # updated_model = FedAvg(client_weights, client_sizes)
         updated_model = average_nn_parameters_simple(list(client_weights.values()))
         self.update_nn_parameters(updated_model)
 
         test_accuracy, test_loss = self.test(self.net)
-        self.logger.info(f'Federator has a accuracy of {test_accuracy} and loss={test_loss}')
+        self.logger.info(f'[Round {id:>3}] Federator has a accuracy of {test_accuracy} and loss={test_loss}')
 
         end_time = time.time()
         duration = end_time - start_time
-        self.logger.info(f'Round duration is {duration} seconds')
+        self.exp_data.append(FederatorRecord(len(selected_clients), 0, duration, test_loss, test_accuracy))
+        self.logger.info(f'[Round {id:>3}] Round duration is {duration} seconds')
 

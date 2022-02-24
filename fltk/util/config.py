@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 
@@ -42,6 +43,12 @@ class Config:
 
     rank: int = 0
     world_size: int = 0
+
+    # Save data in append mode. Thereby flushing on every append to file.
+    # This could be useful when a system is likely to crash midway an experiment
+    save_data_append: bool = False
+
+    output_path: Path = Path('output_test_2')
 
     def get_default_model_folder_path(self):
         return self.default_model_folder_path

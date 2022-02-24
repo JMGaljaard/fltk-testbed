@@ -103,23 +103,25 @@ class Client(Node):
     def get_client_datasize(self):
         return len(self.dataset.get_train_sampler())
 
-    def exec_round(self, num_epochs: int) -> Tuple[float, Any, float, float]:
+    def exec_round(self, num_epochs: int) -> Tuple[Any, Any, Any, Any, float, float, float]:
 
         start = time.time()
 
         loss, weights = self.train(num_epochs)
-
+        time_mark_between = time.time()
         accuracy, test_loss = self.test()
 
         end = time.time()
-        duration = end - start
+        round_duration = end - start
+        train_duration = time_mark_between - start
+        test_duration = end - time_mark_between
         # self.logger.info(f'Round duration is {duration} seconds')
 
         if hasattr(self.optimizer, 'pre_communicate'):  # aka fednova or fedprox
             self.optimizer.pre_communicate()
         for k, v in weights.items():
             weights[k] = v.cpu()
-        return loss, weights, accuracy, test_loss
+        return loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration
 
     def __del__(self):
         self.logger.info(f'Client {self.id} is stopping')
