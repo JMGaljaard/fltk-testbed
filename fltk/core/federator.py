@@ -14,6 +14,7 @@ from fltk.util.config import Config
 from dataclasses import dataclass
 
 from fltk.util.data_container import DataContainer, FederatorRecord, ClientRecord
+from fltk.strategy import get_aggregation
 
 NodeReference = Union[Node, str]
 @dataclass
@@ -36,11 +37,14 @@ class Federator(Node):
         self.loss_function = self.config.get_loss_function()()
         self.num_rounds = config.rounds
         self.config = config
+        config.output_path = Path(config.output_path) / config.exp_name / f'{config.name}_r{config.replication_id}'
         self.exp_data = DataContainer('federator', config.output_path, FederatorRecord, config.save_data_append)
+        self.aggregation_method = get_aggregation(config.aggregation)
 
 
 
     def create_clients(self):
+        self.logger.info('Creating clients')
         if self.config.single_machine:
             # Create direct clients
             world_size = self.config.num_clients + 1
@@ -49,12 +53,19 @@ class Federator(Node):
                 client = Client(client_name, client_id, world_size, copy.deepcopy(self.config))
                 self.clients.append(LocalClient(client_name, client, 0, DataContainer(client_name, self.config.output_path,
                                                                                       ClientRecord, self.config.save_data_append)))
+                self.logger.info(f'Client "{client_name}" created')
 
     def register_client(self, client_name, rank):
+        self.logger.info(f'Got new client registration from client {client_name}')
         if self.config.single_machine:
             self.logger.warning('This function should not be called when in single machine mode!')
-        self.clients.append(LocalClient(client_name, client_name, 0, DataContainer(client_name, self.config.output_path,
+        self.clients.append(LocalClient(client_name, client_name, rank, DataContainer(client_name, self.config.output_path,
                                                                                       ClientRecord, self.config.save_data_append)))
+
+    def stop_all_clients(self):
+        for client in self.clients:
+            self.message(client.ref, Client.stop_client)
+
 
     def _num_clients_online(self) -> int:
         return len(self.clients)
@@ -93,6 +104,9 @@ class Federator(Node):
         while not self._all_clients_online():
             self.logger.info(f'Waiting for all clients to come online. Waiting for {self.world_size - 1 -self._num_clients_online()} clients')
             time.sleep(2)
+        self.logger.info('All clients are online')
+        # self.logger.info('Running')
+        # time.sleep(10)
         self.client_load_data()
         self.get_client_data_sizes()
         self.clients_ready()
@@ -169,18 +183,58 @@ class Federator(Node):
         # Actual training calls
         client_weights = {}
         client_sizes = {}
-        pbar = tqdm(selected_clients)
-        for client in pbar:
-            pbar.set_description(f'[Round {id:>3}] Running clients')
-            train_loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration = self.message(client.ref, Client.exec_round, num_epochs)
+        # pbar = tqdm(selected_clients)
+        # for client in pbar:
+
+        # Client training
+        training_futures: List[torch.Future] = []
+
+
+
+        def training_cb(fut: torch.Future, client: LocalClient):
+            train_loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration = fut.wait()
             client_weights[client.name] = weights
             client_data_size = self.message(client.ref, Client.get_client_datasize)
             client_sizes[client.name] = client_data_size
-            client.exp_data.append(ClientRecord(id, train_duration, test_duration, round_duration, num_epochs, 0, accuracy, train_loss, test_loss))
-            # self.logger.info(f'[Round {id:>3}] Client {client} has a accuracy of {accuracy}, train loss={train_loss}, test loss={test_loss},datasize={client_data_size}')
+            self.logger.info(f'Training callback for client {client.name}')
+            client.exp_data.append(
+                ClientRecord(id, train_duration, test_duration, round_duration, num_epochs, 0, accuracy, train_loss,
+                             test_loss))
+
+        for client in selected_clients:
+            # future: torch.Future
+            # if not self.real_time:
+            #     future = torch.futures.Future()
+            #     future.set_result(self.message(client.ref, Client.exec_round, num_epochs))
+            #     future.then(lambda x: training_cb(x, client))
+            #     training_futures.append(future)
+            # else:
+            future = self.message_async(client.ref, Client.exec_round, num_epochs)
+            future.then(lambda x: training_cb(x, client))
+            training_futures.append(future)
+
+        def all_futures_done(futures: List[torch.Future])->bool:
+            return all(map(lambda x: x.done(), futures))
+
+        while not all_futures_done(training_futures):
+            time.sleep(0.1)
+            # self.logger.info(f'Waiting for other clients')
+
+        self.logger.info(f'Continue with rest [1]')
+
+
+        # for client in selected_clients:
+        #     # pbar.set_description(f'[Round {id:>3}] Running clients')
+        #     train_loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration = self.message(client.ref, Client.exec_round, num_epochs)
+        #     client_weights[client.name] = weights
+        #     client_data_size = self.message(client.ref, Client.get_client_datasize)
+        #     client_sizes[client.name] = client_data_size
+        #     client.exp_data.append(ClientRecord(id, train_duration, test_duration, round_duration, num_epochs, 0, accuracy, train_loss, test_loss))
+        #     # self.logger.info(f'[Round {id:>3}] Client {client} has a accuracy of {accuracy}, train loss={train_loss}, test loss={test_loss},datasize={client_data_size}')
 
         # updated_model = FedAvg(client_weights, client_sizes)
-        updated_model = average_nn_parameters_simple(list(client_weights.values()))
+        updated_model = self.aggregation_method(client_weights, client_sizes)
+        # updated_model = average_nn_parameters_simple(list(client_weights.values()))
         self.update_nn_parameters(updated_model)
 
         test_accuracy, test_loss = self.test(self.net)

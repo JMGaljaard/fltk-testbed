@@ -46,6 +46,7 @@ class Node:
         self.id = id
         self.rank = rank
         self.world_size = world_size
+        self.real_time = config.real_time
         global global_vars
         global_vars['self'] = self
         self._config(config)
@@ -77,8 +78,19 @@ class Node:
     @staticmethod
     def _receive(method: Callable, sender: str, *args, **kwargs):
         global global_vars
+        # print('_receive')
+        # print(global_vars)
         global_self = global_vars['self']
-        return method(global_self, *args, **kwargs)
+        # print(type(method))
+        # print(type(global_self))
+        if type(method) is str:
+            # print(f'Retrieving method from string: "{method}"')
+            method = getattr(global_self, method)
+            return method(*args, **kwargs)
+        else:
+            # print(method)
+            # print(global_self, *args, kwargs)
+            return method(global_self, *args, **kwargs)
 
     # def _lookup_reference(self, node_name: str):
 
@@ -153,12 +165,26 @@ class Node:
             self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
         # self.logger.info(f'Weights of the model are updated')
 
-    def message(self, other_node: str, method: Callable, *args, **kwargs):
+    def message(self, other_node: str, method: Callable, *args, **kwargs) -> torch.Future:
         if self.real_time:
             func = Node._receive
             args_list = [method, self.id] + list(args)
             return rpc.rpc_sync(other_node, func, args=args_list,  kwargs=kwargs)
         return method(other_node, *args, **kwargs)
+
+    def message_async(self, other_node: str, method: Callable, *args, **kwargs) -> torch.Future:
+        if self.real_time:
+            func = Node._receive
+            args_list = [method, self.id] + list(args)
+            return rpc.rpc_async(other_node, func, args=args_list,  kwargs=kwargs)
+        # Wrap inside a future to keep the logic the same
+        future = torch.futures.Future()
+        future.set_result(method(other_node, *args, **kwargs))
+        return future
+
+    # def register_client(self, client_name, rank):
+    #     print(f'self={self}')
+    #     self.logger.info(f'[Default Implementation!] Got new client registration from client {client_name}')
 
     def ping(self, sender: str, be_weird=False):
         self.logger.info(f'Pong from {self.id}, got call from {sender} [{self.counter}]')

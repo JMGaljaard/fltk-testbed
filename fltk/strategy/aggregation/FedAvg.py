@@ -1,6 +1,6 @@
 
 
-def FedAvg(parameters, sizes):
+def fed_avg(parameters, sizes):
     new_params = {}
     sum_size = 0
     for client in parameters:

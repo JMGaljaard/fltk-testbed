@@ -7,9 +7,10 @@
 # 6. Optimizers               #
 ###############################
 # Use enums instead of dataclasses?
-from enum import Enum
+from enum import Enum, unique
 
 
+@unique
 class DataSampler(Enum):
     uniform = "uniform"
     q_sampler = "q sampler"
@@ -21,18 +22,19 @@ class DataSampler(Enum):
     n_labels = "n labels"
 
 
+@unique
 class Optimizations(Enum):
     sgd = 'SGD'
     fedprox = 'FedProx'
     fednova = 'FedNova'
 
 
+@unique
 class Dataset(Enum):
     cifar10 = 'cifar10'
     cifar100 = 'cifar100'
     fashion_mnist = 'fashion-mnist'
     mnist = 'mnist'
-
 
 class LogLevel(Enum):
     CRITICAL = 50
@@ -44,13 +46,14 @@ class LogLevel(Enum):
     DEBUG = 10
     NOTSET = 0
 
-
+@unique
 class Aggregations(Enum):
     avg = 'Avg'
-    fed_avg = 'FedAvg'
+    fedavg = 'FedAvg'
     sum = 'Sum'
 
 
+@unique
 class Nets(Enum):
     cifar100_resnet = "Cifar100ResNet"
     cifar100_vgg = "Cifar100VGG"

@@ -54,6 +54,7 @@ class DataContainer:
         self.records = []
         self.file_name = f'{name}.csv'
         self.name = name
+        output_location = Path(output_location)
         output_location.mkdir(parents=True, exist_ok=True)
         self.file_path = output_location / self.file_name
         self.append_mode = append_mode

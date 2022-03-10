@@ -1,10 +1,15 @@
 import sys
+from pathlib import Path
+
 import yaml
 import copy
 import argparse
 
-global_template_path = './deploy/templates'
+# global_template_path = './deploy/templates'
 
+global_template_path = Path(__file__).absolute().parent.parent.parent / 'deploy' / 'templates'
+global_template_path = global_template_path.__str__()
+print(global_template_path)
 def load_system_template(template_path = global_template_path):
     print(f'Loading system template from {template_path}/system_stub.yml')
     with open(f'{template_path}/system_stub.yml') as file:
@@ -17,7 +22,7 @@ def load_client_template(type='default', template_path = global_template_path):
         return documents
 
 def get_deploy_path(name: str):
-    return f'./deploy/{name}'
+    return f'{Path(global_template_path).parent}/{name}'
 
 
 def generate_client(id, template: dict, world_size: int, type='default', cpu_set=''):

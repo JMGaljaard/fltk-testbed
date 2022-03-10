@@ -7,9 +7,6 @@ MAINTAINER Bart Cox <b.a.cox@tudelft.nl>
 # Run build without interactive dialogue
 ARG DEBIAN_FRONTEND=noninteractive
 
-ENV GLOO_SOCKET_IFNAME=eth0
-ENV TP_SOCKET_IFNAME=eth0
-
 # Define the working directory of the current Docker container
 WORKDIR /opt/federation-lab
 
@@ -25,6 +22,9 @@ COPY requirements.txt ./
 
 # Install all required packages for the generator
 RUN python3 -m pip install -r requirements.txt
+
+ENV GLOO_SOCKET_IFNAME=$NIC
+ENV TP_SOCKET_IFNAME=$NIC
 
 #RUN mkdir -p ./data/MNIST
 #COPY ./data/MNIST ../data/MNIST
@@ -46,5 +46,6 @@ COPY fltk ./fltk
 COPY configs ./configs
 #CMD python3 ./fltk/__main__.py single configs/experiment.yaml --rank=$RANK
 # CMD python3 -m fltk single configs/experiment_vanilla.yaml --rank=$RANK
-CMD python3 -m fltk single $EXP_CONFIG --rank=$RANK
+#CMD python3 -m fltk single $EXP_CONFIG --rank=$RANK
+CMD python3 -m fltk remote $EXP_CONFIG $RANK --nic=$NIC --host=$MASTER_HOSTNAME
 #CMD python3 setup.py

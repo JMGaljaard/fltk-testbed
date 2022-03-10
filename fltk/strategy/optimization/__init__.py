@@ -1,7 +1,7 @@
 import torch
 from .fedprox import FedProx
 from .FedNova import FedNova
-from ...util.definitions import Optimizations
+from fltk.util.definitions import Optimizations
 
 
 def get_optimizer(name: Optimizations):

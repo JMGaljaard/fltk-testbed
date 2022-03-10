@@ -10,7 +10,7 @@ from fltk.util.config import Config
 
 
 class Client(Node):
-
+    running = False
     def __init__(self, id: int, rank: int, world_size: int, config: Config):
         super().__init__(id, rank, world_size, config)
 
@@ -21,6 +21,23 @@ class Client(Node):
                                           self.config.scheduler_step_size,
                                           self.config.scheduler_gamma,
                                           self.config.min_lr)
+
+    def remote_registration(self):
+        self.logger.info('Sending registration')
+        self.message('federator', 'ping', 'new_sender', be_weird=True)
+        self.message('federator', 'register_client', self.id, self.rank)
+        self.running = True
+        self._event_loop()
+
+    def stop_client(self):
+        self.logger.info('Got call to stop event loop')
+        self.running = False
+
+    def _event_loop(self):
+        self.logger.info('Starting event loop')
+        while self.running:
+            time.sleep(0.1)
+        self.logger.info('Exiting node')
 
     def train(self, num_epochs: int):
         start_time = time.time()
@@ -47,10 +64,11 @@ class Client(Node):
             running_loss += loss.item()
             # Mark logging update step
             if i % self.config.log_interval == 0:
-                # self.logger.info(
-                #     '[%d, %5d] loss: %.3f' % (num_epochs, i, running_loss / self.config.log_interval))
+                self.logger.info(
+                    '[%s] [%d, %5d] loss: %.3f' % (self.id, num_epochs, i, running_loss / self.config.log_interval))
                 final_running_loss = running_loss / self.config.log_interval
                 running_loss = 0.0
+                # break
 
         end_time = time.time()
         duration = end_time - start_time
