@@ -1,0 +1,19 @@
+federator:
+  stub-name: system_stub.yml
+  pin-cores: true
+  num-cores: 1
+clients:
+  fast:
+    stub-name: stub_default.yml
+    amount: 20
+    pin-cores: true
+    num-cores: 1
+    cpu-speed: 0.5
+    cpu-variation: 0.16
+  slow:
+    stub-name: stub_default.yml
+    amount: 0
+    pin-cores: true
+    num-cores: 1
+    cpu-speed: 1
+    cpu-variation: 0

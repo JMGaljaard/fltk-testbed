@@ -1,15 +1,14 @@
 from pathlib import Path
 
 if __name__ == '__main__':
-    base_path = f'configs/{Path(__file__).parent.name}'
-    path = Path(base_path)
-    descr_path = path / 'descr.yaml'
+    base_path = Path(__file__).parent
+    descr_path = base_path / 'descr.yaml'
 
-    exp_cfg_list = [x for x in path.iterdir() if '.cfg' in x.suffixes]
+    exp_cfg_list = [x for x in base_path.iterdir() if '.cfg' in x.suffixes]
     descr_data = ''
     with open(descr_path) as descr_f:
         descr_data = descr_f.read()
-    exps_path = path / 'exps'
+    exps_path = base_path / 'exps'
     exps_path.mkdir(parents=True, exist_ok=True)
     for exp_cfg in exp_cfg_list:
         exp_cfg_data = ''

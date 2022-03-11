@@ -29,3 +29,4 @@ system:
     # nic: 'enp3s0'
   clients:
     amount: 2
+num_clients: 2

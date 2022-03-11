@@ -11,7 +11,7 @@ profiling_time: 100
 warmup_round: false
 output_location: 'output/dev_p2'
 tensor_board_active: true
-clients_per_round: 2
+clients_per_round: 4
 node_groups:
   slow: [1, 1]
   medium: [2, 2]
@@ -28,8 +28,11 @@ system:
     nic: 'eth0'
     # nic: 'enp3s0'
   clients:
-    amount: 2
+    amount: 4
+num_clients: 4
 # Individual configuration
 offload_stategy: vanilla
 deadline: 500
-experiment_prefix: 'dev_mnist_fedavg'
+single_machine: false
+real_time: true
+experiment_prefix: 'util_fedavg'

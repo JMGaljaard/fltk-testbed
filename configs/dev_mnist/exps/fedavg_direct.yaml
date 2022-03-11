@@ -1,6 +1,6 @@
 ---
 # Experiment configuration
-total_epochs: 2
+total_epochs: 3
 epochs_per_cycle: 1
 wait_for_clients: true
 net: MNISTCNN
@@ -16,10 +16,10 @@ node_groups:
   slow: [1, 1]
   medium: [2, 2]
   fast: [3, 3]
-sampler: "n labels" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
+sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
 #sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
 sampler_args:
-  - 2     # label limit || q probability || alpha || unused
+  - 0.07     # label limit || q probability || alpha || unused
   - 42    # random seed || random seed || random seed || unused
 system:
   federator:
@@ -29,8 +29,10 @@ system:
     # nic: 'enp3s0'
   clients:
     amount: 2
+num_clients: 2
 # Individual configuration
 offload_stategy: vanilla
-deadline: 500000
-experiment_prefix: 'dev_mnist_all_fedavg'
-single_machine: false
+deadline: 500
+single_machine: true
+real_time: false
+experiment_prefix: 'util_fedavg_direct'

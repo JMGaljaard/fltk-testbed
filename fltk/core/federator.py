@@ -25,6 +25,8 @@ class LocalClient:
     exp_data: DataContainer
 
 
+def cb_factory(future: torch.Future, method, *args, **kwargs):
+    future.then(lambda x: method(x, *args, **kwargs))
 
 class Federator(Node):
     clients: List[LocalClient] = []
@@ -190,27 +192,23 @@ class Federator(Node):
         training_futures: List[torch.Future] = []
 
 
+        # def cb_factory(future: torch.Future, method, client, client_weights, client_sizes, num_epochs, name):
+        #     future.then(lambda x: method(x, client, client_weights, client_sizes, num_epochs, client.name))
 
-        def training_cb(fut: torch.Future, client: LocalClient):
+        def training_cb(fut: torch.Future, client_ref: LocalClient, client_weights, client_sizes, num_epochs):
             train_loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration = fut.wait()
-            client_weights[client.name] = weights
-            client_data_size = self.message(client.ref, Client.get_client_datasize)
-            client_sizes[client.name] = client_data_size
-            self.logger.info(f'Training callback for client {client.name}')
-            client.exp_data.append(
+            self.logger.info(f'Training callback for client {client_ref.name} with accuracy={accuracy}')
+            client_weights[client_ref.name] = weights
+            client_data_size = self.message(client_ref.ref, Client.get_client_datasize)
+            client_sizes[client_ref.name] = client_data_size
+            client_ref.exp_data.append(
                 ClientRecord(id, train_duration, test_duration, round_duration, num_epochs, 0, accuracy, train_loss,
                              test_loss))
 
         for client in selected_clients:
-            # future: torch.Future
-            # if not self.real_time:
-            #     future = torch.futures.Future()
-            #     future.set_result(self.message(client.ref, Client.exec_round, num_epochs))
-            #     future.then(lambda x: training_cb(x, client))
-            #     training_futures.append(future)
-            # else:
             future = self.message_async(client.ref, Client.exec_round, num_epochs)
-            future.then(lambda x: training_cb(x, client))
+            cb_factory(future, training_cb, client, client_weights, client_sizes, num_epochs)
+            self.logger.info(f'Request sent to client {client.name}')
             training_futures.append(future)
 
         def all_futures_done(futures: List[torch.Future])->bool:
@@ -221,7 +219,7 @@ class Federator(Node):
             # self.logger.info(f'Waiting for other clients')
 
         self.logger.info(f'Continue with rest [1]')
-
+        time.sleep(3)
 
         # for client in selected_clients:
         #     # pbar.set_description(f'[Round {id:>3}] Running clients')

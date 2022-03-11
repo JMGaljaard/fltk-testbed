@@ -14,6 +14,8 @@ client_name: # name can be anything
       - RANK={rank}
       - WORLD_SIZE={world_size}
       - EXP_CONFIG=${EXP_CONFIG_FILE}
+      - MASTER_HOSTNAME=10.5.0.11
+      - NIC=eth0
     ports:
       - "5002:5000" # {machine-port}:{docker-port}
     depends_on:

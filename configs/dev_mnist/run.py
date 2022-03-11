@@ -5,7 +5,7 @@ import os
 if __name__ == '__main__':
     name = 'dev'
     generate_docker(name)
-    base_path = f'configs/{Path(__file__).parent.name}'
+    base_path = f'{Path(__file__).parent}'
     exp_list = [
         'fedavg.yaml',
         ]

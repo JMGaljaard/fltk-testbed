@@ -93,9 +93,9 @@ from torch.distributed import rpc
 
 from fltk.core.client import Client
 
-print(sys.path)
+# print(sys.path)
 # from fltk.core.federator import Federator as Fed
-print(list(Path.cwd().iterdir()))
+# print(list(Path.cwd().iterdir()))
 import argparse
 from enum import Enum
 from pathlib import Path
@@ -103,6 +103,8 @@ from pathlib import Path
 from fltk.core.federator import Federator
 from fltk.util.config import Config
 from fltk.util.definitions import Aggregations, Optimizations
+from fltk.util.generate_experiments import generate
+
 
 def run_single(config_path: Path):
 
@@ -152,7 +154,7 @@ def run_remote(config_path: Path, rank: int, nic=None, host=None):
         init_method=f'tcp://{os.environ["MASTER_ADDR"]}:{os.environ["MASTER_PORT"]}'
     )
     if rank != 0:
-        print(f'Starting worker {rank}')
+        print(f'Starting worker {rank}  with world size={config.world_size}')
         rpc.init_rpc(
             f"client{rank}",
             rank=rank,
@@ -194,10 +196,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='fltk', description='Experiment launcher for the Federated Learning Testbed (fltk)')
     subparsers = parser.add_subparsers(dest="action", required=True)
 
-    launch_parser = subparsers.add_parser('launch-util')
+    util_docker_parser = subparsers.add_parser('util-docker')
+    util_docker_parser.add_argument('name', type=str)
+    util_docker_parser.add_argument('--clients', type=int)
+    util_generate_parser = subparsers.add_parser('util-generate')
+    util_generate_parser.add_argument('path', type=str)
+    util_run_parser = subparsers.add_parser('util-run')
+    util_run_parser.add_argument('path', type=str)
+
+    # launch_parser.add_argument('action', choices=['docker', 'generate', 'run'])
+    # launch_parser.add_argument('path', help='path or key')
+
     remote_parser = subparsers.add_parser('remote')
     single_machine_parser = subparsers.add_parser('single')
-    add_default_arguments(launch_parser)
+    # add_default_arguments(launch_parser)
     add_default_arguments(remote_parser)
     add_default_arguments(single_machine_parser)
 
@@ -211,10 +223,15 @@ if __name__ == '__main__':
     # util_parser.add_argument('action')
     # print(sys.argv)
     args = parser.parse_args()
-    if args.action == 'launch-util':
-        pass
-        # run_single(Path(args.config))
-    if args.action == 'remote':
+    if args.action == 'util-docker':
+        print('docker')
+    elif args.action == 'util-generate':
+        path = Path(args.path)
+        print(f'generate for {path}')
+        generate(path)
+    elif args.action == 'util-run':
+        print('run')        # run_single(Path(args.config))
+    elif args.action == 'remote':
         run_remote(Path(args.config), args.rank, args.nic, args.host)
     else:
         # Run single machine mode
