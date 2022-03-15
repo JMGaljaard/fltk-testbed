@@ -13,7 +13,6 @@ from fltk.util.definitions import Dataset, Nets, DataSampler, Optimizations, Log
 @dataclass
 class Config:
     # optimizer: Optimizations
-    name: str = ''
     batch_size: int = 1
     test_batch_size: int = 1000
     rounds: int = 2
@@ -56,7 +55,7 @@ class Config:
     world_size: int = 0
 
     replication_id: int = None
-    exp_name: str = 'experiment'
+    experiment_prefix: str = ''
 
     real_time : bool = False
 
@@ -72,6 +71,8 @@ class Config:
                 kwargs[name] = field.type(kwargs[name])
         for name, value in kwargs.items():
             self.__setattr__(name, value)
+            if name == 'output_location':
+                self.output_path = Path(value)
 
     def get_default_model_folder_path(self):
         return self.default_model_folder_path

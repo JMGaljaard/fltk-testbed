@@ -5,11 +5,11 @@ federator:
 clients:
   fast:
     stub-name: stub_default.yml
-    amount: 20
+    amount: 2
     pin-cores: true
     num-cores: 1
-    cpu-speed: 0.5
-    cpu-variation: 0.16
+    cpu-speed: 1
+    cpu-variation: 0
   slow:
     stub-name: stub_default.yml
     amount: 0

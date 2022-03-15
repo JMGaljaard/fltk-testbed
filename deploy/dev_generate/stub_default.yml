@@ -16,6 +16,7 @@ client_name: # name can be anything
       - EXP_CONFIG=${EXP_CONFIG_FILE}
       - MASTER_HOSTNAME=10.5.0.11
       - NIC=eth0
+      - OPTIONAL_PARAMS=${OPTIONAL_PARAMS}
     ports:
       - "5002:5000" # {machine-port}:{docker-port}
     depends_on:

@@ -39,7 +39,10 @@ class Federator(Node):
         self.loss_function = self.config.get_loss_function()()
         self.num_rounds = config.rounds
         self.config = config
-        config.output_path = Path(config.output_path) / config.exp_name / f'{config.name}_r{config.replication_id}'
+        prefix_text = ''
+        if config.replication_id:
+            prefix_text = f'_r{config.replication_id}'
+        config.output_path = Path(config.output_path) / f'{config.experiment_prefix}{prefix_text}'
         self.exp_data = DataContainer('federator', config.output_path, FederatorRecord, config.save_data_append)
         self.aggregation_method = get_aggregation(config.aggregation)
 
@@ -112,7 +115,8 @@ class Federator(Node):
         self.client_load_data()
         self.get_client_data_sizes()
         self.clients_ready()
-
+        # self.logger.info('Sleeping before starting communication')
+        # time.sleep(20)
         for communication_round in range(self.config.rounds):
             self.exec_round(communication_round)
 
@@ -216,9 +220,10 @@ class Federator(Node):
 
         while not all_futures_done(training_futures):
             time.sleep(0.1)
+            self.logger.info('')
             # self.logger.info(f'Waiting for other clients')
 
-        self.logger.info(f'Continue with rest [1]')
+        self.logger.info(f'Continue with rest [1]')      
         time.sleep(3)
 
         # for client in selected_clients:

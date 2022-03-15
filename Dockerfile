@@ -1,3 +1,14 @@
+# FROM python:3-alpine
+
+# RUN mkdir /data
+# VOLUME /data
+
+# EXPOSE 8080
+
+# WORKDIR /data
+
+# CMD ["python", "-m" , "http.server", "8080"]
+
 # Base image to start with
 FROM ubuntu:20.04
  
@@ -25,6 +36,8 @@ RUN python3 -m pip install -r requirements.txt
 
 ENV GLOO_SOCKET_IFNAME=$NIC
 ENV TP_SOCKET_IFNAME=$NIC
+#ENV GLOO_SOCKET_IFNAME=eth0
+#ENV TP_SOCKET_IFNAME=eth0
 
 #RUN mkdir -p ./data/MNIST
 #COPY ./data/MNIST ../data/MNIST
@@ -46,6 +59,6 @@ COPY fltk ./fltk
 COPY configs ./configs
 #CMD python3 ./fltk/__main__.py single configs/experiment.yaml --rank=$RANK
 # CMD python3 -m fltk single configs/experiment_vanilla.yaml --rank=$RANK
-#CMD python3 -m fltk single $EXP_CONFIG --rank=$RANK
-CMD python3 -m fltk remote $EXP_CONFIG $RANK --nic=$NIC --host=$MASTER_HOSTNAME
+# CMD python3 -m fltk single $EXP_CONFIG --rank=$RANK
+CMD python3 -m fltk remote $EXP_CONFIG $RANK --nic=$NIC --host=$MASTER_HOSTNAME $OPTIONAL_PARAMS
 #CMD python3 setup.py

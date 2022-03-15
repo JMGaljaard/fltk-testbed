@@ -60,6 +60,7 @@ class DataContainer:
         self.append_mode = append_mode
         file_flag = 'a' if append_mode else 'w'
         self.file_handle = open(self.file_path, file_flag)
+        print(f'[<=========>] Creating data container at {self.file_path}')
         self.record_type = record_type
         if self.append_mode:
             open(self.file_path, 'w').close()
