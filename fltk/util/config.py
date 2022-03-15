@@ -6,6 +6,7 @@ from typing import Type
 
 import torch
 import yaml
+from fltk.util.log import getLogger
 
 from fltk.util.definitions import Dataset, Nets, DataSampler, Optimizations, LogLevel, Aggregations
 
@@ -25,6 +26,9 @@ class Config:
     scheduler_step_size: int = 50
     scheduler_gamma: float = 0.5
     min_lr: float = 1e-10
+
+    # @TODO: Set seed from configuration
+    rng_seed = 0
     # Enum
     optimizer: Optimizations = Optimizations.sgd
     optimizer_args = {
@@ -73,7 +77,11 @@ class Config:
             self.__setattr__(name, value)
             if name == 'output_location':
                 self.output_path = Path(value)
+        self.update_rng_seed()
 
+
+    def update_rng_seed(self):
+        torch.manual_seed(self.rng_seed)
     def get_default_model_folder_path(self):
         return self.default_model_folder_path
 
@@ -100,9 +108,9 @@ class Config:
 
     @classmethod
     def FromYamlFile(cls, path: Path):
-        print(f'Loading yaml from {path.absolute()}')
+        getLogger(__name__).debug(f'Loading yaml from {path.absolute()}')
         with open(path) as file:
             content = yaml.safe_load(file)
             for k, v in content.items():
-                print(f'Inserting key "{k}" into config')
+                getLogger(__name__).debug(f'Inserting key "{k}" into config')
             return cls(**content)
