@@ -1,3 +1,4 @@
+import argparse
 import copy
 from pathlib import Path
 import yaml
@@ -67,20 +68,8 @@ def generate_clients_proporties(clients_dict: dict, path: Path):
         results += gen_client(k, v, path)
     return results
 
-
-def generate_compose_file(path: Path):
-    """
-    Used properties:
-    - World size
-    - num clients?
-    - path to deploy files
-    - random seed?
-    """
-
-    system_path = path / 'description.yml'
-    system = load_yaml_file(system_path)
-    # path = Path('deploy/dev_generate')
-
+def generate_compose_file_from_dict(system: dict):
+    path = Path(system['base_path'])
     client_descriptions = generate_clients_proporties(system['clients'], path)
     last_core_id = 0
     world_size = len(client_descriptions) + 1
@@ -95,7 +84,7 @@ def generate_compose_file(path: Path):
         cpu_set: str
         amount = system['federator']['num-cores']
         if amount > 1:
-            cpu_set = f'{last_core_id}-{last_core_id+amount-1}'
+            cpu_set = f'{last_core_id}-{last_core_id + amount - 1}'
         else:
             cpu_set = f'{last_core_id}'
         system_template['services']['fl_server']['cpuset'] = cpu_set
@@ -109,18 +98,39 @@ def generate_compose_file(path: Path):
         if client_d['num_cores']:
             amount = client_d['num_cores']
             if amount > 1:
-                cpu_set = f'{last_core_id}-{last_core_id+amount-1}'
+                cpu_set = f'{last_core_id}-{last_core_id + amount - 1}'
             else:
                 cpu_set = f'{last_core_id}'
             last_core_id += amount
-        local_template, container_name = generate_client(idx + 1, stub_data, world_size, client_d['name'], cpu_set, client_d['num_cpu'])
+        local_template, container_name = generate_client(idx + 1, stub_data, world_size, client_d['name'], cpu_set,
+                                                         client_d['num_cpu'])
         system_template['services'].update(local_template)
         print(container_name)
     with open(r'./docker-compose.yml', 'w') as file:
         yaml.dump(system_template, file, sort_keys=False)
 
+def generate_compose_file(path: Path):
+    """
+    Used properties:
+    - World size
+    - num clients?
+    - path to deploy files
+    - random seed?
+    """
+
+    system_path = path / 'description.yml'
+    system = load_yaml_file(system_path)
+    # path = Path('deploy/dev_generate')
+    generate_compose_file_from_dict(system)
+
+
 
 if __name__ == '__main__':
-    path = Path('deploy/dev_generate')
+    parser = argparse.ArgumentParser(description='Generate docker-compose file')
+    parser.add_argument('path', type=str,
+                        help='Path to a deployment config folder')
+    parser.add_argument('--clients', type=int, help='Set the number of clients in the system', default=None)
+    args = parser.parse_args()
+    path = Path(args.path)
     results = generate_compose_file(path)
     print('done')

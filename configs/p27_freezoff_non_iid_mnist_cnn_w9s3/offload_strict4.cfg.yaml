@@ -1,4 +1,0 @@
-# Individual configuration
-offload_stategy: offload-strict
-deadline: 9
-deadline_threshold: 1

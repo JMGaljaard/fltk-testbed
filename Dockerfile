@@ -28,5 +28,6 @@ EXPOSE 5000
 
 COPY fltk ./fltk
 COPY configs ./configs
+COPY experiments ./experiments
 
 CMD python3 -m fltk remote $EXP_CONFIG $RANK --nic=$NIC --host=$MASTER_HOSTNAME $OPTIONAL_PARAMS

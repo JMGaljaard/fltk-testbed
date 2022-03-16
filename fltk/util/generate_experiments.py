@@ -1,7 +1,8 @@
+import copy
 from pathlib import Path
 import os
 import yaml
-from fltk.util.generate_docker_compose_2 import generate_compose_file
+from fltk.util.generate_docker_compose_2 import generate_compose_file, generate_compose_file_from_dict
 
 
 def rm_tree(pth: Path):
@@ -11,6 +12,16 @@ def rm_tree(pth: Path):
         # else:
         #     rm_tree(child)
     # pth.rmdir()
+
+
+def check_num_clients_consistency(cfg_data: dict):
+    if type(cfg_data) is str:
+        cfg_data = yaml.safe_load(copy.deepcopy(cfg_data))
+
+    if 'deploy' in cfg_data and 'docker' in cfg_data['deploy']:
+        num_docker_clients = sum([x['amount'] for x in cfg_data['deploy']['docker']['clients'].values()])
+        if cfg_data['num_clients'] != num_docker_clients:
+            print('[Warning]\t Number of docker clients is not equal to the num_clients property!')
 
 
 def generate(base_path: Path):
@@ -23,6 +34,8 @@ def generate(base_path: Path):
     exps_path = base_path / 'exps'
     rm_tree(exps_path)
     exps_path.mkdir(parents=True, exist_ok=True)
+
+    check_num_clients_consistency(descr_data)
     for exp_cfg in exp_cfg_list:
         exp_cfg_data = ''
         with open(exp_cfg) as exp_f:
@@ -74,15 +87,17 @@ def run(base_path: Path):
     if 'replications' in descr_data:
         replications = descr_data['replications']
     run_docker = False
-    if 'docker_system' in descr_data:
+    if 'deploy' in descr_data and 'docker' in descr_data['deploy']:
+    # if 'docker_system' in descr_data:
         # Run in docker
         # Generate Docker
         print(descr_data)
-        docker_deploy_path = Path(descr_data['docker_system'])
+        docker_deploy_path = Path(descr_data['deploy']['docker']['base_path'])
 
         print(docker_deploy_path)
         run_docker = True
-        generate_compose_file(docker_deploy_path)
+        generate_compose_file_from_dict(descr_data['deploy']['docker'])
+        # generate_compose_file(docker_deploy_path)
 
     exp_files = [x for x in (base_path / 'exps').iterdir() if x.suffix in ['.yaml', '.yml']]
 

@@ -147,3 +147,4 @@ docker_data
 docker-compose.yml
 
 refactor-notes.md
+experiments/**/exps/*

@@ -1,3 +1,0 @@
-# Individual configuration
-offload_stategy: dynamic-terminate
-deadline: 500000
