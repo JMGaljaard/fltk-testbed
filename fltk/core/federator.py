@@ -245,6 +245,6 @@ class Federator(Node):
 
         end_time = time.time()
         duration = end_time - start_time
-        self.exp_data.append(FederatorRecord(len(selected_clients), 0, duration, test_loss, test_accuracy))
+        self.exp_data.append(FederatorRecord(len(selected_clients), id, duration, test_loss, test_accuracy))
         self.logger.info(f'[Round {id:>3}] Round duration is {duration} seconds')
 

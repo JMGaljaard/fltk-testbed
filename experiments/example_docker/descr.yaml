@@ -1,6 +1,7 @@
 ---
 # Experiment configuration
 total_epochs: 3
+rounds: 5
 epochs_per_cycle: 1
 wait_for_clients: true
 net: MNISTCNN
