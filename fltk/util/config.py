@@ -70,6 +70,10 @@ class Config:
 
     def __init__(self, **kwargs) -> None:
         enum_fields = [x for x in self.__dataclass_fields__.items() if isinstance(x[1].type, Enum) or isinstance(x[1].type, EnumMeta)]
+        if 'dataset' in kwargs and 'dataset_name' not in kwargs:
+            kwargs['dataset_name'] = kwargs['dataset']
+        if 'net' in kwargs and 'net_name' not in kwargs:
+            kwargs['net_name'] = kwargs['net']
         for name, field in enum_fields:
             if name in kwargs and isinstance(kwargs[name], str):
                 kwargs[name] = field.type(kwargs[name])

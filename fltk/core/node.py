@@ -56,7 +56,7 @@ class Node:
         self.config.rank = self.rank
         self.config.world_size = self.world_size
         self.cuda = config.cuda
-        self.init_device()
+        self.device = self.init_device()
         self.distributed = config.distributed
         self.set_net(self.load_default_model())
 
