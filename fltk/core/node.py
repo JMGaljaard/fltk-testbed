@@ -16,11 +16,7 @@ global_vars = {}
 
 
 def _remote_method_direct(method, other_node: str, *args, **kwargs):
-    # Client example
-    #  ret = rpc.rpc_async(self.client_to_offload_to, Client.offload_receive_endpoint, args=([model_weights, i, self.id, local_updates_left]))
-
     args = [method, other_node] + list(args)
-    # return rpc.rpc_sync(other_node, _call_method, args=args, kwargs=kwargs)
     return rpc.rpc_sync(other_node, method, args=args, kwargs=kwargs)
 
 class Node:
@@ -38,8 +34,6 @@ class Node:
     dataset: Any
     logger = getLogger(__name__)
 
-
-    # _address_book = {}
 
     def __init__(self, id: int, rank: int, world_size: int, config: Config):
         self.config = config
@@ -72,27 +66,15 @@ class Node:
     def is_ready(self):
         return self.finished_init
 
-    # def _add_address(self, node_name: str, ref: Any):
-    #     self._address_book[node_name] = ref
-
     @staticmethod
     def _receive(method: Callable, sender: str, *args, **kwargs):
         global global_vars
-        # print('_receive')
-        # print(global_vars)
         global_self = global_vars['self']
-        # print(type(method))
-        # print(type(global_self))
         if type(method) is str:
-            # print(f'Retrieving method from string: "{method}"')
             method = getattr(global_self, method)
             return method(*args, **kwargs)
         else:
-            # print(method)
-            # print(global_self, *args, kwargs)
             return method(global_self, *args, **kwargs)
-
-    # def _lookup_reference(self, node_name: str):
 
     def init_device(self):
         if self.cuda and not torch.cuda.is_available():
@@ -107,11 +89,6 @@ class Node:
     def set_net(self, net):
         self.net = net
         self.net.to(self.device)
-
-    # def load_model_from_file(self):
-    #     model_class = self.args.get_net()
-    #     default_model_path = os.path.join(self.args.get_default_model_folder_path(), model_class.__name__ + ".model")
-    #     return self.load_model_from_file(default_model_path)
 
     def get_nn_parameters(self):
         """
@@ -181,10 +158,6 @@ class Node:
         future = torch.futures.Future()
         future.set_result(method(other_node, *args, **kwargs))
         return future
-
-    # def register_client(self, client_name, rank):
-    #     print(f'self={self}')
-    #     self.logger.info(f'[Default Implementation!] Got new client registration from client {client_name}')
 
     def ping(self, sender: str, be_weird=False):
         self.logger.info(f'Pong from {self.id}, got call from {sender} [{self.counter}]')
