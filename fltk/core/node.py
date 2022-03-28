@@ -1,39 +1,45 @@
 import copy
 import os
 from typing import Callable, Any
-
 import torch
-
-# from fltk.core.rpc_util import _remote_method_direct
 from torch.distributed import rpc
-
 from fltk.datasets.loader_util import get_dataset
 from fltk.nets import get_net
 from fltk.util.config import Config
 from fltk.util.log import getLogger
 
+# Global dictionary to enable peer to peer communication between clients
 global_vars = {}
 
 
 def _remote_method_direct(method, other_node: str, *args, **kwargs):
+    """
+    Utility function for RPC communication between nodes
+    :param method: A callable
+    :param other_node: reference to other node
+    :return: any
+    """
     args = [method, other_node] + list(args)
     return rpc.rpc_sync(other_node, method, args=args, kwargs=kwargs)
 
+
 class Node:
+    """
+    Implementation of any participating node.
+    It handles communication and the basic functions for Deep Learning.
+    """
     id: int
     rank: int
     world_size: int
-    counter = 0
-    real_time = False
-    distributed = True
-    cuda = False
+    counter: int = 0
+    real_time: bool = False
+    distributed: bool = True
+    cuda: bool = False
     finished_init: bool = False
-
     device = torch.device("cpu")
     net: Any
     dataset: Any
     logger = getLogger(__name__)
-
 
     def __init__(self, id: int, rank: int, world_size: int, config: Config):
         self.config = config
@@ -68,6 +74,17 @@ class Node:
 
     @staticmethod
     def _receive(method: Callable, sender: str, *args, **kwargs):
+        """
+        Communication utility function.
+        This is the entry points for all incoming RPC communication.
+        The class object (self) will be loaded from the global space
+        and the callable method is executed within the context of self
+        :param method:
+        :param sender:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         global global_vars
         global_self = global_vars['self']
         if type(method) is str:
@@ -87,19 +104,23 @@ class Node:
             return torch.device("cpu")
 
     def set_net(self, net):
+        """
+        Update the local parameters of self.net with net.
+        This method also makes sure that the parameters are configured for the correct device (CPU or GPU/CUDA)
+        :param net:
+        """
         self.net = net
         self.net.to(self.device)
 
     def get_nn_parameters(self):
         """
-        Return the NN's parameters.
+        Return the DNN parameters.
         """
         return self.net.state_dict()
 
     def load_default_model(self):
         """
         Load a model from default model file.
-
         This is used to ensure consistent default model behavior.
         """
         model_class = get_net(self.config.net_name)
@@ -110,7 +131,6 @@ class Node:
     def load_model_from_file(self, model_file_path):
         """
         Load a model from a file.
-
         :param model_file_path: string
         """
         model_class = get_net(self.config.net_name)
@@ -140,9 +160,13 @@ class Node:
             # self.offloaded_net.load_state_dict(copy.deepcopy(new_params), strict=True)
         else:
             self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
-        # self.logger.info(f'Weights of the model are updated')
 
     def message(self, other_node: str, method: Callable, *args, **kwargs) -> torch.Future:
+        """
+        All communication with other nodes should go through this method.
+        The attribute real_time determines if the communication should use RPC or if it is a direct object call.
+        :return: (resolved) torch.Future
+        """
         if self.real_time:
             func = Node._receive
             args_list = [method, self.id] + list(args)
@@ -150,6 +174,12 @@ class Node:
         return method(other_node, *args, **kwargs)
 
     def message_async(self, other_node: str, method: Callable, *args, **kwargs) -> torch.Future:
+        """
+        This is the async version of 'message'.
+        All communication with other nodes should go through this method.
+        The attribute real_time determines if the communication should use RPC or if it is a direct object call.
+        :return: torch.Future
+        """
         if self.real_time:
             func = Node._receive
             args_list = [method, self.id] + list(args)
