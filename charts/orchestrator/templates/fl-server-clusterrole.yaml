@@ -1,0 +1,12 @@
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fltk-administrator-role
+#  Currently, we allow every action with this ClusterRole, these could be restricted if deemed necessary
+rules:
+  - apiGroups:
+      - '*'
+    resources:
+      - '*'
+    verbs:
+      - '*'

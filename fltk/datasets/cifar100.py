@@ -1,45 +1,37 @@
-from .dataset import Dataset
+from torch.utils.data import DataLoader, DistributedSampler
 from torchvision import datasets
 from torchvision import transforms
-from torch.utils.data import DataLoader
+
+from .dataset import Dataset
+
 
 class CIFAR100Dataset(Dataset):
 
-    def __init__(self, args):
-        super(CIFAR100Dataset, self).__init__(args)
+    DEFAULT_TRANSFORM = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(32, 4),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
+    ])
 
-    def load_train_dataset(self):
-        self.get_args().get_logger().debug("Loading CIFAR100 train data")
+    def __init__(self, config, learning_param, rank: int = 0, world_size: int = None):
+        super(CIFAR100Dataset, self).__init__(config, learning_param, rank, world_size)
 
-        normalize = transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
-        transform = transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomCrop(32, 4),
-            transforms.ToTensor(),
-            normalize
-        ])
-        train_dataset = datasets.CIFAR100(root=self.get_args().get_data_path(), train=True, download=True, transform=transform)
-        train_loader = DataLoader(train_dataset, batch_size=len(train_dataset))
+    def load_train_dataset(self, rank: int = 0, world_size: int = None):
+        train_dataset = datasets.CIFAR100(root=self.config.get_data_path(), train=True, download=True,
+                                          transform=self.DEFAULT_TRANSFORM)
+        sampler = DistributedSampler(train_dataset, rank=rank,
+                                     num_replicas=self.world_size) if self.world_size else None
+        train_loader = DataLoader(train_dataset, batch_size=self.learning_params.batch_size, sampler=sampler,
+                                  shuffle=(sampler is None))
 
-        train_data = self.get_tuple_from_data_loader(train_loader)
-
-        self.get_args().get_logger().debug("Finished loading CIFAR100 train data")
-
-        return train_data
+        return train_loader
 
     def load_test_dataset(self):
-        self.get_args().get_logger().debug("Loading CIFAR100 test data")
 
-        normalize = transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            normalize
-        ])
-        test_dataset = datasets.CIFAR100(root=self.get_args().get_data_path(), train=False, download=True, transform=transform)
-        test_loader = DataLoader(test_dataset, batch_size=len(test_dataset))
-
-        test_data = self.get_tuple_from_data_loader(test_loader)
-
-        self.get_args().get_logger().debug("Finished loading CIFAR100 test data")
-
-        return test_data
+        test_dataset = datasets.CIFAR100(root=self.config.get_data_path(), train=False, download=True,
+                                         transform=self.DEFAULT_TRANSFORM)
+        sampler = DistributedSampler(test_dataset, rank=self.rank,
+                                     num_replicas=self.world_size) if self.world_size else None
+        test_loader = DataLoader(test_dataset, batch_size=self.learning_params.batch_size, sampler=sampler)
+        return test_loader

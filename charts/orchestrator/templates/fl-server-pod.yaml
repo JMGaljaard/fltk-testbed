@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app.kubernetes.io/name: "fltk.orchestrator"
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    fltk.service: fl-server
+  name: fl-server
+spec:
+  containers:
+    - command:
+        - python3
+        - -m
+        - fltk
+      args:
+        - cluster
+        - configs/{{ .Values.orchestrator.configurationFile }}
+      env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: IMAGE_NAME
+          value: {{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName }}
+      image: {{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName }}
+      name: federation-lab-server
+      resources:
+        limits:
+          cpu: {{ (.Values.orchestrator.cpu | int) }}
+          memory: {{ (.Values.orchestrator.memory | int) }}
+      volumeMounts:
+        - mountPath: /opt/federation-lab/output
+          name: fl-server-claim
+          readOnly: true
+  restartPolicy: Never
+  volumes:
+    - name: fl-server-claim
+      persistentVolumeClaim:
+        claimName: fl-server-claim

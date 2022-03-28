@@ -15,11 +15,11 @@ class BasicBlock(nn.Module):
         self.bn2 = nn.BatchNorm2d(planes)
 
         self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion*planes:
+        if stride != 1 or in_planes != self.expansion * planes:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes,
+                nn.Conv2d(in_planes, self.expansion * planes,
                           kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.expansion*planes)
+                nn.BatchNorm2d(self.expansion * planes)
             )
 
     def forward(self, x):
@@ -42,14 +42,14 @@ class Bottleneck(nn.Module):
         self.bn2 = nn.BatchNorm2d(planes)
         self.conv3 = nn.Conv2d(planes, self.expansion *
                                planes, kernel_size=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(self.expansion*planes)
+        self.bn3 = nn.BatchNorm2d(self.expansion * planes)
 
         self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion*planes:
+        if stride != 1 or in_planes != self.expansion * planes:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes,
+                nn.Conv2d(in_planes, self.expansion * planes,
                           kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.expansion*planes)
+                nn.BatchNorm2d(self.expansion * planes)
             )
 
     def forward(self, x):
@@ -62,7 +62,7 @@ class Bottleneck(nn.Module):
 
 
 class Cifar10ResNet(nn.Module):
-    def __init__(self, block = BasicBlock, num_blocks =[2, 2, 2, 2], num_classes=10):
+    def __init__(self, block: nn.Module = BasicBlock, num_blocks=[2, 2, 2, 2], num_classes=10):
         super(Cifar10ResNet, self).__init__()
         self.in_planes = 64
 
@@ -73,10 +73,10 @@ class Cifar10ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
-        self.linear = nn.Linear(512*block.expansion, num_classes)
+        self.linear = nn.Linear(512 * block.expansion, num_classes)
 
     def _make_layer(self, block, planes, num_blocks, stride):
-        strides = [stride] + [1]*(num_blocks-1)
+        strides = [stride] + [1] * (num_blocks - 1)
         layers = []
         for stride in strides:
             layers.append(block(self.in_planes, planes, stride))
@@ -95,21 +95,27 @@ class Cifar10ResNet(nn.Module):
         return out
 
 
-def ResNet18():
-    return Cifar10ResNet(BasicBlock, [2, 2, 2, 2])
+class ResNet18(Cifar10ResNet):
+
+    def __init__(self):
+        super(ResNet18, self).__init__(BasicBlock, [2, 2, 2, 2])
 
 
-def ResNet34():
-    return Cifar10ResNet(BasicBlock, [3, 4, 6, 3])
+class ResNet34(Cifar10ResNet):
+    def __init__(self):
+        super(ResNet34, self).__init__(BasicBlock, [3, 4, 6, 3])
 
 
-def ResNet50():
-    return Cifar10ResNet(Bottleneck, [3, 4, 6, 3])
+class ResNet50(Cifar10ResNet):
+    def __init__(self):
+        super(ResNet50, self).__init__(Bottleneck, [3, 4, 6, 3])
 
 
-def ResNet101():
-    return Cifar10ResNet(Bottleneck, [3, 4, 23, 3])
+class ResNet101(Cifar10ResNet):
+    def __init__(self):
+        super(ResNet101, self).__init__(Bottleneck, [3, 4, 23, 3])
 
 
-def ResNet152():
-    return Cifar10ResNet(Bottleneck, [3, 8, 36, 3])
+class ResNet152(Cifar10ResNet):
+    def __init__(self):
+        super(ResNet152, self).__init__(Bottleneck, [3, 8, 36, 3])

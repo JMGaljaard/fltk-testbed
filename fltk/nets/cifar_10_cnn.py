@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -26,6 +25,8 @@ class Cifar10CNN(nn.Module):
         self.pool3 = nn.MaxPool2d(kernel_size=2)
 
         self.fc1 = nn.Linear(128 * 4 * 4, 128)
+
+        self.softmax = nn.Softmax()
         self.fc2 = nn.Linear(128, 10)
 
     def forward(self, x):
@@ -44,6 +45,6 @@ class Cifar10CNN(nn.Module):
         x = x.view(-1, 128 * 4 * 4)
 
         x = self.fc1(x)
-        x = F.softmax(self.fc2(x))
+        x = self.softmax(self.fc2(x))
 
         return x

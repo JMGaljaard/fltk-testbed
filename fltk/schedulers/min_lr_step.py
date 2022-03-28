@@ -1,9 +1,22 @@
-class MinCapableStepLR:
+import abc
+import logging
 
-    def __init__(self, logger, optimizer, step_size, gamma, min_lr):
+import torch
+
+
+class LearningScheduler(abc.ABC):
+
+    @abc.abstractmethod
+    def step(self):
+        raise NotImplementedError()
+
+
+class MinCapableStepLR(LearningScheduler):
+
+    def __init__(self, optimizer: torch.optim.Optimizer, step_size, gamma, min_lr):
         """
         :param logger: logger
-        :type logger: loguru.logger
+        :type logger: logger
         :param optimizer:
         :type optimizer: torch.optim
         :param step_size: # of epochs between LR updates
@@ -13,7 +26,7 @@ class MinCapableStepLR:
         :param min_lr: minimum learning rate
         :type min_lr: float
         """
-        self.logger = logger
+        self.logger = logging.getLogger('MinCapableStepLR')
 
         self.optimizer = optimizer
         self.step_size = step_size

@@ -1,33 +1,28 @@
 from .dataset import Dataset
 from torchvision import datasets
 from torchvision import transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, DistributedSampler
+
 
 class FashionMNISTDataset(Dataset):
 
-    def __init__(self, args):
-        super(FashionMNISTDataset, self).__init__(args)
+    def __init__(self, config, learning_param, rank: int = 0, world_size: int = None):
+        super(FashionMNISTDataset, self).__init__(config, learning_param, rank, world_size)
 
-    def load_train_dataset(self):
-        self.get_args().get_logger().debug("Loading Fashion MNIST train data")
+    def load_train_dataset(self, rank: int = 0, world_size: int = None):
+        train_dataset = datasets.FashionMNIST(root=self.config.get_data_path(), train=True, download=True,
+                                              transform=transforms.Compose([transforms.ToTensor()]))
+        sampler = DistributedSampler(train_dataset, rank=rank,
+                                     num_replicas=self.world_size) if self.world_size else None
+        train_loader = DataLoader(train_dataset, batch_size=self.learning_params.batch_size, sampler=sampler,
+                                  shuffle=(sampler is None))
 
-        train_dataset = datasets.FashionMNIST(self.get_args().get_data_path(), train=True, download=True, transform=transforms.Compose([transforms.ToTensor()]))
-        train_loader = DataLoader(train_dataset, batch_size=len(train_dataset))
-
-        train_data = self.get_tuple_from_data_loader(train_loader)
-
-        self.get_args().get_logger().debug("Finished loading Fashion MNIST train data")
-
-        return train_data
+        return train_loader
 
     def load_test_dataset(self):
-        self.get_args().get_logger().debug("Loading Fashion MNIST test data")
-
-        test_dataset = datasets.FashionMNIST(self.get_args().get_data_path(), train=False, download=True, transform=transforms.Compose([transforms.ToTensor()]))
-        test_loader = DataLoader(test_dataset, batch_size=len(test_dataset))
-
-        test_data = self.get_tuple_from_data_loader(test_loader)
-
-        self.get_args().get_logger().debug("Finished loading Fashion MNIST test data")
-
-        return test_data
+        test_dataset = datasets.FashionMNIST(root=self.config.get_data_path(), train=False, download=True,
+                                             transform=transforms.Compose([transforms.ToTensor()]))
+        sampler = DistributedSampler(test_dataset, rank=self.rank,
+                                     num_replicas=self.world_size) if self.world_size else None
+        test_loader = DataLoader(test_dataset, batch_size=self.learning_params.batch_size, sampler=sampler)
+        return test_loader

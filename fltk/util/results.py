@@ -1,5 +1,7 @@
 from dataclasses import dataclass
-from typing import Any
+
+import numpy as np
+
 
 @dataclass
 class EpochData:
@@ -9,12 +11,7 @@ class EpochData:
     loss_train: float
     accuracy: float
     loss: float
-    class_precision: Any
-    class_recall: Any
+    class_precision: np.array
+    class_recall: np.array
+    confusion_mat: np.array
     client_id: str = None
-
-    def to_csv_line(self):
-        delimeter = ','
-        values = self.__dict__.values()
-        values = [str(x) for x in values]
-        return delimeter.join(values)

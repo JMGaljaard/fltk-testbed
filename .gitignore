@@ -28,7 +28,7 @@ share/python-wheels/
 MANIFEST
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
+#  Usually these files are written by a python script from a master_template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
@@ -128,15 +128,11 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-
 venv
 venv-*
-default_models
-data
-data_loaders
-simple_example
+data/**
+!data/.gitkeep
 output
-docker_data
 .idea
-*.tmp.txt
-docker-compose.yml
+
+logging/**/events.out.**

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fl-extractor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: "fltk.extractor"
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: "fltk.extractor"
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        fltk.service: fl-extractor
+    spec:
+      containers:
+        - name: federation-lab-server
+          command:
+            - tensorboard
+          args:
+            - --logdir
+            - logging
+          image: {{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName }}
+          ports:
+            - containerPort: 6006
+          resources: {}
+            # Set the following values in case you want to limit the reserved resources.
+            # Whenever the pod exceeds these requirements, the Scheduler (Kubernetes) may kill
+            # the pod, resulting in startup.
+            # requests: {}
+            # limits: {}
+          volumeMounts:
+            - mountPath: /opt/federation-lab/output
+              name: fl-server-claim
+              readOnly: true                      # We mount output readOnly as this is for Orchestrator data.
+            - mountPath: /opt/federation-lab/logging
+              name: fl-log-claim
+              readOnly: true                      # We mount log readOnly as this is for the Master worker nodes.
+          lifecycle:
+            # This pre-stop hook
+            preStop:
+              exec:
+                command:
+                  - "killall -9 tensorboard"
+      volumes:
+        - name: fl-server-claim
+          persistentVolumeClaim:
+            claimName: fl-server-claim
+        - name: fl-log-claim
+          persistentVolumeClaim:
+            claimName: fl-log-claim
