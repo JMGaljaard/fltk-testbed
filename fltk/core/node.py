@@ -31,7 +31,6 @@ class Node:
     id: int
     rank: int
     world_size: int
-    counter: int = 0
     real_time: bool = False
     distributed: bool = True
     cuda: bool = False
@@ -189,14 +188,14 @@ class Node:
         future.set_result(method(other_node, *args, **kwargs))
         return future
 
-    def ping(self, sender: str, be_weird=False):
-        self.logger.info(f'Pong from {self.id}, got call from {sender} [{self.counter}]')
-        # print(f'Pong from {self.id}, got call from {sender} [{self.counter}]')
-        self.counter += 1
-        if be_weird:
-            return 'AAAAAAAAAAAAAAAAAAAAAAHHHH!!!!'
-        else:
-            return f'Pong {self.counter}'
+    def ping(self, sender: str):
+        """
+        Utility function that can be used to test the connectivity between nodes.
+        :param sender: str
+        :return: str
+        """
+        self.logger.info(f'{self.id} got a ping from {sender}')
+        return 'Pong'
 
     def __repr__(self):
         return str(self.id)
