@@ -1,11 +1,20 @@
 from dataclasses import field, dataclass
+from typing import OrderedDict
 from uuid import UUID
 
 from fltk.util.task.config.parameter import SystemParameters, HyperParameters
 
 
-@dataclass(order=True)
+@dataclass
 class ArrivalTask:
+    id: UUID = field(compare=False)
+    network: str = field(compare=False)
+    dataset: str = field(compare=False)
+    param_conf: HyperParameters = field(compare=False)
+
+
+@dataclass(order=True)
+class DistributedArrivalTask(ArrivalTask):
     """
     Object to contain configuration of training task. It describes the following properties;
         * Number of machines
@@ -13,10 +22,13 @@ class ArrivalTask:
         * Network
         * Dataset
         * Hyper-parameters
+
+    The tasks are by default sorted according to priority.
     """
     priority: int
-    id: UUID = field(compare=False)
-    network: str = field(compare=False)
-    dataset: str = field(compare=False)
     sys_conf: SystemParameters = field(compare=False)
-    param_conf: HyperParameters = field(compare=False)
+
+
+@dataclass
+class FederatedArrivalTask(ArrivalTask):
+    sys_configs: OrderedDict[str, SystemParameters]

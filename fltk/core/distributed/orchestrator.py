@@ -13,7 +13,7 @@ from fltk.util.cluster.client import construct_job, ClusterManager
 
 from fltk.util.config import DistributedConfig
 from fltk.util.task.generator.arrival_generator import ArrivalGenerator, Arrival
-from fltk.util.task.task import ArrivalTask
+from fltk.util.task.task import DistributedArrivalTask
 
 
 class Orchestrator(DistNode):
@@ -34,8 +34,8 @@ class Orchestrator(DistNode):
     """
     _alive = False
     # Priority queue, requires an orderable object, otherwise a Tuple[int, Any] can be used to insert.
-    pending_tasks: "PriorityQueue[ArrivalTask]" = PriorityQueue()
-    deployed_tasks: List[ArrivalTask] = []
+    pending_tasks: "PriorityQueue[DistributedArrivalTask]" = PriorityQueue()
+    deployed_tasks: List[DistributedArrivalTask] = []
     completed_tasks: List[str] = []
 
     def __init__(self, cluster_mgr: ClusterManager, arv_gen: ArrivalGenerator, config: DistributedConfig):
@@ -77,12 +77,12 @@ class Orchestrator(DistNode):
             while not self.__arrival_generator.arrivals.empty():
                 arrival: Arrival = self.__arrival_generator.arrivals.get()
                 unique_identifier: uuid.UUID = uuid.uuid4()
-                task = ArrivalTask(priority=arrival.get_priority(),
-                                   id=unique_identifier,
-                                   network=arrival.get_network(),
-                                   dataset=arrival.get_dataset(),
-                                   sys_conf=arrival.get_system_config(),
-                                   param_conf=arrival.get_parameter_config())
+                task = DistributedArrivalTask(priority=arrival.get_priority(),
+                                              id=unique_identifier,
+                                              network=arrival.get_network(),
+                                              dataset=arrival.get_dataset(),
+                                              sys_conf=arrival.get_system_config(),
+                                              param_conf=arrival.get_parameter_config())
 
                 self.__logger.debug(f"Arrival of: {task}")
                 self.pending_tasks.put(task)
