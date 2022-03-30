@@ -1,4 +1,3 @@
-import abc
 import csv
 import time
 from dataclasses import dataclass
@@ -7,7 +6,7 @@ from typing import Union, List, Type, TextIO
 
 
 @dataclass
-class DataRecord(abc.ABC):
+class DataRecord:
     pass
 
 
@@ -51,7 +50,7 @@ class DataContainer:
 
     def __init__(self, name: str, output_location: Path, record_type: Type[DataRecord], append_mode: bool = False):
         # print(f'Creating new Data container for client {name}')
-        self.records: List[record_type] = list()
+        self.records = []
         self.file_name = f'{name}.csv'
         self.name = name
         output_location = Path(output_location)

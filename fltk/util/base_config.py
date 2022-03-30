@@ -13,7 +13,6 @@ from fltk.util.definitions import Optimizations, DataSampler, Nets, Dataset
 SEED = 1
 torch.manual_seed(SEED)
 
-
 class BareConfig:
 
     def __init__(self):
