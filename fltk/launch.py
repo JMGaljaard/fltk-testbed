@@ -6,12 +6,12 @@ from multiprocessing.pool import ThreadPool
 import torch.distributed as dist
 from kubernetes import config
 
-from fltk.client import Client
-from fltk.extractor import download_datasets
-from fltk.orchestrator import Orchestrator
+from fltk.core.distributed.client import Client
+from fltk.core.distributed.extractor import download_datasets
+from fltk.core.distributed.orchestrator import Orchestrator
 from fltk.util.cluster.client import ClusterManager
 from fltk.util.config.arguments import LearningParameters
-from fltk.util.config.base_config import BareConfig
+from fltk.util.config import DistributedConfig
 from fltk.util.task.generator.arrival_generator import ExperimentGenerator
 
 
@@ -28,7 +28,7 @@ def should_distribute() -> bool:
     return dist.is_available() and world_size > 1
 
 
-def launch_client(task_id: str, config: BareConfig = None, learning_params: LearningParameters = None,
+def launch_client(task_id: str, config: DistributedConfig = None, learning_params: LearningParameters = None,
                   namespace: Namespace = None):
     """
     @param task_id: String representation (should be unique) corresponding to a client.
@@ -57,7 +57,7 @@ def launch_client(task_id: str, config: BareConfig = None, learning_params: Lear
     print(epoch_data)
 
 
-def launch_orchestrator(args: Namespace = None, conf: BareConfig = None):
+def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
     """
     Default runner for the Orchestrator that is based on KubeFlow
     @param args: Commandline arguments passed to the execution. Might be removed in a future commit.
@@ -98,7 +98,7 @@ def launch_orchestrator(args: Namespace = None, conf: BareConfig = None):
     logging.info("Stopped execution of Orchestrator...")
 
 
-def launch_extractor(args: Namespace, conf: BareConfig):
+def launch_extractor(args: Namespace, conf: DistributedConfig):
     """
     Extractor launch function, will only download all models and quit execution.
     @param args: Arguments passed from CLI.

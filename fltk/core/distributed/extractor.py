@@ -3,10 +3,10 @@ from argparse import Namespace
 
 from torchvision.datasets import FashionMNIST, CIFAR10, CIFAR100, MNIST
 
-from fltk.util.config import BareConfig
+from fltk.util.config import DistributedConfig
 
 
-def download_datasets(args: Namespace, config: BareConfig):
+def download_datasets(args: Namespace, config: DistributedConfig):
     """
     Function to Download datasets to a system. This is currently meant to be run (using the extractor mode of FLTK) to
     download all datasets into the `data` directory and include it in the Docker image that is build for the project.
@@ -15,7 +15,7 @@ def download_datasets(args: Namespace, config: BareConfig):
     @param args: Namespace object.
     @type args: Namespace
     @param config: FLTK configuration file, for finding the path where the datasets should be stored.
-    @type config: BareConfig
+    @type config: DistributedConfig
     @return: None
     @rtype: None
     """

@@ -1,8 +1,10 @@
-def average_nn_parameters(parameters):
+
+
+def average_nn_parameters_simple(parameters):
     """
-    @deprecated Average passed parameters.
-    @param parameters: nn model named parameters
-    @type parameters: list
+    Averages passed parameters.
+    :param parameters: nn model named parameters
+    :type parameters: list
     """
     new_params = {}
     for name in parameters[0].keys():
@@ -11,13 +13,26 @@ def average_nn_parameters(parameters):
     return new_params
 
 
-def fed_average_nn_parameters(parameters, sizes):
+def average_nn_parameters(parameters):
     """
-    @deprecated Federated Average passed parameters.
-    @param parameters: nn model named parameters
-    @type parameters: list
-    @param sizes:
-    @type sizes:
+    Averages passed parameters.
+    :param parameters: nn model named parameters
+    :type parameters: list
+    """
+    new_params = {}
+    for name in parameters[0].keys():
+        new_params[name] = sum([param[name].data for param in parameters]) / len(parameters)
+
+    return new_params
+
+
+def average_nn_parameters(parameters, sizes):
+    """
+    Federated Average passed parameters.
+    :param parameters: nn model named parameters
+    :type parameters: list
+    :param sizes:
+    :type sizes:
     """
     new_params = {}
     sum_size = 0

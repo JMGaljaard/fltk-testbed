@@ -1,10 +1,13 @@
 FROM ubuntu:20.04
 
-# Who maintains this DockerFile
+
 MAINTAINER Jeroen Galjaard <J.M.Galjaard-1@student.tudelft.nl>
 
 # Run build without interactive dialogue
 ARG DEBIAN_FRONTEND=noninteractive
+
+# ENV GLOO_SOCKET_IFNAME=eth0
+# ENV TP_SOCKET_IFNAME=eth0
 
 # Define the working directory of the current Docker container
 WORKDIR /opt/federation-lab

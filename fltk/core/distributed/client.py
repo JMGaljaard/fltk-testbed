@@ -9,16 +9,20 @@ import torch.distributed as dist
 from sklearn.metrics import confusion_matrix
 from torch.utils.tensorboard import SummaryWriter
 
+from fltk.core.distributed.dist_node import DistNode
 from fltk.nets.util import calculate_class_precision, calculate_class_recall, save_model, load_model_from_file
 from fltk.schedulers import MinCapableStepLR, LearningScheduler
 from fltk.util.config.arguments import LearningParameters
-from fltk.util.config.base_config import BareConfig
+from fltk.util.config import DistributedConfig
 from fltk.util.results import EpochData
 
 
-class Client(object):
+class Client(DistNode):
+    """
+    TODO: Combine with Client and differentiate between Federated and Distributed Learnign through better inheritance.
+    """
 
-    def __init__(self, rank: int, task_id: str, world_size: int, config: BareConfig = None,
+    def __init__(self, rank: int, task_id: str, world_size: int, config: DistributedConfig = None,
                  learning_params: LearningParameters = None):
         """
         @param rank: PyTorch rank provided by KubeFlow setup.

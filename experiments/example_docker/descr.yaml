@@ -1,0 +1,48 @@
+---
+# Experiment configuration
+total_epochs: 3
+rounds: 5
+epochs_per_cycle: 1
+wait_for_clients: true
+net: MNISTCNN
+dataset: mnist
+# Use cuda is available; setting to false will force CPU
+cuda: false
+profiling_time: 100
+warmup_round: false
+output_location: 'output/example_docker'
+tensor_board_active: true
+clients_per_round: 2
+node_groups:
+  slow: [1, 1]
+  medium: [2, 2]
+  fast: [3, 3]
+sampler: "uniform" # "limit labels" || "q sampler" || "dirichlet" || "uniform" (default)
+sampler_args:
+  - 0.07     # label limit || q probability || alpha || unused
+  - 42    # random seed || random seed || random seed || unused
+num_clients: 2
+replications: 2
+deploy:
+  docker:
+    base_path: deploy/docker
+    federator:
+      stub-name: system_stub.yml
+      pin-cores: true
+      num-cores: 1
+    clients:
+      fast:
+        stub-name: stub_default.yml
+        amount: 2
+        pin-cores: true
+        num-cores: 1
+        cpu-speed: 1
+        cpu-variation: 0
+      slow:
+        stub-name: stub_default.yml
+        amount: 0
+        pin-cores: true
+        num-cores: 1
+        cpu-speed: 1
+        cpu-variation: 0
+
