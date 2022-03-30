@@ -2,6 +2,7 @@ import logging
 import os
 from argparse import Namespace
 from multiprocessing.pool import ThreadPool
+from pathlib import Path
 
 import torch.distributed as dist
 from kubernetes import config
@@ -28,8 +29,23 @@ def should_distribute() -> bool:
     return dist.is_available() and world_size > 1
 
 
-def launch_client(task_id: str, config: DistributedConfig = None, learning_params: LearningParameters = None,
-                  namespace: Namespace = None):
+def launch_federated_client(task_id: str, config: ...):
+    """
+    Function to launch a federated client within Kubernetes. This differs from Docker-Compose, as this intended to
+    be variable launch during runtime rather than pre-generated through compose. As a result, some information needs
+    to be looked-up durign execution, rather than it being provided from the get-go. As such, make sure that pods
+    have the permission to interact with the ConfigMaps and Pods within their working Namespace on your cluster.
+    @param task_id:
+    @type task_id:
+    @param config:
+    @type config:
+    @return:
+    @rtype:
+    """
+
+
+def launch_distributed_client(task_id: str, config: DistributedConfig = None, learning_params: LearningParameters = None,
+                              namespace: Namespace = None):
     """
     @param task_id: String representation (should be unique) corresponding to a client.
     @type task_id: str
@@ -98,7 +114,7 @@ def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
     logging.info("Stopped execution of Orchestrator...")
 
 
-def launch_extractor(args: Namespace, conf: DistributedConfig):
+def launch_extractor(base_path: Path, config_path: Path, args: Namespace=None, conf: DistributedConfig=None, **kwargs):
     """
     Extractor launch function, will only download all models and quit execution.
     @param args: Arguments passed from CLI.

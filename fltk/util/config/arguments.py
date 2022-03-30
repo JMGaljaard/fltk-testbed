@@ -137,6 +137,7 @@ def create_client_parser(subparsers) -> None:
     client_parser.add_argument('config', type=str)
     client_parser.add_argument('task_id', type=str)
 
+    # TODO: Combine these with FLTK parameter configurator for de-duplication.
     # Add hyper-parameters
     for long, short, hlp, tpe in CLIENT_ARGS:
         client_parser.add_argument(f'-{short}', f'--{long}', type=tpe, help=hlp, required=True)

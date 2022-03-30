@@ -24,7 +24,7 @@ def check_num_clients_consistency(cfg_data: dict):
             print('[Warning]\t Number of docker clients is not equal to the num_clients property!')
 
 
-def generate(base_path: Path):
+def generate(base_path: Path, config_path: Path, **kwargs):
     descr_path = base_path / 'descr.yaml'
 
     exp_cfg_list = [x for x in base_path.iterdir() if '.cfg' in x.suffixes]
@@ -74,7 +74,7 @@ def generate(base_path: Path):
 #     print('Done')
 
 
-def run(base_path: Path):
+def run(base_path: Path, config_path: Path, **kwargs):
     print(f'Run {base_path}')
     print(list(base_path.iterdir()))
     descr_path = base_path / 'descr.yaml'
