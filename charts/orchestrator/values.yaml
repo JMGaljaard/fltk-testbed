@@ -1,4 +1,4 @@
 orchestrator:
     cpu: 1000m
     memory: 2000000000
-    configurationFile: example_cloud_experiment.json
+    configurationFile: benchmarking/example_cloud_experiment.json

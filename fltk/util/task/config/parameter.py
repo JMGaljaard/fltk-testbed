@@ -22,6 +22,7 @@ class HyperParameters:
     lr: str = field(metadata=config(field_name="learningRate"))
     lr_decay: str = field(metadata=config(field_name="learningrateDecay"))
 
+
 @dataclass_json
 @dataclass(frozen=True)
 class Priority:

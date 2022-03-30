@@ -8,13 +8,15 @@ from kubeflow.pytorchjob import PyTorchJobClient
 from kubeflow.pytorchjob.constants.constants import PYTORCHJOB_GROUP, PYTORCHJOB_VERSION, PYTORCHJOB_PLURAL
 from kubernetes import client
 
+from fltk.core.distributed.dist_node import DistNode
 from fltk.util.cluster.client import construct_job, ClusterManager
-from fltk.util.config.base_config import BareConfig
+
+from fltk.util.config import DistributedConfig
 from fltk.util.task.generator.arrival_generator import ArrivalGenerator, Arrival
 from fltk.util.task.task import ArrivalTask
 
 
-class Orchestrator(object):
+class Orchestrator(DistNode):
     """
     Central component of the Federated Learning System: The Orchestrator
 
@@ -36,7 +38,7 @@ class Orchestrator(object):
     deployed_tasks: List[ArrivalTask] = []
     completed_tasks: List[str] = []
 
-    def __init__(self, cluster_mgr: ClusterManager, arv_gen: ArrivalGenerator, config: BareConfig):
+    def __init__(self, cluster_mgr: ClusterManager, arv_gen: ArrivalGenerator, config: DistributedConfig):
         self.__logger = logging.getLogger('Orchestrator')
         self.__logger.debug("Loading in-cluster configuration")
         self.__cluster_mgr = cluster_mgr

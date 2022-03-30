@@ -13,7 +13,7 @@ from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container,
     V1VolumeMount, V1Toleration, V1Volume, V1PersistentVolumeClaimVolumeSource
 
 from fltk.util.cluster.conversion import Convert
-from fltk.util.config import BareConfig
+from fltk.util.config import DistributedConfig
 from fltk.util.singleton import Singleton
 from fltk.util.task.task import ArrivalTask
 
@@ -221,7 +221,7 @@ class DeploymentBuilder:
         self._buildDescription.resources = client.V1ResourceRequirements(requests=req_dict,
                                                                          limits=req_dict)
 
-    def _generate_command(self, config: BareConfig, task: ArrivalTask):
+    def _generate_command(self, config: DistributedConfig, task: ArrivalTask):
         command = (f'python3 -m fltk client {config.config_path} {task.id} '
                    f'--model {task.network} --dataset {task.dataset} '
                    f'--optimizer Adam --max_epoch {task.param_conf.max_epoch} '
@@ -230,7 +230,7 @@ class DeploymentBuilder:
                    f'--backend gloo')
         return command.split(' ')
 
-    def _build_container(self, conf: BareConfig, task: ArrivalTask, name: str = "pytorch",
+    def _build_container(self, conf: DistributedConfig, task: ArrivalTask, name: str = "pytorch",
                          vol_mnts: List[V1VolumeMount] = None) -> V1Container:
         return V1Container(
             name=name,
@@ -242,10 +242,10 @@ class DeploymentBuilder:
             volume_mounts=vol_mnts
         )
 
-    def build_worker_container(self, conf: BareConfig, task: ArrivalTask, name: str = "pytorch") -> None:
+    def build_worker_container(self, conf: DistributedConfig, task: ArrivalTask, name: str = "pytorch") -> None:
         self._buildDescription.worker_container = self._build_container(conf, task, name)
 
-    def build_master_container(self, conf: BareConfig, task: ArrivalTask, name: str = "pytorch") -> None:
+    def build_master_container(self, conf: DistributedConfig, task: ArrivalTask, name: str = "pytorch") -> None:
         """
         Function to build the Master worker container. This requires the LOG PV to be mounted on the expected
         logging directory. Make sure that any changes in the Helm charts are also reflected here.
@@ -263,7 +263,7 @@ class DeploymentBuilder:
         )]
         self._buildDescription.master_container = self._build_container(conf, task, name, master_mounts)
 
-    def build_container(self, task: ArrivalTask, conf: BareConfig):
+    def build_container(self, task: ArrivalTask, conf: DistributedConfig):
         self.build_master_container(conf, task)
         self.build_worker_container(conf, task)
 
@@ -342,12 +342,12 @@ class DeploymentBuilder:
         self._buildDescription.id = task.id
 
 
-def construct_job(conf: BareConfig, task: ArrivalTask) -> V1PyTorchJob:
+def construct_job(conf: DistributedConfig, task: ArrivalTask) -> V1PyTorchJob:
     """
     Function to build a Job, based on the specifications of an ArrivalTask, and the general configuration of the
     BareConfig.
     @param conf: configuration object that contains specifics to properly start a client.
-    @type conf: BareConfig
+    @type conf: DistributedConfig
     @param task: Learning task for which a job description must be made.
     @type task: ArrivalTask
     @return: KubeFlow compatible PyTorchJob description to create a Job with the requested system and hyper parameters.
@@ -361,5 +361,6 @@ def construct_job(conf: BareConfig, task: ArrivalTask) -> V1PyTorchJob:
     dp_builder.build_template()
     dp_builder.build_spec(task)
     job = dp_builder.construct()
+    # Fix to deploy on more up-to-date Kubernetes clusters.
     job.openapi_types = job.swagger_types
     return job

@@ -1,0 +1,5 @@
+# Individual configuration
+offload_stategy: vanilla
+deadline: 500
+single_machine: false
+real_time: true

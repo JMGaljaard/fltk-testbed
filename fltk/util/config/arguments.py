@@ -56,7 +56,7 @@ class LearningParameters:
     }
 
     _available_optimizer = {
-        "ADAM": torch.optim.SGD
+        "ADAM": torch.optim.Adam
     }
 
     @staticmethod
@@ -110,7 +110,7 @@ class LearningParameters:
 
 def extract_learning_parameters(args: Namespace) -> LearningParameters:
     """
-    Function to extract the learning hyper-parameters from the Namespace object for the passed arguments.
+    Function to extract the learning hyperparameters from the Namespace object for the passed arguments.
     @param args: Namespace environment for running the Client.
     @type args: Namespace
     @return: Parsed learning parameters.
@@ -151,3 +151,49 @@ def create_cluster_parser(subparsers) -> None:
     cluster_parser = subparsers.add_parser('cluster')
     cluster_parser.add_argument('config', type=str)
     cluster_parser.add_argument('-l', '--local', type=bool, default=False)
+
+
+def create_container_util_parser(subparsers) -> None:
+    util_docker_parser = subparsers.add_parser('util-docker')
+    util_docker_parser.add_argument('name', type=str)
+    util_docker_parser.add_argument('--clients', type=int)
+
+
+def create_util_parser(subparsers):
+    util_generate_parser = subparsers.add_parser('util-generate')
+    util_generate_parser.add_argument('path', type=str)
+
+
+def create_util_run_parser(subparsers) -> None:
+    util_run_parser = subparsers.add_parser('util-run')
+    util_run_parser.add_argument('path', type=str)
+
+
+def create_remote_parser(subparsers) -> None:
+    remote_parser = subparsers.add_parser('remote')
+    remote_parser.add_argument('rank', type=int)
+    remote_parser.add_argument('--nic', type=str, default=None)
+    remote_parser.add_argument('--host', type=str, default=None)
+    add_default_arguments(remote_parser)
+
+
+def create_single_parser(subparsers) -> None:
+    single_machine_parser = subparsers.add_parser('single')
+    add_default_arguments(single_machine_parser)
+
+
+def add_default_arguments(*parsers):
+    for parser in parsers:
+        parser.add_argument('config', type=str, help='')
+        parser.add_argument('--prefix', type=str, default=None)
+
+
+def create_all_subparsers(subparsers):
+    create_extractor_parser(subparsers)
+    create_client_parser(subparsers)
+    create_cluster_parser(subparsers)
+    create_container_util_parser(subparsers)
+    create_util_parser(subparsers)
+    create_util_run_parser(subparsers)
+    create_remote_parser(subparsers)
+    create_single_parser(subparsers)
