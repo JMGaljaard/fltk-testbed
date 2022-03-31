@@ -3,7 +3,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from multiprocessing.pool import ThreadPool
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, OrderedDict
 from uuid import UUID
 
 import schedule
@@ -15,7 +15,7 @@ from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container,
 from fltk.util.cluster.conversion import Convert
 from fltk.util.config import DistributedConfig
 from fltk.util.singleton import Singleton
-from fltk.util.task.task import DistributedArrivalTask
+from fltk.util.task.task import DistributedArrivalTask, ArrivalTask
 
 
 @dataclass
@@ -28,13 +28,12 @@ class Resource:
     cpu_limit: int
     memory_limit: int
 
+
 @dataclass
 class BuildDescription:
-    resources: V1ResourceRequirements
-    master_container: V1Container
-    worker_container: V1Container
-    master_template: V1PodTemplateSpec
-    worker_template: V1PodTemplateSpec
+    resources: OrderedDict[str, V1ResourceRequirements]
+    typed_containers: OrderedDict[str, V1Container]
+    typed_templates: OrderedDict[str, V1PodTemplateSpec]
     id: UUID
     spec: V1PyTorchJobSpec
     tolerations: List[V1Toleration]
@@ -213,15 +212,16 @@ class DeploymentBuilder:
         """
         return {'memory': mem, 'cpu': str(cpu)}
 
-    def build_resources(self, arrival_task: DistributedArrivalTask) -> None:
-        system_reqs = arrival_task.sys_conf
-        req_dict = self.__resource_dict(mem=system_reqs.executor_memory,
-                                        cpu=system_reqs.executor_cores)
-        # Currently the request is set to the limits. You may want to change this.
-        self._buildDescription.resources = client.V1ResourceRequirements(requests=req_dict,
-                                                                         limits=req_dict)
+    def build_resources(self, arrival_task: ArrivalTask) -> None:
+        system_reqs = arrival_task.named_system_params()
+        for tpe, sys_reqs in system_reqs.items():
+            typed_req_dict = self.__resource_dict(mem=sys_reqs.executor_memory,
+                                                  cpu=sys_reqs.executor_cores)
+            # Currently the request is set to the limits. You may want to change this.
+            self._buildDescription.resources[tpe] = client.V1ResourceRequirements(requests=typed_req_dict,
+                                                                                  limits=typed_req_dict)
 
-    def _generate_command(self, config: DistributedConfig, task: DistributedArrivalTask):
+    def _generate_command(self, config: DistributedConfig, task: ArrivalTask):
         command = (f'python3 -m fltk client {config.config_path} {task.id} '
                    f'--model {task.network} --dataset {task.dataset} '
                    f'--optimizer Adam --max_epoch {task.param_conf.max_epoch} '
@@ -230,42 +230,50 @@ class DeploymentBuilder:
                    f'--backend gloo')
         return command.split(' ')
 
-    def _build_container(self, conf: DistributedConfig, task: DistributedArrivalTask, name: str = "pytorch",
-                         vol_mnts: List[V1VolumeMount] = None) -> V1Container:
-        return V1Container(
-            name=name,
-            image=conf.cluster_config.image,
-            command=self._generate_command(conf, task),
-            image_pull_policy='Always',
-            # Set the resources to the pre-generated resources
-            resources=self._buildDescription.resources,
-            volume_mounts=vol_mnts
-        )
-
-    def build_worker_container(self, conf: DistributedConfig, task: DistributedArrivalTask, name: str = "pytorch") -> None:
-        self._buildDescription.worker_container = self._build_container(conf, task, name)
-
-    def build_master_container(self, conf: DistributedConfig, task: DistributedArrivalTask, name: str = "pytorch") -> None:
+    def _build_typed_container(self, conf: DistributedConfig, cmd: str, resources: V1ResourceRequirements,
+                               name: str = "pytorch", requires_mount: bool = False) -> V1Container:
         """
         Function to build the Master worker container. This requires the LOG PV to be mounted on the expected
         logging directory. Make sure that any changes in the Helm charts are also reflected here.
-        @param image:
-        @type image:
         @param name:
         @type name:
         @return:
         @rtype:
         """
-        master_mounts: List[V1VolumeMount] = [V1VolumeMount(
-            mount_path=f'/opt/federation-lab/{conf.get_log_dir()}',
-            name='fl-log-claim',
-            read_only=False
-        )]
-        self._buildDescription.master_container = self._build_container(conf, task, name, master_mounts)
+        mount_list: Optional[List[V1VolumeMount]] = None
+        if requires_mount:
+            mount_list: List[V1VolumeMount] = [V1VolumeMount(
+                    mount_path=f'/opt/federation-lab/{conf.get_log_dir()}',
+                    name='fl-log-claim',
+                    read_only=False
+            )]
+
+        container = V1Container(name=name,
+                                image=conf.cluster_config.image,
+                                command=cmd,
+                                image_pull_policy='Always',
+                                # Set the resources to the pre-generated resources
+                                resources=resources,
+                                volume_mounts=mount_list)
+        return container
 
     def build_container(self, task: DistributedArrivalTask, conf: DistributedConfig):
-        self.build_master_container(conf, task)
-        self.build_worker_container(conf, task)
+        """
+        Function to build container descriptions for deploying from within an Orchestrator pod.
+        @param task:
+        @type task:
+        @param conf:
+        @type conf:
+        @return:
+        @rtype:
+        """
+        # TODO: Implement cmd / config reference.
+        cmd = None
+        tpe, curr_resource = self._buildDescription.resources.items()[0]
+        self._buildDescription.typed_containers[tpe] = self._build_typed_container(conf, cmd, curr_resource,
+                                                                                   requires_mount=True)
+        for tpe, curr_resource in self._buildDescription.resources.items()[1:]:
+            self._buildDescription.typed_containers[tpe] = self._build_typed_container(conf, cmd, curr_resource)
 
     def build_tolerations(self, tols: List[Tuple[str, Optional[str], str, str]] = None):
         if not tols:
@@ -292,32 +300,27 @@ class DeploymentBuilder:
                       persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(claim_name='fl-log-claim'))
              ]
 
-        self._buildDescription.master_template = client.V1PodTemplateSpec(
-            metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
-            spec=client.V1PodSpec(containers=[self._buildDescription.master_container],
-                                  volumes=master_volumes,
-                                  tolerations=self._buildDescription.tolerations))
-        self._buildDescription.worker_template = client.V1PodTemplateSpec(
-            metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
-            spec=client.V1PodSpec(containers=[self._buildDescription.worker_container],
-                                  tolerations=self._buildDescription.tolerations))
 
-    def build_spec(self, task: DistributedArrivalTask, restart_policy: str = 'OnFailure') -> None:
-        master_repl_spec = V1ReplicaSpec(
-            replicas=1,
-            restart_policy=restart_policy,
-            template=self._buildDescription.master_template)
-        master_repl_spec.openapi_types = master_repl_spec.swagger_types
-        pt_rep_spec: Dict[str, V1ReplicaSpec] = {"Master": master_repl_spec}
-        parallelism = int(task.sys_conf.data_parallelism)
-        if parallelism > 1:
-            worker_repl_spec = V1ReplicaSpec(
-                replicas=parallelism - 1,
-                restart_policy=restart_policy,
-                template=self._buildDescription.worker_template
-            )
-            worker_repl_spec.openapi_types = worker_repl_spec.swagger_types
-            pt_rep_spec['Worker'] = worker_repl_spec
+        for tpe, container in self._buildDescription.typed_containers:
+            # TODO: Make this less hardcody
+            volumes = master_volumes if 'Master' in tpe else None
+
+            self._buildDescription.typed_templates = client.V1PodTemplateSpec(
+                metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
+                spec=client.V1PodSpec(containers=[container],
+                                      volumes=volumes,
+                                      tolerations=self._buildDescription.tolerations))
+
+    def build_spec(self, task: ArrivalTask, restart_policy: str = 'OnFailure') -> None:
+        pt_rep_spec = OrderedDict[str, V1ReplicaSpec]()
+        for tpe, tpe_template in self._buildDescription.typed_templates:
+
+            typed_replica_spec = V1ReplicaSpec(
+                    replicas=task.typed_replica_count(tpe),
+                    restart_policy=restart_policy,
+                    template=tpe_template)
+            pt_rep_spec[tpe] = typed_replica_spec
+            tpe.openapi_types = tpe.swagger_types
 
         job_spec = V1PyTorchJobSpec(pytorch_replica_specs=pt_rep_spec)
         job_spec.openapi_types = job_spec.swagger_types
@@ -332,10 +335,10 @@ class DeploymentBuilder:
         @rtype: V1PyTorchJob
         """
         job = V1PyTorchJob(
-            api_version="kubeflow.org/v1",
-            kind="PyTorchJob",
-            metadata=V1ObjectMeta(name=f'trainjob-{self._buildDescription.id}', namespace='test'),
-            spec=self._buildDescription.spec)
+                api_version="kubeflow.org/v1",
+                kind="PyTorchJob",
+                metadata=V1ObjectMeta(name=f'trainjob-{self._buildDescription.id}', namespace='test'),
+                spec=self._buildDescription.spec)
         return job
 
     def create_identifier(self, task: DistributedArrivalTask):
@@ -361,6 +364,6 @@ def construct_job(conf: DistributedConfig, task: DistributedArrivalTask) -> V1Py
     dp_builder.build_template()
     dp_builder.build_spec(task)
     job = dp_builder.construct()
-    # Fix to deploy on more up-to-date Kubernetes clusters.
+    # Fix to deploy on more up-to-date Kubernetes clusters. See if needed for KubeFlow operator release.
     job.openapi_types = job.swagger_types
     return job
