@@ -9,7 +9,7 @@ from kubernetes import config
 from torch.distributed import rpc
 
 from fltk.core.client import Client
-from fltk.core.distributed.client import Client
+from fltk.core.distributed.client import DistClient
 from fltk.core.distributed.extractor import download_datasets
 from fltk.core.distributed.orchestrator import Orchestrator
 from fltk.core.federator import Federator
@@ -70,7 +70,7 @@ def launch_distributed_client(task_id: str, config: DistributedConfig = None, le
 
     logging.info(f'Starting Creating client with {rank}')
 
-    client = Client(rank, task_id, world_size, config, learning_params)
+    client = DistClient(rank, task_id, world_size, config, learning_params)
     client.prepare_learner(distributed)
     epoch_data = client.run_epochs()
     print(epoch_data)
@@ -153,7 +153,16 @@ def launch_single(base_path: Path, config_path: Path, prefix: str = None, **kwar
     federator_node.run()
 
 
-def _retrieve_env_params(nic=None, host=None):
+def _retrieve_or_init_env(nic=None, host=None):
+    """
+    Function
+    @param nic:
+    @type nic:
+    @param host:
+    @type host:
+    @return:
+    @rtype:
+    """
     if host:
         os.environ['MASTER_ADDR'] = host
     os.environ['MASTER_PORT'] = '5000'
@@ -161,6 +170,9 @@ def _retrieve_env_params(nic=None, host=None):
         os.environ['GLOO_SOCKET_IFNAME'] = nic
         os.environ['TP_SOCKET_IFNAME'] = nic
 
+def _retrieve_env_config():
+    rank, world_size, port = os.environ.get('RANK'), os.environ.get('WORLD_SIZE'), os.environ["MASTER_PORT"]
+    return rank, world_size, port
 
 def _retrieve_network_params_from_config(config: Config, nic=None, host=None):
     if hasattr(config, 'system'):
@@ -173,27 +185,33 @@ def _retrieve_network_params_from_config(config: Config, nic=None, host=None):
     return nic, host
 
 
-def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=None, host=None, prefix: str = None,
-                  **kwargs):
+def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=None, host=None, prefix: str = None, **kwargs):
     print(config_path, rank)
+
     config = Config.FromYamlFile(config_path)
     config.world_size = config.num_clients + 1
     config.replication_id = prefix
-    nic, host = _retrieve_network_params_from_config(config, nic, host)
     if not (nic and host):
-        print('Missing rank, host, world-size, or nic argument when in \'remote\' mode!')
+        nic, host = _retrieve_network_params_from_config(config, nic, host)
+        _retrieve_or_init_env(nic, host)
+    elif not (nic and host):
+        rank, world_size, master_port = _retrieve_env_config()
+        assert world_size == config.world_size
+    else:
+        print('Missing rank, host, world-size, checking environment!')
         parser.print_help()
         exit(1)
-    _retrieve_env_params(nic, host)
-    print(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]} and interface={nic}')
+
+    msg = f'Starting with host={host} and port={os.environ["MASTER_PORT"]} and interface={nic}'
+    logging.log(logging.INFO, msg)
     options = rpc.TensorPipeRpcBackendOptions(
             num_worker_threads=16,
             rpc_timeout=0,  # infinite timeout
             init_method='env://',
-            _transports=["uv"]
+            _transports=["uv"]  # Use LibUV backend for async/IO interaction
     )
     if rank != 0:
-        print(f'Starting worker {rank}  with world size={config.world_size}')
+        print(f'Starting worker-{rank} with world size={config.world_size}')
         rpc.init_rpc(
                 f"client{rank}",
                 rank=rank,
@@ -203,7 +221,7 @@ def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=Non
         client_node = Client(f'client{rank}', rank, config.world_size, config)
         client_node.remote_registration()
     else:
-        print(f'Starting the ps with world size={config.world_size}')
+        print(f'Starting the PS (Fed) with world size={config.world_size}')
         rpc.init_rpc(
                 "federator",
                 rank=rank,
@@ -217,7 +235,7 @@ def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=Non
     print('Ending program')
 
 
-def launch_cluster(arg_path, conf_path, args: Namespace = None, configuration: DistributedConfig = None, **kwargs):
+def launch_cluster(arg_path, conf_path, args: Namespace = None, config: DistributedConfig = None, **kwargs):
     """
     Function to launch Orchestrator for execution with provided configurations. Currently
     this assumes that a single Orchestrator is started that manages all the resources in the cluster.
@@ -227,5 +245,5 @@ def launch_cluster(arg_path, conf_path, args: Namespace = None, configuration: D
                         datefmt='%m-%d %H:%M')
     # Set the seed for arrivals, torch seed is mostly ignored. Set the `arrival_seed` to a different value
     # for each repetition that you want to run an experiment with.
-    configuration.set_seed()
-    launch_orchestrator(args=args, conf=configuration)
+    config.set_seed()
+    launch_orchestrator(args=args, conf=config)

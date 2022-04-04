@@ -172,10 +172,12 @@ def create_util_run_parser(subparsers) -> None:
 
 def create_remote_parser(subparsers) -> None:
     remote_parser = subparsers.add_parser('remote')
+    add_default_arguments(remote_parser)
+
     remote_parser.add_argument('rank', type=int)
     remote_parser.add_argument('--nic', type=str, default=None)
     remote_parser.add_argument('--host', type=str, default=None)
-    add_default_arguments(remote_parser)
+
 
 
 def create_single_parser(subparsers) -> None:

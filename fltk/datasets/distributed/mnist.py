@@ -1,5 +1,5 @@
 from __future__ import annotations
-from fltk.datasets import DistDataset
+from fltk.datasets.distributed.dataset import DistDataset
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 # from fltk.strategy import get_sampler, get_augmentations, get_augmentations_tensor, UnifyingSampler

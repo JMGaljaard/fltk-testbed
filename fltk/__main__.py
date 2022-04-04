@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
+from typing import Optional, Any
 
 from fltk.launch import launch_extractor, launch_client, launch_single, \
     launch_remote, launch_cluster
@@ -22,6 +23,12 @@ __run_op_dict = {
 }
 
 
+def _save_get(args, param) -> Optional[Any]:
+    if args is not None and hasattr(args, param):
+        return args.__dict__[param]
+    return None
+
+
 def __main__():
     parser = argparse.ArgumentParser(prog='fltk',
                                      description='Experiment launcher for the Federated Learning Testbed (fltk)')
@@ -33,17 +40,32 @@ def __main__():
     """
 
     args = parser.parse_args()
+    config = None
+    try:
+        with open(args.config, 'r') as config_file:
+            config: DistributedConfig = DistributedConfig.from_dict(json.load(config_file))
+            config.config_path = Path(args.config)
+    except:
+        pass
+    arg_path, conf_path = None, None
+    try:
+        arg_path = Path(args.path)
+    except Exception as e:
+        print('No argument path is provided.')
+    try:
+        conf_path = Path(args.config)
+    except Exception as e:
+        print('No configuration path is provided.')
 
-    with open(args.config, 'r') as config_file:
-        config: DistributedConfig = DistributedConfig.from_dict(json.load(config_file))
-        config.config_path = Path(args.config)
-
-    arg_path = Path(args.path)
-    conf_path = Path(args.config)
-
-    # Lookup execution mode and call function to start subroutine
-    __run_op_dict[args.action](arg_path, conf_path, rank=args.rank, parser=parser, nic=args.nic, host=args.host,
-                               prefix=args.prefix, args=args)
+    # TODO: move kwargs into function as extractor
+    __run_op_dict[args.action](arg_path, conf_path,
+                               rank=_save_get(args, 'rank'),
+                               parser=parser,
+                               nic=_save_get(args, 'nic'),
+                               host=_save_get(args, 'host'),
+                               prefix=_save_get(args, 'prefix'),
+                               args=args,
+                               config=config)
 
     exit(0)
 

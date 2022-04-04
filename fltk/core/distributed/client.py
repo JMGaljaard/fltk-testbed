@@ -17,7 +17,7 @@ from fltk.util.config import DistributedConfig
 from fltk.util.results import EpochData
 
 
-class Client(DistNode):
+class DistClient(DistNode):
     """
     TODO: Combine with Client and differentiate between Federated and Distributed Learnign through better inheritance.
     """

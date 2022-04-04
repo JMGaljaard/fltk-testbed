@@ -6,7 +6,7 @@ from typing import Union
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from fltk.util.config.base_config import BareConfig
+import fltk.util.config as config
 from fltk.util.results import EpochData
 
 
@@ -46,7 +46,7 @@ def recover_flattened(flat_params, model):
     return l
 
 
-def initialize_default_model(config: BareConfig, model_class) -> torch.nn.Module:
+def initialize_default_model(config: config.DistributedConfig, model_class) -> torch.nn.Module:
     """
     Load a default model dictionary into a torch model.
     @param model:

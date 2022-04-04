@@ -12,7 +12,7 @@ profiling_time: 100
 warmup_round: false
 output_location: 'output/example_cuda'
 tensor_board_active: true
-clients_per_round: 2
+clients_per_round: 1
 node_groups:
   slow: [1, 1]
   medium: [2, 2]

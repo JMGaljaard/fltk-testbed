@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dataclasses_json import config, dataclass_json
 
-from fltk.nets.util.reproducability import init_reproducibility
+from fltk.util import init_reproducibility
 
 
 @dataclass_json

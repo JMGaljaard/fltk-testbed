@@ -31,12 +31,12 @@ class Resource:
 
 @dataclass
 class BuildDescription:
-    resources: OrderedDict[str, V1ResourceRequirements]
-    typed_containers: OrderedDict[str, V1Container]
-    typed_templates: OrderedDict[str, V1PodTemplateSpec]
-    id: UUID
-    spec: V1PyTorchJobSpec
-    tolerations: List[V1Toleration]
+    resources = OrderedDict[str, V1ResourceRequirements]()
+    typed_containers = OrderedDict[str, V1Container]()
+    typed_templates = OrderedDict[str, V1PodTemplateSpec]()
+    id: Optional[UUID] = None
+    spec: Optional[V1PyTorchJobSpec] = None
+    tolerations: Optional[List[V1Toleration]] = None
 
 
 class ResourceWatchDog:

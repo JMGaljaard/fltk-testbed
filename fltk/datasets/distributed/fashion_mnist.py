@@ -1,4 +1,4 @@
-from fltk.datasets.distributed import DistDataset
+from fltk.datasets.distributed.dataset import DistDataset
 from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data import DataLoader, DistributedSampler

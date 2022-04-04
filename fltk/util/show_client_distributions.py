@@ -1,7 +1,7 @@
 import pandas as pd
 from tqdm import tqdm
 
-from fltk.core.distributed.client import Client
+from fltk.core.distributed.client import DistClient
 from fltk.datasets.distributed import DistCIFAR10Dataset, DistCIFAR100Dataset, DistFashionMNISTDataset, DistDataset
 import logging
 
@@ -108,7 +108,7 @@ def gen_distribution(name, params):
         # for i, (inputs, labels) in enumerate(dataset.get_train_loader(), 0):
         #     print(labels)
         # print('d')
-        client = Client("test", None, rank, args.world_size, args)
+        client = DistClient("test", None, rank, args.world_size, args)
         client.init_dataloader()
         train_loader = client.dataset.get_train_loader()
         train_loader2 = dataset.get_train_loader()

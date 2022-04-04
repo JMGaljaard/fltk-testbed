@@ -3,7 +3,7 @@ from dataclasses import field, dataclass
 from typing import OrderedDict, Dict, List, Optional
 from uuid import UUID
 
-from fltk.util.task.config.parameter import SystemParameters, HyperParameters
+from fltk.util.task.config import SystemParameters, HyperParameters
 
 
 @dataclass
