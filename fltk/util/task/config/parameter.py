@@ -1,12 +1,32 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
+from typing import List, Optional, OrderedDict, Any
 
-from dataclasses_json import config, dataclass_json
+from dataclasses_json import dataclass_json, LetterCase, config
 
 
-@dataclass_json
+def _none_factory():
+    return None
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass(frozen=True)
+class HyperParameterConfiguration:
+    bs: Optional[int] = field(metadata=config(field_name="batchSize"), default_factory=_none_factory)
+    lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory)
+    lr_decay: Optional[float] = field(metadata=config(field_name="learningRateDecay"), default_factory=_none_factory)
+
+    def merge_default(self, other: dict[str, Any]):
+        """
+        Function to merge a HyperParameterConfiguration object with a default configuration
+        @param other:
+        @type other:
+        @return:
+        @rtype:
+        """
+        return HyperParameterConfiguration.from_dict({**self.__dict__, **other})
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class HyperParameters:
     """
@@ -17,13 +37,24 @@ class HyperParameters:
     lr: Learning rate parameter, limiting the step size in the gradient update.
     lr_decay: How fast the learning rate 'shrinks'.
     """
-    bs: int = field(metadata=config(field_name="batchSize"))
-    max_epoch: int = field(metadata=config(field_name="maxEpoch"))
-    lr: str = field(metadata=config(field_name="learningRate"))
-    lr_decay: str = field(metadata=config(field_name="learningrateDecay"))
+    default: HyperParameterConfiguration
+    configurations: OrderedDict[str, Optional[HyperParameterConfiguration]]
 
+    def __post_init__(self):
+        """
+        Post init function that populates the hyperparameters of optionally configured elements of a HyperParam
+        Configuration.
+        @return:
+        @rtype:
+        """
+        for config_type in self.configurations.keys():
+            if not (conf := self.configurations.get(config_type, self.default)):
+                conf = self.default
 
-@dataclass_json
+            merge = {k: v for k, v in conf.__dict__.items() if v is not None}
+            self.configurations[config_type] = self.default.merge_default(merge)
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class Priority:
     """
@@ -33,7 +64,14 @@ class Priority:
     probability: float
 
 
-@dataclass_json
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass(frozen=True)
+class SystemResources:
+    cores: str
+    memory: str
+
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class SystemParameters:
     """
@@ -43,13 +81,12 @@ class SystemParameters:
     executor_memory: Amount of RAM allocated to each executor.
     action: Indicating whether it regards 'inference' or 'train'ing time.
     """
-    data_parallelism: int = field(metadata=config(field_name="dataParallelism"))
-    executor_cores: int = field(metadata=config(field_name="executorCores"))
-    executor_memory: str = field(metadata=config(field_name="executorMemory"))
-    action: str = field(metadata=config(field_name="action"))
+    data_parallelism: Optional[int]
+    configurations: OrderedDict[str, SystemResources]
 
 
-@dataclass_json
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class NetworkConfiguration:
     """
@@ -59,20 +96,38 @@ class NetworkConfiguration:
     dataset: str
 
 
-@dataclass_json
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass(frozen=True)
+class LearningParameters:
+    total_epochs: int
+    rounds: int
+    epochs_per_round: int
+    cuda: bool
+    clients_per_round: int
+
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass(frozen=True)
+class ExperimentConfiguration:
+    random_seed: List[int]
+    worker_replication: OrderedDict[str, int]
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class JobClassParameter:
     """
     Dataclass describing the job specific parameters (system and hyper).
     """
-    network_configuration: NetworkConfiguration = field(metadata=config(field_name="networkConfiguration"))
-    system_parameters: SystemParameters = field(metadata=config(field_name="systemParameters"))
-    hyper_parameters: HyperParameters = field(metadata=config(field_name="hyperParameters"))
-    class_probability: float = field(metadata=config(field_name="classProbability"))
-    priorities: List[Priority] = field(metadata=config(field_name="priorities"))
+    network_configuration: NetworkConfiguration
+    system_parameters: SystemParameters
+    hyper_parameters: HyperParameters
+    learning_parameters: LearningParameters
+    experiment_configuration: ExperimentConfiguration
+    class_probability: Optional[float] = field(default_factory=_none_factory)
+    priorities: Optional[List[Priority]] = field(default_factory=_none_factory)
 
 
-@dataclass_json
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class JobDescription:
     """
@@ -82,9 +137,9 @@ class JobDescription:
     preemtible_jobs: indicates whether the jobs can be pre-emptively rescheduled by the scheduler. This is currently
     not implemented in FLTK, but could be added as a project (advanced)
     """
-    job_class_parameters: List[JobClassParameter] = field(metadata=config(field_name="jobClassParameters"))
-    arrival_statistic: float = field(metadata=config(field_name="lambda"))
-    preemtible_jobs: float = field(metadata=config(field_name="preemptJobs"))
+    job_class_parameters: JobClassParameter
+    preemtible_jobs: Optional[float] = field(default_factory=_none_factory)
+    arrival_statistic: Optional[float] = field(default_factory=_none_factory)
 
 
 @dataclass(order=True)
