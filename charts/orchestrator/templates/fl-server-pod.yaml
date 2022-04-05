@@ -15,7 +15,7 @@ spec:
         - fltk
       args:
         - cluster
-        - configs/{{ .Values.orchestrator.configurationFile }}
+        - configs/benchmarking/{{ .Values.orchestrator.configurationFile }}
       env:
         - name: PYTHONUNBUFFERED
           value: "1"

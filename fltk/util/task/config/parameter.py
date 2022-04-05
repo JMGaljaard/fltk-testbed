@@ -26,6 +26,7 @@ class HyperParameterConfiguration:
         """
         return HyperParameterConfiguration.from_dict({**self.__dict__, **other})
 
+
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class HyperParameters:

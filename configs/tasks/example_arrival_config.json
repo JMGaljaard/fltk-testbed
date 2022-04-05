@@ -1,34 +1,56 @@
 [
   {
-    "jobClassParameters": [
-      {
-        "networkConfiguration": {
-          "network": "FashionMNISTCNN",
-          "dataset": "MNIST"
-        },
-        "systemParameters": {
-          "dataParallelism": "1",
-          "executorCores": "750m",
-          "executorMemory": "1Gi",
-          "action": "train"
-        },
-        "hyperParameters": {
-          "batchSize": "128",
-          "maxEpoch": "5",
-          "learningRate": "0.01",
-          "learningrateDecay": "0.0002"
-        },
-        "classProbability": 0.1,
-        "priorities": [
-          {
-            "priority": 1,
-            "probability": 1
+    "jobClassParameters": {
+      "networkConfiguration": {
+        "network": "FashionMNISTCNN",
+        "dataset": "MNIST"
+      },
+      "systemParameters": {
+        "dataParallelism": null,
+        "configurations": {
+          "slow": {
+            "cores": "750m",
+            "memory": "1Gi"
+          },
+          "medium": {
+            "cores": "1500m",
+            "memory": "1.5Gi"
           }
-        ]
+        }
+      },
+      "hyperParameters": {
+        "default": {
+          "batchSize": "128",
+          "learningRate": "0.01",
+          "learningRateDecay": "0.0002"
+        },
+        "configurations": {
+          "slow": null,
+          "medium": {
+            "learningRate": "0.05"
+          }
+        }
+      },
+      "learningParameters": {
+        "totalEpochs": 3,
+        "rounds": 5,
+        "epochsPerRound": 1,
+        "cuda": false,
+        "clientsPerRound": 2
+      },
+      "experimentConfiguration": {
+        "randomSeed": [
+          1,
+          41,
+          42,
+          43,
+          430
+        ],
+        "workerReplication": {
+          "slow": 2,
+          "medium": 1
+        }
       }
-    ],
-    "lambda": 20,
-    "preemptJobs": 0
+    }
   }
 ]
-
