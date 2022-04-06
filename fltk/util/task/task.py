@@ -4,6 +4,7 @@ from typing import OrderedDict, Dict, List, Optional
 from uuid import UUID
 
 from fltk.util.task.config import SystemParameters, HyperParameters
+from fltk.util.task.config.parameter import SystemResources, HyperParameterConfiguration
 
 
 @dataclass
@@ -67,8 +68,8 @@ class FederatedArrivalTask(ArrivalTask):
     """
 
     type_map: OrderedDict[str, int]
-    sys_config_map: Dict[str, SystemParameters]
-    param_config_map: Dict[str, HyperParameters]
+    sys_config_map: Dict[str, SystemResources]
+    param_config_map: Dict[str, HyperParameterConfiguration]
 
     def named_system_params(self) -> OrderedDict[str, SystemParameters]:
         """

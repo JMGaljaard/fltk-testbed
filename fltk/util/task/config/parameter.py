@@ -9,6 +9,7 @@ from dataclasses_json import dataclass_json, LetterCase, config
 def _none_factory():
     return None
 
+
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class HyperParameterConfiguration:
@@ -55,6 +56,7 @@ class HyperParameters:
             merge = {k: v for k, v in conf.__dict__.items() if v is not None}
             self.configurations[config_type] = self.default.merge_default(merge)
 
+
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class Priority:
@@ -86,7 +88,6 @@ class SystemParameters:
     configurations: OrderedDict[str, SystemResources]
 
 
-
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class NetworkConfiguration:
@@ -112,6 +113,7 @@ class LearningParameters:
 class ExperimentConfiguration:
     random_seed: List[int]
     worker_replication: OrderedDict[str, int]
+
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
@@ -141,6 +143,10 @@ class JobDescription:
     job_class_parameters: JobClassParameter
     preemtible_jobs: Optional[float] = field(default_factory=_none_factory)
     arrival_statistic: Optional[float] = field(default_factory=_none_factory)
+    priority: Optional[Priority] = None
+
+    def get_experiment_configuration(self) -> ExperimentConfiguration:
+        return self.job_class_parameters.experiment_configuration
 
 
 @dataclass(order=True)
@@ -153,11 +159,13 @@ class TrainTask:
     """
     priority: int
     network_configuration: NetworkConfiguration = field(compare=False)
+    experiment_configuration: ExperimentConfiguration = field(compare=False)
     system_parameters: SystemParameters = field(compare=False)
     hyper_parameters: HyperParameters = field(compare=False)
     identifier: str = field(compare=False)
 
-    def __init__(self, identity: str, job_parameters: JobClassParameter, priority: Priority):
+    def __init__(self, identity: str, job_parameters: JobClassParameter, priority: Priority = None,
+                 experiment_config: ExperimentConfiguration = None):
         """
         Overridden init method for dataclass, to allow for 'exploding' a JobDescription object to a flattened object.
         @param job_parameters:
@@ -171,7 +179,9 @@ class TrainTask:
         self.network_configuration = job_parameters.network_configuration
         self.system_parameters = job_parameters.system_parameters
         self.hyper_parameters = job_parameters.hyper_parameters
-        self.priority = priority.priority
+        if priority:
+            self.priority = priority.priority
+        self.experiment_configuration = experiment_config
 
 
 class ExperimentParser(object):

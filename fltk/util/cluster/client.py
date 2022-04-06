@@ -217,7 +217,7 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask, federated=Tr
     return command.split(' ')
 
 
-def _build_typed_container(conf: DistributedConfig, cmd: str, resources: V1ResourceRequirements,
+def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V1ResourceRequirements,
                            name: str = "pytorch", requires_mount: bool = False) -> V1Container:
     """
     Function to build the Master worker container. This requires the LOG PV to be mounted on the expected
@@ -227,14 +227,14 @@ def _build_typed_container(conf: DistributedConfig, cmd: str, resources: V1Resou
     @return:
     @rtype:
     """
-    mount_list: Optional[List[V1VolumeMount]] = None
+    mount_list: Optional[List[V1VolumeMount]] = []
     if requires_mount:
         mount_list: List[V1VolumeMount] = [V1VolumeMount(
                 mount_path=f'/opt/federation-lab/{conf.get_log_dir()}',
                 name='fl-log-claim',
                 read_only=False
         )]
-
+    # Create mount for configuration
     container = V1Container(name=name,
                             image=conf.cluster_config.image,
                             command=cmd,
@@ -270,8 +270,8 @@ class DeploymentBuilder:
     def build_resources(self, arrival_task: ArrivalTask) -> None:
         system_reqs = arrival_task.named_system_params()
         for tpe, sys_reqs in system_reqs.items():
-            typed_req_dict = _resource_dict(mem=sys_reqs.executor_memory,
-                                                 cpu=sys_reqs.executor_cores)
+            typed_req_dict = _resource_dict(mem=sys_reqs.memory,
+                                            cpu=sys_reqs.cores)
             # Currently the request is set to the limits. You may want to change this.
             self._buildDescription.resources[tpe] = client.V1ResourceRequirements(requests=typed_req_dict,
                                                                                   limits=typed_req_dict)
@@ -288,11 +288,9 @@ class DeploymentBuilder:
         """
         # TODO: Implement cmd / config reference.
         cmd = _generate_command(conf, task)
-        tpe, curr_resource = self._buildDescription.resources.items()[0]
-        self._buildDescription.typed_containers[tpe] = _build_typed_container(conf, cmd, curr_resource,
-                                                                                   requires_mount=True)
-        for tpe, curr_resource in self._buildDescription.resources.items()[1:]:
-            self._buildDescription.typed_containers[tpe] = _build_typed_container(conf, cmd, curr_resource)
+        for indx, (tpe, curr_resource) in enumerate(self._buildDescription.resources.items()):
+            self._buildDescription.typed_containers[tpe] = _build_typed_container(conf, cmd, curr_resource,
+                                                                                  requires_mount=not indx)
 
     def build_tolerations(self, tols: List[Tuple[str, Optional[str], str, str]] = None):
         if not tols:
@@ -319,27 +317,26 @@ class DeploymentBuilder:
                       persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(claim_name='fl-log-claim'))
              ]
 
-
-        for tpe, container in self._buildDescription.typed_containers:
+        for tpe, container in self._buildDescription.typed_containers.items():
             # TODO: Make this less hardcody
             volumes = master_volumes if 'Master' in tpe else None
 
-            self._buildDescription.typed_templates = client.V1PodTemplateSpec(
-                metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
-                spec=client.V1PodSpec(containers=[container],
-                                      volumes=volumes,
-                                      tolerations=self._buildDescription.tolerations))
+            self._buildDescription.typed_templates[tpe] = \
+                client.V1PodTemplateSpec(
+                        metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
+                        spec=client.V1PodSpec(containers=[container],
+                                              volumes=volumes,
+                                              tolerations=self._buildDescription.tolerations))
 
     def build_spec(self, task: ArrivalTask, restart_policy: str = 'OnFailure') -> None:
         pt_rep_spec = OrderedDict[str, V1ReplicaSpec]()
-        for tpe, tpe_template in self._buildDescription.typed_templates:
-
+        for tpe, tpe_template in self._buildDescription.typed_templates.items():
             typed_replica_spec = V1ReplicaSpec(
                     replicas=task.typed_replica_count(tpe),
                     restart_policy=restart_policy,
                     template=tpe_template)
+            typed_replica_spec.openapi_types = typed_replica_spec.swagger_types
             pt_rep_spec[tpe] = typed_replica_spec
-            tpe.openapi_types = tpe.swagger_types
 
         job_spec = V1PyTorchJobSpec(pytorch_replica_specs=pt_rep_spec)
         job_spec.openapi_types = job_spec.swagger_types

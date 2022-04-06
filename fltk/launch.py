@@ -9,14 +9,14 @@ from kubernetes import config
 from torch.distributed import rpc
 
 from fltk.core.client import Client
-from fltk.core.distributed.client import DistClient
+from fltk.core.distributed import DistClient
+from fltk.core.distributed import Orchestrator
 from fltk.core.distributed.extractor import download_datasets
-from fltk.core.distributed.orchestrator import Orchestrator
 from fltk.core.federator import Federator
 from fltk.util.cluster.client import ClusterManager
-from fltk.util.config.arguments import LearningParameters, extract_learning_parameters
 from fltk.util.config import DistributedConfig, Config
-from fltk.util.task.generator.arrival_generator import ExperimentGenerator
+from fltk.util.config.arguments import LearningParameters, extract_learning_parameters
+from fltk.util.task.generator.arrival_generator import DistributedExperimentGenerator, FederatedArrivalGenerator
 
 
 def should_distribute() -> bool:
@@ -47,7 +47,8 @@ def launch_federated_client(task_id: str, config: ...):
     """
 
 
-def launch_distributed_client(task_id: str, config: DistributedConfig = None, learning_params: LearningParameters = None,
+def launch_distributed_client(task_id: str, config: DistributedConfig = None,
+                              learning_params: LearningParameters = None,
                               namespace: Namespace = None):
     """
     @param task_id: String representation (should be unique) corresponding to a client.
@@ -76,7 +77,7 @@ def launch_distributed_client(task_id: str, config: DistributedConfig = None, le
     print(epoch_data)
 
 
-def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
+def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None, simulate_arrivals=False):
     """
     Default runner for the Orchestrator that is based on KubeFlow
     @param args: Commandline arguments passed to the execution. Might be removed in a future commit.
@@ -95,12 +96,10 @@ def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
     else:
         logging.info("Loading in cluster configuration file")
         config.load_incluster_config()
-
         logging.info("Pointing configuration to in cluster configuration.")
         conf.cluster_config.load_incluster_namespace()
         conf.cluster_config.load_incluster_image()
-
-    arrival_generator = ExperimentGenerator()
+    arrival_generator = DistributedExperimentGenerator() if simulate_arrivals else FederatedArrivalGenerator()
     cluster_manager = ClusterManager()
 
     orchestrator = Orchestrator(cluster_manager, arrival_generator, conf)
@@ -111,13 +110,14 @@ def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
     logging.info("Starting arrival generator")
     pool.apply_async(arrival_generator.start, args=[conf.get_duration()])
     logging.info("Starting orchestrator")
-    pool.apply(orchestrator.run)
+    pool.apply(orchestrator.run if simulate_arrivals else orchestrator.run_federated)
     pool.join()
 
     logging.info("Stopped execution of Orchestrator...")
 
 
-def launch_extractor(base_path: Path, config_path: Path, args: Namespace=None, conf: DistributedConfig=None, **kwargs):
+def launch_extractor(base_path: Path, config_path: Path, args: Namespace = None, conf: DistributedConfig = None,
+                     **kwargs):
     """
     Extractor launch function, will only download all models and quit execution.
     @param args: Arguments passed from CLI.
@@ -170,9 +170,11 @@ def _retrieve_or_init_env(nic=None, host=None):
         os.environ['GLOO_SOCKET_IFNAME'] = nic
         os.environ['TP_SOCKET_IFNAME'] = nic
 
+
 def _retrieve_env_config():
     rank, world_size, port = os.environ.get('RANK'), os.environ.get('WORLD_SIZE'), os.environ["MASTER_PORT"]
     return rank, world_size, port
+
 
 def _retrieve_network_params_from_config(config: Config, nic=None, host=None):
     if hasattr(config, 'system'):
@@ -185,7 +187,8 @@ def _retrieve_network_params_from_config(config: Config, nic=None, host=None):
     return nic, host
 
 
-def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=None, host=None, prefix: str = None, **kwargs):
+def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=None, host=None, prefix: str = None,
+                  **kwargs):
     print(config_path, rank)
 
     config = Config.FromYamlFile(config_path)
