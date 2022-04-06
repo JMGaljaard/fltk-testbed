@@ -8,6 +8,10 @@
       "systemParameters": {
         "dataParallelism": null,
         "configurations": {
+          "master": {
+            "cores": "1000m",
+            "memory": "1Gi"
+          },
           "slow": {
             "cores": "750m",
             "memory": "1Gi"
@@ -47,6 +51,7 @@
           430
         ],
         "workerReplication": {
+          "master": 1,
           "slow": 2,
           "medium": 1
         }
