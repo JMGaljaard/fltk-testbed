@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fltk-orchestrator-config
+data:
+  experiment.fltk.json: |-
+{{ if .Values.orchestrator.configuration }}
+{{ .Values.orchestrator.configuration | indent 4 }}     # Requires set-file to be passed during the template generation.
+{{ else if .Values.orchestrator.configurationFile }}
+{{ .Values.orchestrator.configurationFile | indent 4 }} # Requires a systemlink to be present within the template.
+{{ end }}
