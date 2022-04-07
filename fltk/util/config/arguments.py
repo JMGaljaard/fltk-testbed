@@ -23,7 +23,6 @@ CLIENT_ARGS: List[Tuple[str, str, str, type]] = \
      ("optimizer", 'op', "Which optimizer to use during the training process", str)
      ]
 
-
 @dataclass(frozen=True)
 class LearningParameters:
     model: str
@@ -132,6 +131,11 @@ def create_extractor_parser(subparsers):
     extractor_parser.add_argument('config', type=str)
 
 
+def _add_shared_hyperparameters(subparser):
+    for long, short, hlp, tpe in CLIENT_ARGS:
+        subparser.add_argument(f'-{short}', f'--{long}', type=tpe, help=hlp, required=True)
+
+
 def create_client_parser(subparsers) -> None:
     client_parser = subparsers.add_parser('client')
     client_parser.add_argument('config', type=str)
@@ -139,8 +143,7 @@ def create_client_parser(subparsers) -> None:
 
     # TODO: Combine these with FLTK parameter configurator for de-duplication.
     # Add hyper-parameters
-    for long, short, hlp, tpe in CLIENT_ARGS:
-        client_parser.add_argument(f'-{short}', f'--{long}', type=tpe, help=hlp, required=True)
+    _add_shared_hyperparameters(client_parser)
 
     # Add parameter parser for backend
     client_parser.add_argument('--backend', type=str, help='Distributed backend',
@@ -171,13 +174,19 @@ def create_util_run_parser(subparsers) -> None:
 
 
 def create_remote_parser(subparsers) -> None:
+    """
+    Parser for remote FLTK learning.
+    @param subparsers:
+    @type subparsers:
+    @return:
+    @rtype:
+    """
     remote_parser = subparsers.add_parser('remote')
     add_default_arguments(remote_parser)
 
-    remote_parser.add_argument('rank', type=int)
+    remote_parser.add_argument('rank', type=int, default=None)
     remote_parser.add_argument('--nic', type=str, default=None)
     remote_parser.add_argument('--host', type=str, default=None)
-
 
 
 def create_single_parser(subparsers) -> None:
