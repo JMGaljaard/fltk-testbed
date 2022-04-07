@@ -1,0 +1,24 @@
+batch_size: {{ config.get_bs(tpe) }}
+test_batch_size: {{ config.get_test_bs(tpe) }}
+rounds: {{ config.get_rounds() }}
+lr: {{ config.get_lr(tpe) }}
+momentum: {{ config.get_momentum(tpe) }}
+cuda: {{ config.get_cuda(tpe) }}
+shuffle: {{ config.get_shuffle(tpe) }}
+scheduler_step_size: {{ config.get_step_size(tpe) }}
+scheduler_gamma: {{ config.get_gamma(tpe) }}
+min_lr: {{ config.get_min_lr(tpe) }}
+rng_seed: {{ config.get_rng_seed(tpe) }}
+optimizer: {{ config.get_optimizer(tpe) }}
+optimizer_args: {{ config.get_opimizer_args(tpe) }}
+loss_function: {{ config.get_loss_func(tpe }}
+distributed: true
+single_machine: false
+aggregration: {{ config.get_aggregration() }}
+dataset_name: {{ config.get_dataset_name() }}
+net_name: {{ config.get_net_name() }}
+data_sampler: {{ config.get_data_sampler(tpe) }}
+data_sampler_args: {{ config.get_data_sampler_args(tpe) }}
+replication_id: {{ replication }}
+real_time: true
+save_data_append: true
