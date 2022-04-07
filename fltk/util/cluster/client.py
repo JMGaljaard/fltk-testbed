@@ -10,7 +10,7 @@ import schedule
 from kubeflow.pytorchjob import V1PyTorchJob, V1ReplicaSpec, V1PyTorchJobSpec
 from kubernetes import client
 from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container, V1PodTemplateSpec, \
-    V1VolumeMount, V1Toleration, V1Volume, V1PersistentVolumeClaimVolumeSource
+    V1VolumeMount, V1Toleration, V1Volume, V1PersistentVolumeClaimVolumeSource, V1ConfigMapVolumeSource, V1KeyToPath
 
 from fltk.util.cluster.conversion import Convert
 from fltk.util.config import DistributedConfig
@@ -302,7 +302,7 @@ class DeploymentBuilder:
             self._buildDescription.tolerations = \
                 [V1Toleration(key=key, value=vl, operator=op, effect=effect) for key, vl, op, effect in tols]
 
-    def build_template(self) -> None:
+    def build_template(self, config_name_dict: Optional[Dict[str, str]]) -> None:
         """
 
         @return:
@@ -316,7 +316,14 @@ class DeploymentBuilder:
             [V1Volume(name="fl-log-claim",
                       persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(claim_name='fl-log-claim'))
              ]
-
+        if config_name_dict:
+            for tpe, tpe_config_map_name in config_name_dict.items():
+                V1Volume(name=tpe_config_map_name,
+                         config_map=V1ConfigMapVolumeSource(tpe_config_map_name,
+                                                            items=[V1KeyToPath(
+                                                                    key='experiment.yaml',
+                                                                    path='configs/experiment.yaml')]
+                                                            ))
         for tpe, container in self._buildDescription.typed_containers.items():
             # TODO: Make this less hardcody
             volumes = master_volumes if 'Master' in tpe else None
@@ -361,7 +368,8 @@ class DeploymentBuilder:
         self._buildDescription.id = task.id
 
 
-def construct_job(conf: DistributedConfig, task: DistributedArrivalTask) -> V1PyTorchJob:
+def construct_job(conf: DistributedConfig, task: DistributedArrivalTask,
+                  config_name_dict: Optional[Dict[str, str]] = None) -> V1PyTorchJob:
     """
     Function to build a Job, based on the specifications of an ArrivalTask, and the general configuration of the
     BareConfig.
@@ -377,7 +385,7 @@ def construct_job(conf: DistributedConfig, task: DistributedArrivalTask) -> V1Py
     dp_builder.build_resources(task)
     dp_builder.build_container(task, conf)
     dp_builder.build_tolerations()
-    dp_builder.build_template()
+    dp_builder.build_template(config_name_dict)
     dp_builder.build_spec(task)
     job = dp_builder.construct()
     # Fix to deploy on more up-to-date Kubernetes clusters. See if needed for KubeFlow operator release.

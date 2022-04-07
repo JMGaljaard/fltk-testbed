@@ -1,12 +1,14 @@
+import collections
 import logging
 import time
 import uuid
 from queue import PriorityQueue
-from typing import List
+from typing import List, OrderedDict, Dict
 
 from kubeflow.pytorchjob import PyTorchJobClient
 from kubeflow.pytorchjob.constants.constants import PYTORCHJOB_GROUP, PYTORCHJOB_VERSION, PYTORCHJOB_PLURAL
 from kubernetes import client
+from kubernetes.client import V1ConfigMap, V1ObjectMeta
 
 from fltk.core.distributed.dist_node import DistNode
 from fltk.util.cluster.client import construct_job, ClusterManager
@@ -15,6 +17,23 @@ from fltk.util.config import DistributedConfig
 from fltk.util.task.config import SystemParameters
 from fltk.util.task.generator.arrival_generator import ArrivalGenerator, Arrival
 from fltk.util.task.task import DistributedArrivalTask, FederatedArrivalTask
+
+
+from jinja2 import Template
+
+def _prepare_experiment_maps(task: FederatedArrivalTask, uuid, replication: int =1) -> (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
+    template = Template(open('configs/node.jinja.yaml'))
+    tpe_dict = collections.OrderedDict()
+    name_dict = collections.OrderedDict()
+    for tpe in task.type_map.keys():
+        name = f'{uuid}_{tpe}_{replication}'
+        meta = V1ObjectMeta(name=name,
+                     labels={'app.kubernetes.io/name': f"fltk.node.config.{tpe}"})
+
+        filled_template = template.generate(config=task, tpe=tpe, replication=replication)
+        tpe_dict[tpe] = V1ConfigMap(data={'node.config.json': filled_template}, metadata=meta)
+        name_dict[tpe] = name
+    return tpe_dict, name_dict
 
 
 class Orchestrator(DistNode):
@@ -48,6 +67,7 @@ class Orchestrator(DistNode):
 
         # API to interact with the cluster.
         self.__client = PyTorchJobClient()
+        self.__v1 = client.CoreV1Api()
 
     def stop(self) -> None:
         """
@@ -124,9 +144,11 @@ class Orchestrator(DistNode):
         start_time = time.time()
         if clear:
             self.__clear_jobs()
+        # TODO: Set duration correctly/till everything is done
         while self._alive and time.time() - start_time < self._config.get_duration():
             # 1. Check arrivals
             # If new arrivals, store them in arrival list
+            # TODO: Make sure to account for repetitions
             while not self.__arrival_generator.arrivals.empty():
                 arrival: Arrival = self.__arrival_generator.arrivals.get()
                 unique_identifier: uuid.UUID = uuid.uuid4()
@@ -139,6 +161,7 @@ class Orchestrator(DistNode):
                 sys_config_map: Dict[str, SystemParameters]
                 param_config_map: Dict[str, HyperParameters]
                 """
+                # TODO: Add replication
                 task = FederatedArrivalTask(id=unique_identifier,
                                             network=arrival.get_network(),
                                             dataset=arrival.get_dataset(),
@@ -153,8 +176,10 @@ class Orchestrator(DistNode):
                 # Do blocking request to priority queue
                 curr_task = self.pending_tasks.get()
                 self.__logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
-                job_to_start = construct_job(self._config, curr_task)
+                config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task, curr_task.id, 1)
+                job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
 
+                self.__create_config_maps(config_dict)
                 # Hack to overcome limitation of KubeFlow version (Made for older version of Kubernetes)
                 self.__logger.info(f"Deploying on cluster: {curr_task.id}")
                 self.__client.create(job_to_start, namespace=self._config.cluster_config.namespace)
@@ -193,3 +218,8 @@ class Orchestrator(DistNode):
             except Exception as e:
                 self.__logger.warning(f'Could not delete: {job_name}')
                 print(e)
+
+    def __create_config_maps(self, config_maps: Dict[str, V1ConfigMap]):
+        for _, config_map in config_maps.values():
+            self.__v1.create_namespaced_config_map(self._config.cluster_config.namespace,
+                                                   config_map)
