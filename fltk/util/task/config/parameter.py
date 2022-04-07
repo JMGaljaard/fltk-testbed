@@ -14,6 +14,7 @@ def _none_factory():
 @dataclass(frozen=True)
 class HyperParameterConfiguration:
     bs: Optional[int] = field(metadata=config(field_name="batchSize"), default_factory=_none_factory)
+    test_bs: Optional[int] = field(metadata=config(field_name="testBatchSize"), default_factory=_none_factory)
     lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory)
     lr_decay: Optional[float] = field(metadata=config(field_name="learningRateDecay"), default_factory=_none_factory)
 
@@ -100,12 +101,21 @@ class NetworkConfiguration:
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
+class SamplerConfiguration:
+    type: str
+    q_value: str
+    seed: int
+
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass(frozen=True)
 class LearningParameters:
     total_epochs: int
     rounds: int
     epochs_per_round: int
     cuda: bool
     clients_per_round: int
+    sampler: SamplerConfiguration
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
