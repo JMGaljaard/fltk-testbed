@@ -25,8 +25,17 @@
       "hyperParameters": {
         "default": {
           "batchSize": "128",
-          "learningRate": "0.01",
-          "learningRateDecay": "0.0002"
+          "testBatchSize": 1000,
+          "learningRateDecay": "0.0002",
+          "optimizerConfig": {
+            "learningRate": "0.01",
+            "momentum": 0.1
+          },
+          "schedulerConfig": {
+            "schedulerStepSize": 50,
+            "schedulerGamma": 0.5,
+            "minimumLearningRate": 1e-10
+          }
         },
         "configurations": {
           "slow": null,
@@ -40,7 +49,14 @@
         "rounds": 5,
         "epochsPerRound": 1,
         "cuda": false,
-        "clientsPerRound": 2
+        "clientsPerRound": 2,
+        "sampler": {
+          "type": "uniform",
+          "qValue": 0.07,
+          "seed": 42
+        },
+        "aggregration": "Aggregations.fedavg",
+        "dataSampler": "DataSampler.uniform"
       },
       "experimentConfiguration": {
         "randomSeed": [
