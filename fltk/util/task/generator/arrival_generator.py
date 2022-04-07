@@ -189,9 +189,7 @@ class FederatedArrivalGenerator(ArrivalGenerator):
         self.start_time = time.time()
 
         description: JobDescription
-        print(self.job_dict)
         for job_name, description in self.job_dict.items():
-
             train_task = TrainTask(job_name, description.job_class_parameters, description.priority,
                                 description.get_experiment_configuration())
 
