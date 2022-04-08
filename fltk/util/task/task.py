@@ -88,24 +88,81 @@ class FederatedArrivalTask(ArrivalTask):
         return self.type_map[replica_type]
 
     def get_hyper_param(self, tpe, parameter):
+        """
+        Helper function to acquire hyperparameters as-though the configuration is a flat configuration file.
+        @param tpe:
+        @type tpe:
+        @param parameter:
+        @type parameter:
+        @return:
+        @rtype:
+        """
         return getattr(self.hyper_parameters.configurations[tpe], parameter)
 
     def get_learn_param(self, parameter):
+        """
+        Helper function to acquire federated learning parameters as-though the configuration is a flat configuration file.
+        @param tpe:
+        @type tpe:
+        @param parameter:
+        @type parameter:
+        @return:
+        @rtype:
+        """
         return getattr(self.learning_parameters, parameter)
 
     def get_sampler_param(self, tpe, parameter):
+        """
+        Helper function to acquire federated datasampler parameters as-though the configuration is a flat configuration file.
+        @param tpe:
+        @type tpe:
+        @param parameter:
+        @type parameter:
+        @return:
+        @rtype:
+        """
         return getattr(self.learning_parameters.data_sampler, parameter)
 
     def get_sampler_args(self, tpe):
+        """
+        Helper function to acquire federated datasampler arguments as-though the configuration is a flat configuration file.
+        @param tpe:
+        @type tpe:
+        @param parameter:
+        @type parameter:
+        @return:
+        @rtype:
+        """
         sampler_conf: SamplerConfiguration = self.learning_parameters.data_sampler
         args = [sampler_conf.q_value, sampler_conf.seed]
         return args
 
 
     def get_optimizer_param(self, tpe, parameter):
+        """
+        Helper function to acquire optimizer parameters as-though the configuration is a flat configuration file.
+        @param tpe:
+        @type tpe:
+        @param parameter:
+        @type parameter:
+        @return:
+        @rtype:
+        """
         return getattr(self.hyper_parameters.configurations[tpe].optimizer_config, parameter)
 
     def get_optimizer_args(self, tpe):
+        """
+        Helper function to acquire optimizer arguments as-though the configuration is a flat configuration file.
+        @note: This function requires a semantically correct configuration file to be provided, as otherwise
+        arguments can be missing. For current version `lr` and `momentum` must be set in accordance to the type of
+        learner.
+        @param tpe:
+        @type tpe:
+        @param parameter:
+        @type parameter:
+        @return:
+        @rtype:
+        """
         optimizer_conf: OptimizerConfig = self.hyper_parameters.configurations[tpe].optimizer_config
         kwargs = {
             'lr': optimizer_conf.lr,
@@ -115,7 +172,25 @@ class FederatedArrivalTask(ArrivalTask):
 
 
     def get_scheduler_param(self, tpe, parameter):
+        """
+        Helper function to acquire learnign scheduler parameters as-though the configuration is a flat configuration file.
+        @param tpe:
+        @type tpe:
+        @param parameter:
+        @type parameter:
+        @return:
+        @rtype:
+        """
         return getattr(self.hyper_parameters.configurations[tpe].scheduler_config, parameter)
 
     def get_net_param(self, parameter):
+        """
+        Helper function to acquire network parameters as-though the configuration is a flat configuration file.
+        @param tpe:
+        @type tpe:
+        @param parameter:
+        @type parameter:
+        @return:
+        @rtype:
+        """
         return getattr(self, parameter)
