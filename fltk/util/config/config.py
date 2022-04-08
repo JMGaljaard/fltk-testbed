@@ -6,6 +6,8 @@ from typing import Type
 
 import torch
 import yaml
+from torch.nn.modules.loss import _Loss
+
 from fltk.util.log import getLogger
 
 from fltk.util.definitions import Dataset, Nets, DataSampler, Optimizations, LogLevel, Aggregations
@@ -13,7 +15,6 @@ from fltk.util.definitions import Dataset, Nets, DataSampler, Optimizations, Log
 
 @dataclass
 class Config:
-    # optimizer: Optimizations
     batch_size: int = 1
     test_batch_size: int = 1000
     rounds: int = 2
@@ -29,13 +30,14 @@ class Config:
 
     # @TODO: Set seed from configuration
     rng_seed = 0
+
     # Enum
     optimizer: Optimizations = Optimizations.sgd
     optimizer_args = {
         'lr': lr,
         'momentum': momentum
     }
-    loss_function = torch.nn.CrossEntropyLoss
+    loss_function: Type[_Loss] = torch.nn.CrossEntropyLoss
     # Enum
     log_level: LogLevel = LogLevel.DEBUG
 
@@ -55,6 +57,7 @@ class Config:
     data_sampler: DataSampler = DataSampler.uniform
     data_sampler_args = []
 
+    # Set by Node upon argument
     rank: int = 0
     world_size: int = 0
 
@@ -86,6 +89,7 @@ class Config:
 
     def update_rng_seed(self):
         torch.manual_seed(self.rng_seed)
+
     def get_default_model_folder_path(self):
         return self.default_model_folder_path
 
@@ -107,7 +111,7 @@ class Config:
     def get_data_path(self):
         return self.data_path
 
-    def get_loss_function(self):
+    def get_loss_function(self) -> Type[_Loss]:
         return self.loss_function
 
     @classmethod
@@ -118,3 +122,10 @@ class Config:
             for k, v in content.items():
                 getLogger(__name__).debug(f'Inserting key "{k}" into config')
             return cls(**content)
+
+if __name__ == '__main__':
+    a = Config()
+    print(a)
+    import yaml
+    with open('./output.yaml', 'w') as file:
+        yaml.dump(a, file)

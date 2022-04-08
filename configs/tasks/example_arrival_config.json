@@ -3,7 +3,8 @@
     "jobClassParameters": {
       "networkConfiguration": {
         "network": "FashionMNISTCNN",
-        "dataset": "MNIST"
+        "lossFunction": "CrossEntropyLoss",
+        "dataset": "mnist"
       },
       "systemParameters": {
         "dataParallelism": null,
@@ -28,6 +29,7 @@
           "testBatchSize": 1000,
           "learningRateDecay": "0.0002",
           "optimizerConfig": {
+            "type": "SGD",
             "learningRate": "0.01",
             "momentum": 0.1
           },
@@ -38,6 +40,7 @@
           }
         },
         "configurations": {
+          "master": null,
           "slow": null,
           "medium": {
             "learningRate": "0.05"
@@ -50,13 +53,13 @@
         "epochsPerRound": 1,
         "cuda": false,
         "clientsPerRound": 2,
-        "sampler": {
+        "dataSampler": {
           "type": "uniform",
           "qValue": 0.07,
-          "seed": 42
+          "seed": 42,
+          "shuffle": true
         },
-        "aggregration": "Aggregations.fedavg",
-        "dataSampler": "DataSampler.uniform"
+        "aggregation": "FedAvg"
       },
       "experimentConfiguration": {
         "randomSeed": [

@@ -4,7 +4,8 @@ from typing import OrderedDict, Dict, List, Optional
 from uuid import UUID
 
 from fltk.util.task.config import SystemParameters, HyperParameters
-from fltk.util.task.config.parameter import SystemResources, HyperParameterConfiguration
+from fltk.util.task.config.parameter import SystemResources, HyperParameterConfiguration, LearningParameters, \
+    OptimizerConfig, SamplerConfiguration
 
 
 @dataclass
@@ -14,7 +15,7 @@ class ArrivalTask(abc.ABC):
     dataset: str = field(compare=False)
 
     @abc.abstractmethod
-    def named_system_params(self, **kwargs) -> OrderedDict[str, SystemParameters]:
+    def named_system_params(self, **kwargs) -> OrderedDict[str, SystemResources]:
         pass
 
     @abc.abstractmethod
@@ -68,19 +69,53 @@ class FederatedArrivalTask(ArrivalTask):
     """
 
     type_map: OrderedDict[str, int]
-    sys_config_map: Dict[str, SystemResources]
-    param_config_map: Dict[str, HyperParameterConfiguration]
+    hyper_parameters: HyperParameters
+    system_parameters: SystemParameters
+    learning_parameters: LearningParameters
 
-    def named_system_params(self) -> OrderedDict[str, SystemParameters]:
+    def named_system_params(self) -> OrderedDict[str, SystemResources]:
         """
         Helper function to get named system parameters for types. Default follows the naming convention of KubeFlow,
         where the first operator gets assigned the name 'Master' and subsequent compute units are assigned 'Worker'.
         @return:
         @rtype:
         """
-        ret_dict = OrderedDict[str, SystemParameters](
-                [(tpe, self.sys_config_map[tpe]) for tpe in self.type_map.keys()])
+        ret_dict = OrderedDict[str, SystemResources](
+                [(tpe, self.system_parameters.configurations[tpe]) for tpe in self.type_map.keys()])
         return ret_dict
 
     def typed_replica_count(self, replica_type):
         return self.type_map[replica_type]
+
+    def get_hyper_param(self, tpe, parameter):
+        return getattr(self.hyper_parameters.configurations[tpe], parameter)
+
+    def get_learn_param(self, parameter):
+        return getattr(self.learning_parameters, parameter)
+
+    def get_sampler_param(self, tpe, parameter):
+        return getattr(self.learning_parameters.data_sampler, parameter)
+
+    def get_sampler_args(self, tpe):
+        sampler_conf: SamplerConfiguration = self.learning_parameters.data_sampler
+        args = [sampler_conf.q_value, sampler_conf.seed]
+        return args
+
+
+    def get_optimizer_param(self, tpe, parameter):
+        return getattr(self.hyper_parameters.configurations[tpe].optimizer_config, parameter)
+
+    def get_optimizer_args(self, tpe):
+        optimizer_conf: OptimizerConfig = self.hyper_parameters.configurations[tpe].optimizer_config
+        kwargs = {
+            'lr': optimizer_conf.lr,
+            'momentum': optimizer_conf.momentum
+        }
+        return kwargs
+
+
+    def get_scheduler_param(self, tpe, parameter):
+        return getattr(self.hyper_parameters.configurations[tpe].scheduler_config, parameter)
+
+    def get_net_param(self, parameter):
+        return getattr(self, parameter)

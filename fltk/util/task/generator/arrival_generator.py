@@ -13,7 +13,7 @@ import numpy as np
 
 from fltk.util.singleton import Singleton
 from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser, JobClassParameter, \
-    SystemParameters, HyperParameters, ExperimentConfiguration
+    SystemParameters, HyperParameters, ExperimentConfiguration, LearningParameters
 
 
 @dataclass
@@ -97,6 +97,9 @@ class Arrival:
 
     def get_experiment_config(self) -> ExperimentConfiguration:
         return self.task.experiment_configuration
+
+    def get_learning_config(self) -> LearningParameters:
+        return self.task.learning_parameters
 
 class DistributedExperimentGenerator(ArrivalGenerator):
     job_dict: Dict[str, JobDescription] = None

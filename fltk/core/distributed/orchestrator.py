@@ -16,21 +16,23 @@ from fltk.util.cluster.client import construct_job, ClusterManager
 from fltk.util.config import DistributedConfig
 from fltk.util.task.config import SystemParameters
 from fltk.util.task.generator.arrival_generator import ArrivalGenerator, Arrival
-from fltk.util.task.task import DistributedArrivalTask, FederatedArrivalTask
+from fltk.util.task.task import DistributedArrivalTask, FederatedArrivalTask, ArrivalTask
+
+from jinja2 import Template, Environment, FileSystemLoader
+
+__ENV = Environment(loader=FileSystemLoader('./configs'))
 
 
-from jinja2 import Template
-
-def _prepare_experiment_maps(task: FederatedArrivalTask, uuid, replication: int =1) -> (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
-    template = Template(open('configs/node.jinja.yaml'))
+def _prepare_experiment_maps(task: FederatedArrivalTask, uuid, replication: int = 1) -> (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
+    template = __ENV.get_template('node.jinja.yaml')
     tpe_dict = collections.OrderedDict()
     name_dict = collections.OrderedDict()
     for tpe in task.type_map.keys():
         name = f'{uuid}_{tpe}_{replication}'
         meta = V1ObjectMeta(name=name,
                      labels={'app.kubernetes.io/name': f"fltk.node.config.{tpe}"})
-
-        filled_template = template.generate(config=task, tpe=tpe, replication=replication)
+        # TODO: Replication / seed information
+        filled_template = template.render(task=task, tpe=tpe, replication=replication, seed=42)
         tpe_dict[tpe] = V1ConfigMap(data={'node.config.json': filled_template}, metadata=meta)
         name_dict[tpe] = name
     return tpe_dict, name_dict
@@ -54,7 +56,7 @@ class Orchestrator(DistNode):
     """
     _alive = False
     # Priority queue, requires an orderable object, otherwise a Tuple[int, Any] can be used to insert.
-    pending_tasks: "PriorityQueue[DistributedArrivalTask]" = PriorityQueue()
+    pending_tasks: "PriorityQueue[ArrivalTask]" = PriorityQueue()
     deployed_tasks: List[DistributedArrivalTask] = []
     completed_tasks: List[str] = []
 
@@ -166,8 +168,9 @@ class Orchestrator(DistNode):
                                             network=arrival.get_network(),
                                             dataset=arrival.get_dataset(),
                                             type_map=arrival.get_experiment_config().worker_replication,
-                                            sys_config_map=arrival.get_system_config().configurations,
-                                            param_config_map=arrival.get_parameter_config().configurations)
+                                            system_parameters=arrival.get_system_config(),
+                                            hyper_parameters=arrival.get_parameter_config(),
+                                            learning_parameters=arrival.get_learning_config())
 
                 self.__logger.debug(f"Arrival of: {task}")
                 self.pending_tasks.put(task)

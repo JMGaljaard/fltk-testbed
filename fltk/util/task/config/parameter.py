@@ -1,9 +1,13 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, OrderedDict, Any
+from typing import List, Optional, OrderedDict, Any, Union, Tuple, Type
 
+import torch
 from dataclasses_json import dataclass_json, LetterCase, config
+from torch.nn.modules.loss import _Loss
+
+from fltk.util.definitions import Aggregations, DataSampler, Optimizations, Dataset, Nets
 
 
 def _none_factory():
@@ -12,10 +16,27 @@ def _none_factory():
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
+class OptimizerConfig:
+    type: Optimizations
+    momentum: Optional[Union[float, Tuple[float]]]
+    lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory)
+
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass(frozen=True)
+class SchedulerConfig:
+    scheduler_step_size: int
+    scheduler_gamma: float
+    min_lr: float = field(metadata=config(field_name="minimumLearningRate"))
+
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass(frozen=True)
 class HyperParameterConfiguration:
+    optimizer_config: Optional[OptimizerConfig] = field(metadata=config(field_name="optimizerConfig"), default_factory=_none_factory)
+    scheduler_config: Optional[SchedulerConfig] = field(metadata=config(field_name="schedulerConfig"), default_factory=_none_factory)
     bs: Optional[int] = field(metadata=config(field_name="batchSize"), default_factory=_none_factory)
     test_bs: Optional[int] = field(metadata=config(field_name="testBatchSize"), default_factory=_none_factory)
-    lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory)
     lr_decay: Optional[float] = field(metadata=config(field_name="learningRateDecay"), default_factory=_none_factory)
 
     def merge_default(self, other: dict[str, Any]):
@@ -95,8 +116,9 @@ class NetworkConfiguration:
     """
     Dataclass describing the network and dataset that is 'trained' for a task.
     """
-    network: str
-    dataset: str
+    network: Nets
+    dataset: Dataset
+    loss_function: Optional[Type[_Loss]]
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -105,6 +127,7 @@ class SamplerConfiguration:
     type: str
     q_value: str
     seed: int
+    shuffle: bool
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -115,7 +138,8 @@ class LearningParameters:
     epochs_per_round: int
     cuda: bool
     clients_per_round: int
-    sampler: SamplerConfiguration
+    aggregation: Optional[Aggregations]
+    data_sampler: Optional[SamplerConfiguration]
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -172,6 +196,7 @@ class TrainTask:
     experiment_configuration: ExperimentConfiguration = field(compare=False)
     system_parameters: SystemParameters = field(compare=False)
     hyper_parameters: HyperParameters = field(compare=False)
+    learning_parameters: LearningParameters = field(compare=False)
     identifier: str = field(compare=False)
 
     def __init__(self, identity: str, job_parameters: JobClassParameter, priority: Priority = None,
@@ -192,6 +217,7 @@ class TrainTask:
         if priority:
             self.priority = priority.priority
         self.experiment_configuration = experiment_config
+        self.learning_parameters = job_parameters.learning_parameters
 
 
 class ExperimentParser(object):

@@ -15,6 +15,7 @@ from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container,
 from fltk.util.cluster.conversion import Convert
 from fltk.util.config import DistributedConfig
 from fltk.util.singleton import Singleton
+from fltk.util.task.config.parameter import SystemResources
 from fltk.util.task.task import DistributedArrivalTask, ArrivalTask
 
 
@@ -268,7 +269,7 @@ class DeploymentBuilder:
         self._buildDescription = BuildDescription()
 
     def build_resources(self, arrival_task: ArrivalTask) -> None:
-        system_reqs = arrival_task.named_system_params()
+        system_reqs: Dict[str, SystemResources] = arrival_task.named_system_params()
         for tpe, sys_reqs in system_reqs.items():
             typed_req_dict = _resource_dict(mem=sys_reqs.memory,
                                             cpu=sys_reqs.cores)
