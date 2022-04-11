@@ -184,7 +184,7 @@ def create_remote_parser(subparsers) -> None:
     remote_parser = subparsers.add_parser('remote')
     add_default_arguments(remote_parser)
 
-    remote_parser.add_argument('rank', type=int, default=None)
+    remote_parser.add_argument('rank', nargs='?', type=int, default=None)
     remote_parser.add_argument('--nic', type=str, default=None)
     remote_parser.add_argument('--host', type=str, default=None)
 

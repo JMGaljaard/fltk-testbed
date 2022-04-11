@@ -9,17 +9,13 @@
       "systemParameters": {
         "dataParallelism": null,
         "configurations": {
-          "master": {
+          "Master": {
             "cores": "1000m",
             "memory": "1Gi"
           },
-          "slow": {
+          "Worker": {
             "cores": "750m",
             "memory": "1Gi"
-          },
-          "medium": {
-            "cores": "1500m",
-            "memory": "1.5Gi"
           }
         }
       },
@@ -40,9 +36,8 @@
           }
         },
         "configurations": {
-          "master": null,
-          "slow": null,
-          "medium": {
+          "Master": null,
+          "Worker": {
             "learningRate": "0.05"
           }
         }
@@ -70,9 +65,8 @@
           430
         ],
         "workerReplication": {
-          "master": 1,
-          "slow": 2,
-          "medium": 1
+          "Master": 1,
+          "Worker": 2
         }
       }
     }

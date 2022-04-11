@@ -1,0 +1,23 @@
+batch_size: 128
+test_batch_size: 1000
+rounds: 5
+lr: 0.01
+momentum: 0.1
+cuda: False
+shuffle: True
+scheduler_step_size: 50
+scheduler_gamma: 0.5
+min_lr: 1e-10
+rng_seed: 42
+optimizer: SGD
+optimizer_args: {'lr': 0.01, 'momentum': 0.1}
+distributed: true
+single_machine: false
+aggregration: FedAvg
+dataset_name: mnist
+net_name: FashionMNISTCNN
+data_sampler: uniform
+data_sampler_args: [0.07, 42]
+replication_id: 1
+real_time: true
+save_data_append: true

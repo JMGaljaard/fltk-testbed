@@ -172,7 +172,7 @@ def _retrieve_or_init_env(nic=None, host=None):
 
 
 def _retrieve_env_config():
-    rank, world_size, port = os.environ.get('RANK'), os.environ.get('WORLD_SIZE'), os.environ["MASTER_PORT"]
+    rank, world_size, port = int(os.environ.get('RANK')), int(os.environ.get('WORLD_SIZE')), int(os.environ["MASTER_PORT"])
     return rank, world_size, port
 
 
@@ -194,12 +194,15 @@ def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=Non
     config = Config.FromYamlFile(config_path)
     config.world_size = config.num_clients + 1
     config.replication_id = prefix
-    if not (nic and host):
+    if rank and not (nic and host):
+        print("Getting parameters from configuration file")
         nic, host = _retrieve_network_params_from_config(config, nic, host)
         _retrieve_or_init_env(nic, host)
-    elif not (nic and host):
+    elif not rank:
+        print("Retrieving environmental configurations!")
         rank, world_size, master_port = _retrieve_env_config()
-        assert world_size == config.world_size
+        print(f"Retrieved: rank {rank} w_s {world_size} m_p {master_port}")
+        config.world_size = world_size
     else:
         print('Missing rank, host, world-size, checking environment!')
         parser.print_help()

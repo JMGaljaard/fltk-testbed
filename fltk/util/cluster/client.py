@@ -214,12 +214,12 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask, federated=Tr
                    f'--decay {task.param_conf.lr_decay} --loss CrossEntropy '
                    f'--backend gloo')
     else:
-        command = (f'python3 -m fltk remote')
+        command = (f'python3 -m fltk remote experiments/node.config.yaml')
     return command.split(' ')
 
 
 def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V1ResourceRequirements,
-                           name: str = "pytorch", requires_mount: bool = False) -> V1Container:
+                           name: str = "pytorch", requires_mount: bool = False, experiment_name: str = None) -> V1Container:
     """
     Function to build the Master worker container. This requires the LOG PV to be mounted on the expected
     logging directory. Make sure that any changes in the Helm charts are also reflected here.
@@ -230,11 +230,18 @@ def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V
     """
     mount_list: Optional[List[V1VolumeMount]] = []
     if requires_mount:
-        mount_list: List[V1VolumeMount] = [V1VolumeMount(
+        mount_list.append(V1VolumeMount(
                 mount_path=f'/opt/federation-lab/{conf.get_log_dir()}',
                 name='fl-log-claim',
                 read_only=False
-        )]
+        ))
+    # TODO: Mount volume
+
+    # mount_list.append(V1VolumeMount(
+    #             mount_path=f'/opt/federation-lab/experiments',
+    #             name='experiment',
+    #             read_only=True
+    # ))
     # Create mount for configuration
     container = V1Container(name=name,
                             image=conf.cluster_config.image,
@@ -277,7 +284,7 @@ class DeploymentBuilder:
             self._buildDescription.resources[tpe] = client.V1ResourceRequirements(requests=typed_req_dict,
                                                                                   limits=typed_req_dict)
 
-    def build_container(self, task: ArrivalTask, conf: DistributedConfig):
+    def build_container(self, task: ArrivalTask, conf: DistributedConfig, config_name_dict: Optional[Dict[str, str]]):
         """
         Function to build container descriptions for deploying from within an Orchestrator pod.
         @param task:
@@ -291,7 +298,8 @@ class DeploymentBuilder:
         cmd = _generate_command(conf, task)
         for indx, (tpe, curr_resource) in enumerate(self._buildDescription.resources.items()):
             self._buildDescription.typed_containers[tpe] = _build_typed_container(conf, cmd, curr_resource,
-                                                                                  requires_mount=not indx)
+                                                                                  requires_mount=not indx,
+                                                                                  experiment_name=config_name_dict[tpe])
 
     def build_tolerations(self, tols: List[Tuple[str, Optional[str], str, str]] = None):
         if not tols:
@@ -313,22 +321,16 @@ class DeploymentBuilder:
         # Ensure with taints that
         # https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
 
-        master_volumes = \
+        volumes = \
             [V1Volume(name="fl-log-claim",
                       persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(claim_name='fl-log-claim'))
              ]
-        if config_name_dict:
-            for tpe, tpe_config_map_name in config_name_dict.items():
-                V1Volume(name=tpe_config_map_name,
-                         config_map=V1ConfigMapVolumeSource(tpe_config_map_name,
-                                                            items=[V1KeyToPath(
-                                                                    key='experiment.yaml',
-                                                                    path='configs/experiment.yaml')]
-                                                            ))
+        # if config_name_dict:
+        #     for tpe, tpe_config_map_name in config_name_dict.items():
+        #         volumes.append(V1Volume(name='experiment',
+        #                  config_map=V1ConfigMapVolumeSource(tpe_config_map_name)))
         for tpe, container in self._buildDescription.typed_containers.items():
             # TODO: Make this less hardcody
-            volumes = master_volumes if 'Master' in tpe else None
-
             self._buildDescription.typed_templates[tpe] = \
                 client.V1PodTemplateSpec(
                         metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
@@ -384,7 +386,7 @@ def construct_job(conf: DistributedConfig, task: DistributedArrivalTask,
     dp_builder = DeploymentBuilder()
     dp_builder.create_identifier(task)
     dp_builder.build_resources(task)
-    dp_builder.build_container(task, conf)
+    dp_builder.build_container(task, conf, config_name_dict)
     dp_builder.build_tolerations()
     dp_builder.build_template(config_name_dict)
     dp_builder.build_spec(task)

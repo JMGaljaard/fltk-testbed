@@ -35,7 +35,7 @@ def get_sampler(dataset, args):
             sampler = DirichletSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                        args=args.get_sampler_args())
         else:  # default
-            logger.warning("Unknown sampler " + method + ", using uniform instead")
+            logger.warning(f"Unknown sampler {method}, using uniform instead")
             sampler = UniformSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank())
 
     return sampler

@@ -18,14 +18,14 @@ class Client(Node):
         self.loss_function = self.config.get_loss_function()()
         self.optimizer = get_optimizer(self.config.optimizer)(self.net.parameters(),
                                                    **self.config.optimizer_args)
-        self.scheduler = MinCapableStepLR(self.logger, self.optimizer,
+        self.scheduler = MinCapableStepLR(self.optimizer,
                                           self.config.scheduler_step_size,
                                           self.config.scheduler_gamma,
                                           self.config.min_lr)
 
     def remote_registration(self):
         self.logger.info('Sending registration')
-        self.message('federator', 'ping', 'new_sender', be_weird=True)
+        self.message('federator', 'ping', 'new_sender')
         self.message('federator', 'register_client', self.id, self.rank)
         self.running = True
         self._event_loop()

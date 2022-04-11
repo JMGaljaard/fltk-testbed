@@ -24,8 +24,10 @@ __run_op_dict = {
 
 
 def _save_get(args, param) -> Optional[Any]:
+    a = None
     if args is not None and hasattr(args, param):
-        return args.__dict__[param]
+        a = args.__dict__[param]
+    print(f"gotten {param} resulted in {a}")
     return None
 
 
@@ -58,6 +60,7 @@ def __main__():
         print('No configuration path is provided.')
 
     # TODO: move kwargs into function as extractor
+
     __run_op_dict[args.action](arg_path, conf_path,
                                rank=_save_get(args, 'rank'),
                                parser=parser,

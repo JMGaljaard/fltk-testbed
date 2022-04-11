@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, OrderedDict, Any, Union, Tuple, Type
+from typing import List, Optional, OrderedDict, Any, Union, Tuple, Type, Dict
 
 import torch
 from dataclasses_json import dataclass_json, LetterCase, config
@@ -39,7 +39,7 @@ class HyperParameterConfiguration:
     test_bs: Optional[int] = field(metadata=config(field_name="testBatchSize"), default_factory=_none_factory)
     lr_decay: Optional[float] = field(metadata=config(field_name="learningRateDecay"), default_factory=_none_factory)
 
-    def merge_default(self, other: dict[str, Any]):
+    def merge_default(self, other: Dict[str, Any]):
         """
         Function to merge a HyperParameterConfiguration object with a default configuration
         @param other:

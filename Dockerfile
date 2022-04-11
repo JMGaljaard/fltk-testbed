@@ -25,4 +25,5 @@ RUN --mount=type=cache,target=/root/.cache/pip python3 -m pip install -r require
 # Add FLTK and configurations
 ADD fltk fltk
 ADD configs configs
+ADD experiments experiments
 ADD charts charts

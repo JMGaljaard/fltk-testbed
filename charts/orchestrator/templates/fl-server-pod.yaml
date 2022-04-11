@@ -32,12 +32,12 @@ spec:
           name: fl-server-claim
           readOnly: true
         - mountPath: /opt/federation-lab/config
-          name: fl-server-config
+          name: fltk-orchestrator-config
   restartPolicy: Never
   volumes:
     - name: fl-server-claim
       persistentVolumeClaim:
         claimName: fl-server-claim
-    - name: fl-server-config
+    - name: fltk-orchestrator-config
       configMap:
-        name: fltk-experiment-config
+        name: fltk-orchestrator-config

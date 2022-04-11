@@ -28,12 +28,12 @@ def _prepare_experiment_maps(task: FederatedArrivalTask, uuid, replication: int 
     tpe_dict = collections.OrderedDict()
     name_dict = collections.OrderedDict()
     for tpe in task.type_map.keys():
-        name = f'{uuid}_{tpe}_{replication}'
+        name = str(f'{tpe}-{uuid}-{replication}').lower()
         meta = V1ObjectMeta(name=name,
                      labels={'app.kubernetes.io/name': f"fltk.node.config.{tpe}"})
         # TODO: Replication / seed information
         filled_template = template.render(task=task, tpe=tpe, replication=replication, seed=42)
-        tpe_dict[tpe] = V1ConfigMap(data={'node.config.json': filled_template}, metadata=meta)
+        tpe_dict[tpe] = V1ConfigMap(data={'node.config.yaml': filled_template}, metadata=meta)
         name_dict[tpe] = name
     return tpe_dict, name_dict
 
@@ -68,8 +68,8 @@ class Orchestrator(DistNode):
         self._config = config
 
         # API to interact with the cluster.
-        self.__client = PyTorchJobClient()
-        self.__v1 = client.CoreV1Api()
+        self._client = PyTorchJobClient()
+        self._v1 = client.CoreV1Api()
 
     def stop(self) -> None:
         """
@@ -118,7 +118,7 @@ class Orchestrator(DistNode):
 
                 # Hack to overcome limitation of KubeFlow version (Made for older version of Kubernetes)
                 self.__logger.info(f"Deploying on cluster: {curr_task.id}")
-                self.__client.create(job_to_start, namespace=self._config.cluster_config.namespace)
+                self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
                 self.deployed_tasks.append(curr_task)
 
                 # TODO: Extend this logic in your real project, this is only meant for demo purposes
@@ -185,7 +185,7 @@ class Orchestrator(DistNode):
                 self.__create_config_maps(config_dict)
                 # Hack to overcome limitation of KubeFlow version (Made for older version of Kubernetes)
                 self.__logger.info(f"Deploying on cluster: {curr_task.id}")
-                self.__client.create(job_to_start, namespace=self._config.cluster_config.namespace)
+                self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
                 self.deployed_tasks.append(curr_task)
 
                 # TODO: Extend this logic in your real project, this is only meant for demo purposes
@@ -208,11 +208,11 @@ class Orchestrator(DistNode):
         namespace = self._config.cluster_config.namespace
         self.__logger.info(f'Clearing old jobs in current namespace: {namespace}')
 
-        for job in self.__client.get(namespace=self._config.cluster_config.namespace)['items']:
+        for job in self._client.get(namespace=self._config.cluster_config.namespace)['items']:
             job_name = job['metadata']['name']
             self.__logger.info(f'Deleting: {job_name}')
             try:
-                self.__client.custom_api.delete_namespaced_custom_object(
+                self._client.custom_api.delete_namespaced_custom_object(
                         PYTORCHJOB_GROUP,
                         PYTORCHJOB_VERSION,
                         namespace,
@@ -223,6 +223,6 @@ class Orchestrator(DistNode):
                 print(e)
 
     def __create_config_maps(self, config_maps: Dict[str, V1ConfigMap]):
-        for _, config_map in config_maps.values():
-            self.__v1.create_namespaced_config_map(self._config.cluster_config.namespace,
-                                                   config_map)
+        for _, config_map in config_maps.items():
+            self._v1.create_namespaced_config_map(self._config.cluster_config.namespace,
+                                                  config_map)
