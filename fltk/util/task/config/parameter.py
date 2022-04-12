@@ -124,7 +124,7 @@ class NetworkConfiguration:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class SamplerConfiguration:
-    type: str
+    type: DataSampler
     q_value: str
     seed: int
     shuffle: bool

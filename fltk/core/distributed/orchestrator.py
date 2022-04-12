@@ -192,7 +192,6 @@ class Orchestrator(DistNode):
                 # For now we exit the thread after scheduling a single task.
 
                 self.stop()
-                return
 
             self.__logger.debug("Still alive...")
             time.sleep(5)

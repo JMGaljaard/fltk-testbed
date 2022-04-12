@@ -239,6 +239,7 @@ def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=Non
         federator_node.run()
         federator_node.stop_all_clients()
     print('Ending program')
+    exit(0)
 
 
 def launch_cluster(arg_path, conf_path, args: Namespace = None, config: DistributedConfig = None, **kwargs):

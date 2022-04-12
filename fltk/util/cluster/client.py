@@ -7,6 +7,7 @@ from typing import Dict, List, Tuple, Optional, OrderedDict, Union
 from uuid import UUID
 
 import schedule
+import yaml
 from kubeflow.pytorchjob import V1PyTorchJob, V1ReplicaSpec, V1PyTorchJobSpec
 from kubernetes import client
 from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container, V1PodTemplateSpec, \
@@ -228,20 +229,19 @@ def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V
     @return:
     @rtype:
     """
-    mount_list: Optional[List[V1VolumeMount]] = []
+    volume_mounts: Optional[List[V1VolumeMount]] = []
     if requires_mount:
-        mount_list.append(V1VolumeMount(
+        volume_mounts.append(V1VolumeMount(
                 mount_path=f'/opt/federation-lab/{conf.get_log_dir()}',
                 name='fl-log-claim',
                 read_only=False
         ))
-    # TODO: Mount volume
 
-    # mount_list.append(V1VolumeMount(
-    #             mount_path=f'/opt/federation-lab/experiments',
-    #             name='experiment',
-    #             read_only=True
-    # ))
+    volume_mounts.append(V1VolumeMount(
+                mount_path=f'/opt/federation-lab/experiments',
+                name=experiment_name,
+                read_only=True
+    ))
     # Create mount for configuration
     container = V1Container(name=name,
                             image=conf.cluster_config.image,
@@ -249,7 +249,7 @@ def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V
                             image_pull_policy='Always',
                             # Set the resources to the pre-generated resources
                             resources=resources,
-                            volume_mounts=mount_list)
+                            volume_mounts=volume_mounts)
     return container
 
 
@@ -301,19 +301,24 @@ class DeploymentBuilder:
                                                                                   requires_mount=not indx,
                                                                                   experiment_name=config_name_dict[tpe])
 
-    def build_tolerations(self, tols: List[Tuple[str, Optional[str], str, str]] = None):
+    def build_tolerations(self, tols: List[Tuple[str, Optional[str], str, str]] = None, specific_nodes=False):
         if not tols:
-            self._buildDescription.tolerations = [
-                V1Toleration(key="fltk.node",
+            if specific_nodes:
+                self._buildDescription.tolerations = [
+                    V1Toleration(key="fltk.node",
                              operator="Exists",
                              effect="NoSchedule")]
+            else:
+                self._buildDescription.tolerations = []
         else:
             self._buildDescription.tolerations = \
                 [V1Toleration(key=key, value=vl, operator=op, effect=effect) for key, vl, op, effect in tols]
 
     def build_template(self, config_name_dict: Optional[Dict[str, str]]) -> None:
         """
-
+        Build Pod Template specs needed for PytorchJob object. This function will create the V1TemplateSpec
+        with the required V1PodSpec  (including mounts fo volumes and containers, etc.). Requires other parameters to be
+        set appropriately.
         @return:
         @rtype:
         """
@@ -325,10 +330,12 @@ class DeploymentBuilder:
             [V1Volume(name="fl-log-claim",
                       persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(claim_name='fl-log-claim'))
              ]
-        # if config_name_dict:
-        #     for tpe, tpe_config_map_name in config_name_dict.items():
-        #         volumes.append(V1Volume(name='experiment',
-        #                  config_map=V1ConfigMapVolumeSource(tpe_config_map_name)))
+        if config_name_dict:
+            for tpe, tpe_config_map_name in config_name_dict.items():
+                # Use default file permission 0644
+                conf_map = V1ConfigMapVolumeSource(name=tpe_config_map_name)
+                volumes.append(V1Volume(name=tpe_config_map_name,
+                         config_map=conf_map))
         for tpe, container in self._buildDescription.typed_containers.items():
             # TODO: Make this less hardcody
             self._buildDescription.typed_templates[tpe] = \

@@ -21,12 +21,12 @@
       },
       "hyperParameters": {
         "default": {
-          "batchSize": "128",
+          "batchSize": 128,
           "testBatchSize": 1000,
-          "learningRateDecay": "0.0002",
+          "learningRateDecay": 0.0002,
           "optimizerConfig": {
             "type": "SGD",
-            "learningRate": "0.01",
+            "learningRate": 0.01,
             "momentum": 0.1
           },
           "schedulerConfig": {
@@ -38,12 +38,12 @@
         "configurations": {
           "Master": null,
           "Worker": {
-            "learningRate": "0.05"
+            "learningRate": 0.05
           }
         }
       },
       "learningParameters": {
-        "totalEpochs": 3,
+        "totalEpochs": 0,
         "rounds": 5,
         "epochsPerRound": 1,
         "cuda": false,
