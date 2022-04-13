@@ -105,12 +105,16 @@ def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None, 
     orchestrator = Orchestrator(cluster_manager, arrival_generator, conf)
 
     pool = ThreadPool(3)
+
     logging.info("Starting cluster manager")
     pool.apply(cluster_manager.start)
+
     logging.info("Starting arrival generator")
     pool.apply_async(arrival_generator.start, args=[conf.get_duration()])
     logging.info("Starting orchestrator")
     pool.apply(orchestrator.run if simulate_arrivals else orchestrator.run_federated)
+
+    pool.close()
     pool.join()
 
     logging.info("Stopped execution of Orchestrator...")
@@ -189,8 +193,29 @@ def _retrieve_network_params_from_config(config: Config, nic=None, host=None):
 
 def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=None, host=None, prefix: str = None,
                   **kwargs):
-    print(config_path, rank)
-
+    """
+    Function to launch a remote experiment. When launched in K8s, configuration will be set by KubeFlow, meaning that
+    many parameters will be None. When launched in docker, parameters are provided by the callee through passed argument
+    flags.
+    @param base_path:
+    @type base_path:
+    @param config_path:
+    @type config_path:
+    @param rank:
+    @type rank:
+    @param parser:
+    @type parser:
+    @param nic:
+    @type nic:
+    @param host:
+    @type host:
+    @param prefix:
+    @type prefix:
+    @param kwargs:
+    @type kwargs:
+    @return:
+    @rtype:
+    """
     config = Config.FromYamlFile(config_path)
     config.world_size = config.num_clients + 1
     config.replication_id = prefix
@@ -244,8 +269,8 @@ def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=Non
 
 def launch_cluster(arg_path, conf_path, args: Namespace = None, config: DistributedConfig = None, **kwargs):
     """
-    Function to launch Orchestrator for execution with provided configurations. Currently
-    this assumes that a single Orchestrator is started that manages all the resources in the cluster.
+    Function to launch Orchestrator for execution with provided configurations. Currently, this assumes that a single
+    Orchestrator is started that manages all the training jobs withing the K8s cluster.
     """
     logging.info("Starting in cluster mode.")
     logging.basicConfig(level=logging.DEBUG,
