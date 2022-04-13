@@ -1,9 +1,11 @@
 import json
+import logging
+import typing
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, OrderedDict, Any, Union, Tuple, Type, Dict
+from typing import List, Optional, OrderedDict, Any, Union, Tuple, Type, Dict, MutableMapping, T
 
-import torch
+
 from dataclasses_json import dataclass_json, LetterCase, config
 from torch.nn.modules.loss import _Loss
 
@@ -17,17 +19,17 @@ def _none_factory():
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class OptimizerConfig:
-    type: Optimizations
-    momentum: Optional[Union[float, Tuple[float]]]
+    type: Optional[Optimizations] = None
+    momentum: Optional[Union[float, Tuple[float]]] = None
     lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory)
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class SchedulerConfig:
-    scheduler_step_size: int
-    scheduler_gamma: float
-    min_lr: float = field(metadata=config(field_name="minimumLearningRate"))
+    scheduler_step_size: Optional[int] = None
+    scheduler_gamma: Optional[float] = None
+    min_lr: Optional[float] = field(metadata=config(field_name="minimumLearningRate"), default_factory=_none_factory)
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -48,6 +50,31 @@ class HyperParameterConfiguration:
         @rtype:
         """
         return HyperParameterConfiguration.from_dict({**self.__dict__, **other})
+
+def merge_optional(og_d1: Dict[str, Any], d2: Dict[str, Any], tpe: str):
+    d1_copy = og_d1.copy()
+    for k, v in d1_copy.items():
+        if k in d2:
+            if all(isinstance(e, MutableMapping) for e in (v, d2[k])):
+                d2[k] = merge_optional(v, d2[k], tpe)
+        else:
+            logging.warning(f"Gotten unknown alternative mapping {k}:{v} for {tpe}")
+
+    # Base case
+    update = list(filter(lambda item: item[1] is not None, d2.items()))
+    for k, v in update:
+        if not isinstance(v, dict):
+            logging.info(f'Updating {k} from {d1_copy[k]} to {v} for {tpe}')
+        d1_copy[k] = v
+    return d1_copy
+
+D = typing.TypeVar('D')
+def merge_optional_dataclass(default: D, update: D, data_type: Type, learner_type: str):
+    if isinstance(update, default.__class__):
+        return data_type.from_dict(
+                merge_optional(default.to_dict(), update.to_dict(), learner_type))
+    else:
+        raise Exception(f"Cannot merge dataclasses of different type: {default.__class__} and {update.__class__}")
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -71,12 +98,15 @@ class HyperParameters:
         @return:
         @rtype:
         """
-        for config_type in self.configurations.keys():
-            if not (conf := self.configurations.get(config_type, self.default)):
-                conf = self.default
 
-            merge = {k: v for k, v in conf.__dict__.items() if v is not None}
-            self.configurations[config_type] = self.default.merge_default(merge)
+        for learner_type in self.configurations.keys():
+            conf: HyperParameterConfiguration
+            if not (conf := self.configurations.get(learner_type, self.default)):
+                self.configurations[learner_type] = self.default
+            else:
+                updated_conf = merge_optional_dataclass(self.default, conf, HyperParameterConfiguration, learner_type)
+
+                self.configurations[learner_type] = updated_conf
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
