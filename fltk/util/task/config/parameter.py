@@ -1,10 +1,8 @@
 import json
 import logging
-import typing
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, OrderedDict, Any, Union, Tuple, Type, Dict, MutableMapping, T
-
 
 from dataclasses_json import dataclass_json, LetterCase, config
 from torch.nn.modules.loss import _Loss
@@ -19,14 +17,20 @@ def _none_factory():
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class OptimizerConfig:
+    """
+    Dataclass containing learning Optimizer parameters for learning tasks.
+    """
     type: Optional[Optimizations] = None
     momentum: Optional[Union[float, Tuple[float]]] = None
-    lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory)
+    lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory) # pylint: disable=invalid-name
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class SchedulerConfig:
+    """
+    Dataclass containing learning rate scheduler configuration.
+    """
     scheduler_step_size: Optional[int] = None
     scheduler_gamma: Optional[float] = None
     min_lr: Optional[float] = field(metadata=config(field_name="minimumLearningRate"), default_factory=_none_factory)
@@ -35,9 +39,14 @@ class SchedulerConfig:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class HyperParameterConfiguration:
-    optimizer_config: Optional[OptimizerConfig] = field(metadata=config(field_name="optimizerConfig"), default_factory=_none_factory)
-    scheduler_config: Optional[SchedulerConfig] = field(metadata=config(field_name="schedulerConfig"), default_factory=_none_factory)
-    bs: Optional[int] = field(metadata=config(field_name="batchSize"), default_factory=_none_factory)
+    """
+    Dataclass containing training hyper parameters for learning tasks.
+    """
+    optimizer_config: Optional[OptimizerConfig] = field(metadata=config(field_name="optimizerConfig"),
+                                                        default_factory=_none_factory)
+    scheduler_config: Optional[SchedulerConfig] = field(metadata=config(field_name="schedulerConfig"),
+                                                        default_factory=_none_factory)
+    bs: Optional[int] = field(metadata=config(field_name="batchSize"), default_factory=_none_factory)  # pylint: disable=invalid-name
     test_bs: Optional[int] = field(metadata=config(field_name="testBatchSize"), default_factory=_none_factory)
     lr_decay: Optional[float] = field(metadata=config(field_name="learningRateDecay"), default_factory=_none_factory)
 
@@ -49,32 +58,57 @@ class HyperParameterConfiguration:
         @return:
         @rtype:
         """
-        return HyperParameterConfiguration.from_dict({**self.__dict__, **other})
+        return HyperParameterConfiguration.from_dict({**self.__dict__, **other})  # pylint: disable=no-member
 
-def merge_optional(og_d1: Dict[str, Any], d2: Dict[str, Any], tpe: str):
-    d1_copy = og_d1.copy()
-    for k, v in d1_copy.items():
-        if k in d2:
-            if all(isinstance(e, MutableMapping) for e in (v, d2[k])):
-                d2[k] = merge_optional(v, d2[k], tpe)
+
+def merge_optional(default_dict: Dict[str, Any], update_dict: Dict[str, Any], tpe: str):
+    """
+    Function to merge dictionaries to add set parameters from update dictionary into default dictionary.
+    @param default_dict: Default configuraiton dictionary.
+    @type default_dict: dict
+    @param update_dict: Update configuration to be merged into default configurations.
+    @type update_dict: dict
+    @param tpe: String representation of type of learner.
+    @type tpe: str
+    @return: Result of merged dictionaries.
+    @rtype: dict
+    """
+    default_copy = default_dict.copy()
+    for k, v in default_copy.items(): # pylint: disable=invalid-name
+        if k in update_dict:
+            if all(isinstance(e, MutableMapping) for e in (v, update_dict[k])):
+                update_dict[k] = merge_optional(v, update_dict[k], tpe)
         else:
             logging.warning(f"Gotten unknown alternative mapping {k}:{v} for {tpe}")
 
     # Base case
-    update = list(filter(lambda item: item[1] is not None, d2.items()))
-    for k, v in update:
+    update = list(filter(lambda item: item[1] is not None, update_dict.items()))
+    for k, v in update: # pylint: disable=invalid-name
         if not isinstance(v, dict):
-            logging.info(f'Updating {k} from {d1_copy[k]} to {v} for {tpe}')
-        d1_copy[k] = v
-    return d1_copy
+            logging.info(f'Updating {k} from {default_copy[k]} to {v} for {tpe}')
+        default_copy[k] = v
+    return default_copy
 
-D = typing.TypeVar('D')
-def merge_optional_dataclass(default: D, update: D, data_type: Type, learner_type: str):
+
+def merge_optional_dataclass(default: T, update: T, data_type: Type, learner_type: str):
+    """
+    Function to merge two dataclasses of same type to update a default object with an update dataclass containing
+    only a few set parameters.
+    @param default: Default dataclass.
+    @type default: T
+    @param update: Update dataclass to merge into default.
+    @type update: T
+    @param data_type: Type of the two dataclasses.
+    @type data_type: Type
+    @param learner_type: String representation of learner type.
+    @type learner_type: str
+    @return: Instance of the passed data_type.
+    @rtype: T
+    """
     if isinstance(update, default.__class__):
         return data_type.from_dict(
-                merge_optional(default.to_dict(), update.to_dict(), learner_type))
-    else:
-        raise Exception(f"Cannot merge dataclasses of different type: {default.__class__} and {update.__class__}")
+                merge_optional(default.to_dict(), update.to_dict(), learner_type))  # pylint: disable=no-member
+    raise Exception(f"Cannot merge dataclasses of different type: {default.__class__} and {update.__class__}")
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -122,6 +156,9 @@ class Priority:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class SystemResources:
+    """
+    Dataclass representing SystemResources for Pods to be spawned in K8s.
+    """
     cores: str
     memory: str
 
@@ -154,6 +191,9 @@ class NetworkConfiguration:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class SamplerConfiguration:
+    """
+    Dataclass containing configuration for datasampler to be used by learners.
+    """
     type: DataSampler
     q_value: str
     seed: int
@@ -163,6 +203,10 @@ class SamplerConfiguration:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class LearningParameters:
+    """
+    Dataclass containing configuration parameters for the learning process itself. This includes the Federated learning
+    parameters as well as some system parameters like cuda.
+    """
     total_epochs: int
     rounds: int
     epochs_per_round: int
@@ -175,6 +219,11 @@ class LearningParameters:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class ExperimentConfiguration:
+    """
+    Dataclass representing Experiment configuration parameters such as a list of random seeds and the replication of
+    worker types. For now only `Master' and `Worker' are accepted as types by KubeFlow, so make sure to set these
+    accordingly in the configuration file.
+    """
     random_seed: List[int]
     worker_replication: OrderedDict[str, int]
 
@@ -210,6 +259,11 @@ class JobDescription:
     priority: Optional[Priority] = None
 
     def get_experiment_configuration(self) -> ExperimentConfiguration:
+        """
+        Helper function to retrieve experiment configuration object from a JobDescription.
+        @return: Experiment configuration object corresponding to a job.
+        @rtype: ExperimentConfiguration
+        """
         return self.job_class_parameters.experiment_configuration
 
 
@@ -250,7 +304,10 @@ class TrainTask:
         self.learning_parameters = job_parameters.learning_parameters
 
 
-class ExperimentParser(object):
+class ExperimentParser(object): # pylint: disable=too-few-public-methods
+    """
+    Simple parser object to load configuration files into Dataclass objects.
+    """
 
     def __init__(self, config_path: Path):
         self.__config_path = config_path
@@ -263,5 +320,5 @@ class ExperimentParser(object):
         """
         with open(self.__config_path, 'r') as config_file:
             config_dict = json.load(config_file)
-            job_list = [JobDescription.from_dict(job_description) for job_description in config_dict]
+            job_list = [JobDescription.from_dict(job_description) for job_description in config_dict] # pylint: disable=no-member
         return job_list
