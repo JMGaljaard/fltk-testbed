@@ -5,6 +5,7 @@ import uuid
 from queue import PriorityQueue
 from typing import List, OrderedDict, Dict
 
+from jinja2 import Environment, FileSystemLoader
 from kubeflow.pytorchjob import PyTorchJobClient
 from kubeflow.pytorchjob.constants.constants import PYTORCHJOB_GROUP, PYTORCHJOB_VERSION, PYTORCHJOB_PLURAL
 from kubernetes import client
@@ -12,30 +13,27 @@ from kubernetes.client import V1ConfigMap, V1ObjectMeta
 
 from fltk.core.distributed.dist_node import DistNode
 from fltk.util.cluster.client import construct_job, ClusterManager
-
 from fltk.util.config import DistributedConfig
-from fltk.util.task.config import SystemParameters
 from fltk.util.task.generator.arrival_generator import ArrivalGenerator, Arrival
 from fltk.util.task.task import DistributedArrivalTask, FederatedArrivalTask, ArrivalTask
 
-from jinja2 import Template, Environment, FileSystemLoader
-
-__ENV = Environment(loader=FileSystemLoader('./configs'))
+EXPERIMENT_DIR = 'experiments'
+__ENV = Environment(loader=FileSystemLoader(EXPERIMENT_DIR))
 
 
 def _prepare_experiment_maps(task: FederatedArrivalTask, uuid, replication: int = 1) -> (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
     template = __ENV.get_template('node.jinja.yaml')
-    tpe_dict = collections.OrderedDict()
+    type_dict = collections.OrderedDict()
     name_dict = collections.OrderedDict()
     for tpe in task.type_map.keys():
         name = str(f'{tpe}-{uuid}-{replication}').lower()
         meta = V1ObjectMeta(name=name,
-                     labels={'app.kubernetes.io/name': f"fltk.node.config.{tpe}"})
+                            labels={'app.kubernetes.io/name': f"fltk.node.config.{tpe}"})
         # TODO: Replication / seed information
         filled_template = template.render(task=task, tpe=tpe, replication=replication, seed=42)
-        tpe_dict[tpe] = V1ConfigMap(data={'node.config.yaml': filled_template}, metadata=meta)
+        type_dict[tpe] = V1ConfigMap(data={'node.config.yaml': filled_template}, metadata=meta)
         name_dict[tpe] = name
-    return tpe_dict, name_dict
+    return type_dict, name_dict
 
 
 class Orchestrator(DistNode):
