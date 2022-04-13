@@ -38,7 +38,13 @@
         "configurations": {
           "Master": null,
           "Worker": {
-            "learningRate": 0.05
+            "batchSize": 500,
+            "optimizerConfig": {
+              "learningRate": 0.05
+            },
+            "schedulerConfig": {
+              "schedulerStepSize": 2000
+            }
           }
         }
       },
