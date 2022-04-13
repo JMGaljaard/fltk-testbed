@@ -7,17 +7,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
 from random import choices
-from typing import Dict, List, Union, T, OrderedDict, Optional
+from typing import Dict, List, Union, OrderedDict, Optional
 
 import numpy as np
 
+from fltk.util.definitions import Nets
+from fltk.datasets.dataset import Dataset
 from fltk.util.singleton import Singleton
 from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser, JobClassParameter, \
     SystemParameters, HyperParameters, ExperimentConfiguration, LearningParameters
 
 
 @dataclass
-class ArrivalGenerator(metaclass=Singleton):
+class ArrivalGenerator(metaclass=Singleton): # pylint: disable=too-many-instance-attributes
     """
     Abstract Base Class for generating arrivals in the system. These tasks must be run
     """
@@ -42,7 +44,8 @@ class ArrivalGenerator(metaclass=Singleton):
         """
         parser = ExperimentParser(config_path=alternative_path or self.__default_config)
         experiment_descriptions = parser.parse()
-        self.job_dict = collections.OrderedDict({f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions)})
+        self.job_dict = collections.OrderedDict(
+                {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions)})
 
     def start(self, duration: Union[float, int]):
         """
@@ -67,41 +70,61 @@ class ArrivalGenerator(metaclass=Singleton):
 
     @abstractmethod
     def run(self, duration: float):
-        raise Exception()
+        """
+        Abstract function to run experiment generator for a specified time duration.
+        @param duration: Time in seconds to run experiment generation.
+        @type duration: int
+        @return: None
+        @rtype: None
+        """
 
     @abstractmethod
     def set_logger(self, name: str = None):
-        pass
+        """
+        Function to set logger to keep track of execution.
+        @param name: Name to use for the logger.
+        @type name: str
+        @return: None
+        @rtype: None
+        """
 
 
 @dataclass
 class Arrival:
+    """
+    Dataclass describing the information needed to keep track of Arrivals and let them `Arrive'. Uses a single timer
+    to allow for easy generation of tasks.
+    """
     ticks: Optional[int]
     task: TrainTask
     task_id: str
 
-    def get_priority(self):
+    def get_priority(self): # pylint: disable=missing-function-docstring
         return self.task.priority
 
-    def get_network(self) -> str:
+    def get_network(self) -> Nets: # pylint: disable=missing-function-docstring
         return self.task.network_configuration.network
 
-    def get_dataset(self) -> str:
+    def get_dataset(self) -> Dataset: # pylint: disable=missing-function-docstring
         return self.task.network_configuration.dataset
 
-    def get_system_config(self) -> SystemParameters:
+    def get_system_config(self) -> SystemParameters: # pylint: disable=missing-function-docstring
         return self.task.system_parameters
 
-    def get_parameter_config(self) -> HyperParameters:
+    def get_parameter_config(self) -> HyperParameters: # pylint: disable=missing-function-docstring
         return self.task.hyper_parameters
 
-    def get_experiment_config(self) -> ExperimentConfiguration:
+    def get_experiment_config(self) -> ExperimentConfiguration: # pylint: disable=missing-function-docstring
         return self.task.experiment_configuration
 
-    def get_learning_config(self) -> LearningParameters:
+    def get_learning_config(self) -> LearningParameters: # pylint: disable=missing-function-docstring
         return self.task.learning_parameters
 
+
 class DistributedExperimentGenerator(ArrivalGenerator):
+    """
+    Distributed experiments (on K8s) Experiment generator.
+    """
     job_dict: Dict[str, JobDescription] = None
 
     _tick_list: List[Arrival] = []
@@ -131,7 +154,8 @@ class DistributedExperimentGenerator(ArrivalGenerator):
         @return: generated arrival corresponding to the unique task_id.
         @rtype: Arrival
         """
-        self.logger.info(f"Creating task for {task_id}")
+        msg = f"Creating task for {task_id}"
+        self.logger.info(msg)
         job: JobDescription = self.job_dict[task_id]
         parameters: JobClassParameter = \
             choices(job.job_class_parameters, [param.class_probability for param in job.job_class_parameters])[0]
@@ -154,7 +178,8 @@ class DistributedExperimentGenerator(ArrivalGenerator):
         for task_id in self.job_dict.keys():
             new_arrival: Arrival = self.generate_arrival(task_id)
             self._tick_list.append(new_arrival)
-            self.logger.info(f"Arrival {new_arrival} arrives at {new_arrival.ticks} seconds")
+            msg = f"Arrival {new_arrival} arrives at {new_arrival.ticks} seconds"
+            self.logger.info(msg)
         event = multiprocessing.Event()
         while self.alive and time.time() - self.start_time < duration:
             save_time = time.time()
@@ -166,7 +191,8 @@ class DistributedExperimentGenerator(ArrivalGenerator):
                     self.arrivals.put(entry)
                     new_arrival = self.generate_arrival(entry.task_id)
                     new_scheduled.append(new_arrival)
-                    self.logger.info(f"Arrival {new_arrival} arrives at {new_arrival.ticks} seconds")
+                    msg = f"Arrival {new_arrival} arrives at {new_arrival.ticks} seconds"
+                    self.logger.info(msg)
                 else:
                     new_scheduled.append(entry)
             self._tick_list = new_scheduled
@@ -174,11 +200,15 @@ class DistributedExperimentGenerator(ArrivalGenerator):
             correction_time = time.time() - save_time
             event.wait(timeout=self._decrement - correction_time)
         self.stop_time = time.time()
-        self.logger.info(
-                f"Stopped execution at: {self.stop_time}, duration: {self.stop_time - self.start_time}/{duration}")
+        msg = f"Stopped execution at: {self.stop_time}, duration: {self.stop_time - self.start_time}/{duration}"
+        self.logger.info(msg)
 
 
 class FederatedArrivalGenerator(ArrivalGenerator):
+    """
+    Arrival Generator implementation for Federated Learning (i.e. spawning sequential experiments with
+    configuration maps). Distributed Learning Generator will be matched new execution later.
+    """
 
     def __init__(self, custom_config: Path = None):
         super(FederatedArrivalGenerator, self).__init__(custom_config)
@@ -194,8 +224,7 @@ class FederatedArrivalGenerator(ArrivalGenerator):
         description: JobDescription
         for job_name, description in self.job_dict.items():
             train_task = TrainTask(job_name, description.job_class_parameters, description.priority,
-                                description.get_experiment_configuration())
+                                   description.get_experiment_configuration())
 
             arrival = Arrival(None, train_task, job_name)
             self.arrivals.put(arrival)
-
