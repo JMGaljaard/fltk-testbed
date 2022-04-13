@@ -1,26 +1,41 @@
 import abc
 from dataclasses import field, dataclass
-from typing import OrderedDict, Dict, List, Optional
+from typing import OrderedDict, List, Optional
 from uuid import UUID
 
 from fltk.util.task.config import SystemParameters, HyperParameters
-from fltk.util.task.config.parameter import SystemResources, HyperParameterConfiguration, LearningParameters, \
+from fltk.util.task.config.parameter import SystemResources, LearningParameters, \
     OptimizerConfig, SamplerConfiguration
 
 
 @dataclass
 class ArrivalTask(abc.ABC):
-    id: UUID = field(compare=False)
+    """
+    DataClass representation of an ArrivalTask, representing all the information needed to spawn a new learning task.
+    """
+    id: UUID = field(compare=False) # pylint: disable=invalid-name
     network: str = field(compare=False)
     dataset: str = field(compare=False)
 
     @abc.abstractmethod
-    def named_system_params(self, **kwargs) -> OrderedDict[str, SystemResources]:
-        pass
+    def named_system_params(self, *args, **kwargs) -> OrderedDict[str, SystemResources]:
+        """
+        Helper function to get system parameters by name.
+        @param kwargs: kwargs for arguments.
+        @type kwargs: dict
+        @return: Dictionary corresponding to System resources per learner type.
+        @rtype: OrderedDict[str, SystemResources]
+        """
 
     @abc.abstractmethod
-    def typed_replica_count(self, replica_type):
-        pass
+    def typed_replica_count(self, replica_type: str) -> int:
+        """
+        Helper function to get replica cout per type of learner.
+        @param replica_type: String representation of learner type.
+        @type replica_type: str
+        @return: Number of workers to spawn of a specific type.
+        @rtype: int
+        """
 
 
 @dataclass(order=True)
@@ -101,7 +116,8 @@ class FederatedArrivalTask(ArrivalTask):
 
     def get_learn_param(self, parameter):
         """
-        Helper function to acquire federated learning parameters as-though the configuration is a flat configuration file.
+        Helper function to acquire federated learning parameters as-though the configuration is a flat configuration
+        file.
         @param tpe:
         @type tpe:
         @param parameter:
@@ -113,7 +129,8 @@ class FederatedArrivalTask(ArrivalTask):
 
     def get_sampler_param(self, tpe, parameter):
         """
-        Helper function to acquire federated datasampler parameters as-though the configuration is a flat configuration file.
+        Helper function to acquire federated datasampler parameters as-though the configuration is a flat configuration
+        file.
         @param tpe:
         @type tpe:
         @param parameter:
@@ -123,9 +140,10 @@ class FederatedArrivalTask(ArrivalTask):
         """
         return getattr(self.learning_parameters.data_sampler, parameter)
 
-    def get_sampler_args(self, tpe):
+    def get_sampler_args(self, tpe: str):
         """
-        Helper function to acquire federated datasampler arguments as-though the configuration is a flat configuration file.
+        Helper function to acquire federated datasampler arguments as-though the configuration is a flat configuration
+        file.
         @param tpe:
         @type tpe:
         @param parameter:
@@ -137,31 +155,28 @@ class FederatedArrivalTask(ArrivalTask):
         args = [sampler_conf.q_value, sampler_conf.seed]
         return args
 
-
     def get_optimizer_param(self, tpe, parameter):
         """
         Helper function to acquire optimizer parameters as-though the configuration is a flat configuration file.
-        @param tpe:
-        @type tpe:
-        @param parameter:
-        @type parameter:
-        @return:
-        @rtype:
+        @param tpe: Type of learner to set the kwargs values for.
+        @type tpe: str
+        @param parameter: Which parameter to retrieve.
+        @type parameter: str
+        @return: Parameter corresponding to the requested field of the configuration.
+        @rtype: Any
         """
         return getattr(self.hyper_parameters.configurations[tpe].optimizer_config, parameter)
 
-    def get_optimizer_args(self, tpe):
+    def get_optimizer_args(self, tpe: str):
         """
         Helper function to acquire optimizer arguments as-though the configuration is a flat configuration file.
         @note: This function requires a semantically correct configuration file to be provided, as otherwise
         arguments can be missing. For current version `lr` and `momentum` must be set in accordance to the type of
         learner.
-        @param tpe:
-        @type tpe:
-        @param parameter:
-        @type parameter:
-        @return:
-        @rtype:
+        @param tpe: Type of learner to set the kwargs values for.
+        @type tpe: str
+        @return: Kwarg dict populated with optimizer configuration.
+        @rtype: Dict[str, Any]
         """
         optimizer_conf: OptimizerConfig = self.hyper_parameters.configurations[tpe].optimizer_config
         kwargs = {
@@ -170,10 +185,10 @@ class FederatedArrivalTask(ArrivalTask):
         }
         return kwargs
 
-
     def get_scheduler_param(self, tpe, parameter):
         """
-        Helper function to acquire learnign scheduler parameters as-though the configuration is a flat configuration file.
+        Helper function to acquire learnign scheduler parameters as-though the configuration is a flat configuration
+        file.
         @param tpe:
         @type tpe:
         @param parameter:
