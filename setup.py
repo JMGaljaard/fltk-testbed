@@ -3,9 +3,9 @@ from fltk import __version__
 setup(
     name="fltk",
     author="Bart Cox",
-    author_email="b.a.cox@tudelft.nl",
-    maintainer="Bart Cox",
-    maintainer_email="b.a.cox@tudelft.nl",
+    author_email="b.a.cox@tudelft.nl,J.M.Galjaard-1@student.tudelft.nl",
+    maintainer="Bart Cox,Jeroen Galjaard",
+    maintainer_email="b.a.cox@tudelft.nl,J.M.Galjaard-1@student.tudelft.nl",
     description="Federated Learning Toolkit",
     packages=find_packages(),
     version=__version__,
