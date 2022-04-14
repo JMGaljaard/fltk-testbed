@@ -1,3 +1,4 @@
+# pylint: disable-all
 from dataclasses import dataclass
 
 import torch
@@ -165,7 +166,7 @@ class Profiler:
 
     def profile_run(self, module, input, iterations, warmup_time = 0) -> pd.DataFrame:
         output = module(input)
-        g0 = torch.rand_like(output)
+        g0 = torch.rand_like(output) # pylint: disable=no-member
 
         self.attach(module)
         module.train()

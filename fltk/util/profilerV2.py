@@ -1,3 +1,4 @@
+# pylint: disable-all
 import torch
 from torch.nn import Module
 import time
@@ -149,7 +150,7 @@ class Profiler:
 
     def profile_run(self, module, input, iterations, warmup_time = 0):
         output = module(input)
-        g0 = torch.rand_like(output)
+        g0 = torch.rand_like(output) # pylint: disable=no-member
 
         self.attach(module)
         module.train()

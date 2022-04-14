@@ -7,7 +7,7 @@ from .FedAvg import fed_avg
 from .aggregation import average_nn_parameters, average_nn_parameters_simple
 
 
-def get_aggregation(name: Aggregations) -> Callable[[...], torch.Tensor]:
+def get_aggregation(name: Aggregations):
     """
     Helper function to get specific Aggregation class references.
     @param name: Aggregation class reference.

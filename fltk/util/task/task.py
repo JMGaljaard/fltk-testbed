@@ -80,7 +80,7 @@ class DistributedArrivalTask(ArrivalTask):
 @dataclass
 class FederatedArrivalTask(ArrivalTask):
     """
-
+    Task describing configuration objects for running FederatedLearning experiments on K8s.
     """
 
     type_map: OrderedDict[str, int]

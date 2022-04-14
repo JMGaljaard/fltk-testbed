@@ -1,11 +1,15 @@
+# pylint: disable=missing-class-docstring,invalid-name,missing-function-docstring
 from torchvision import datasets
 from torchvision import transforms
-from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.data import DataLoader
 from fltk.datasets.distributed.dataset import DistDataset
 from fltk.samplers import get_sampler
 
 
 class DistCIFAR100Dataset(DistDataset):
+    """
+    CIFAR100 Dataset implementation for Distributed learning experiments.
+    """
 
     def __init__(self, args):
         super(DistCIFAR100Dataset, self).__init__(args)
@@ -86,4 +90,3 @@ class DistCIFAR100Dataset(DistDataset):
         self.logger.debug("Finished loading CIFAR10 test data")
 
         return test_data
-

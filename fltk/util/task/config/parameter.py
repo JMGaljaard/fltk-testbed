@@ -304,7 +304,7 @@ class TrainTask:
         self.learning_parameters = job_parameters.learning_parameters
 
 
-class ExperimentParser(object): # pylint: disable=too-few-public-methods
+class ExperimentParser(): # pylint: disable=too-few-public-methods
     """
     Simple parser object to load configuration files into Dataclass objects.
     """

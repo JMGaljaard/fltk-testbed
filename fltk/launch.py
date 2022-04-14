@@ -1,5 +1,7 @@
+# pylint: disable=unused-argument
 import logging
 import os
+import sys
 from argparse import Namespace
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
@@ -32,36 +34,21 @@ def should_distribute() -> bool:
     return dist.is_available() and world_size > 1
 
 
-def launch_federated_client(task_id: str, config: ...):
-    """
-    Function to launch a federated client within Kubernetes. This differs from Docker-Compose, as this intended to
-    be variable launch during runtime rather than pre-generated through compose. As a result, some information needs
-    to be looked-up durign execution, rather than it being provided from the get-go. As such, make sure that pods
-    have the permission to interact with the ConfigMaps and Pods within their working Namespace on your cluster.
-    @param task_id:
-    @type task_id:
-    @param config:
-    @type config:
-    @return:
-    @rtype:
-    """
-
-
-def launch_distributed_client(task_id: str, config: DistributedConfig = None,
+def launch_distributed_client(task_id: str, conf: DistributedConfig = None,
                               learning_params: LearningParameters = None,
                               namespace: Namespace = None):
     """
     @param task_id: String representation (should be unique) corresponding to a client.
     @type task_id: str
-    @param config: Configuration for components, needed for spinning up components of the Orchestrator.
-    @type config: BareConfig
+    @param conf: Configuration for components, needed for spinning up components of the Orchestrator.
+    @type conf: BareConfig
     @param learning_params: Parsed configuration of Hyper-Parameters for learning.
     @type: LearningParameters
     @return: None
     @rtype: None
     """
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
-    rank, world_size, backend = 0, None, None
+    rank, world_size = 0, None
     distributed = should_distribute()
     if distributed:
         logging.info(f'Initializing backend for training process: {namespace.backend}')
@@ -71,7 +58,7 @@ def launch_distributed_client(task_id: str, config: DistributedConfig = None,
 
     logging.info(f'Starting Creating client with {rank}')
 
-    client = DistClient(rank, task_id, world_size, config, learning_params)
+    client = DistClient(rank, task_id, world_size, conf, learning_params)
     client.prepare_learner(distributed)
     epoch_data = client.run_epochs()
     print(epoch_data)
@@ -135,6 +122,19 @@ def launch_extractor(base_path: Path, config_path: Path, args: Namespace = None,
 
 
 def launch_client(arg_path, conf_path, args: Namespace = None, configuration: DistributedConfig = None, **kwargs):
+    """
+    Client launch function.
+    @param arg_path:
+    @type arg_path:
+    @param conf_path:
+    @type conf_path:
+    @param args:
+    @type args:
+    @param configuration:
+    @type configuration:
+    @param kwargs:
+    @type kwargs:
+    """
     logging.info("Starting in client mode")
 
     learning_params = extract_learning_parameters(args)
@@ -142,18 +142,29 @@ def launch_client(arg_path, conf_path, args: Namespace = None, configuration: Di
     # for each repetition that you want to run an experiment with.
     configuration.set_seed()
     task_id = args.task_id
-    launch_distributed_client(task_id, config=configuration, learning_params=learning_params, namespace=args)
+    launch_distributed_client(task_id, conf=configuration, learning_params=learning_params, namespace=args)
     logging.info("Stopping client...")
 
 
 def launch_single(base_path: Path, config_path: Path, prefix: str = None, **kwargs):
+    """
+    Single runner launch function.
+    @param base_path:
+    @type base_path:
+    @param config_path:
+    @type config_path:
+    @param prefix:
+    @type prefix:
+    @param kwargs:
+    @type kwargs:
+    """
     # We can iterate over all the experiments in the directory and execute it, as long as the system remains the same!
     # System = machines and its configuration
     print(config_path)
-    config = Config.FromYamlFile(config_path)
-    config.world_size = config.num_clients + 1
-    config.replication_id = prefix
-    federator_node = Federator('federator', 0, config.world_size, config)
+    conf = Config.FromYamlFile(config_path)
+    conf.world_size = conf.num_clients + 1
+    conf.replication_id = prefix
+    federator_node = Federator('federator', 0, conf.world_size, conf)
     federator_node.run()
 
 
@@ -176,13 +187,20 @@ def _retrieve_or_init_env(nic=None, host=None):
 
 
 def _retrieve_env_config():
-    rank, world_size, port = int(os.environ.get('RANK')), int(os.environ.get('WORLD_SIZE')), int(os.environ["MASTER_PORT"])
+    """
+    Helper function to get environmental configuration variables. These are provided in case the experiment is run
+    in an K8s cluster.
+    @return: Tuple containing the parsed rank, world_size, and port that may have been set in the environment.
+    @rtype: Tuple[int, int, int]
+    """
+    rank, world_size, port = (int(os.environ.get('RANK')), int(os.environ.get('WORLD_SIZE')),
+                              int(os.environ["MASTER_PORT"]))
     return rank, world_size, port
 
 
-def _retrieve_network_params_from_config(config: Config, nic=None, host=None):
-    if hasattr(config, 'system'):
-        system_attr = getattr(config, 'system')
+def _retrieve_network_params_from_config(conf: Config, nic=None, host=None):
+    if hasattr(conf, 'system'):
+        system_attr = getattr(conf, 'system')
         if 'federator' in system_attr:
             if 'hostname' in system_attr['federator'] and not host:
                 host = system_attr['federator']['hostname']
@@ -216,22 +234,22 @@ def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=Non
     @return:
     @rtype:
     """
-    config = Config.FromYamlFile(config_path)
-    config.world_size = config.num_clients + 1
-    config.replication_id = prefix
+    conf = Config.FromYamlFile(config_path)
+    conf.world_size = conf.num_clients + 1
+    conf.replication_id = prefix
     if rank and not (nic and host):
         print("Getting parameters from configuration file")
-        nic, host = _retrieve_network_params_from_config(config, nic, host)
+        nic, host = _retrieve_network_params_from_config(conf, nic, host)
         _retrieve_or_init_env(nic, host)
     elif not rank:
         print("Retrieving environmental configurations!")
         rank, world_size, master_port = _retrieve_env_config()
         print(f"Retrieved: rank {rank} w_s {world_size} m_p {master_port}")
-        config.world_size = world_size
+        conf.world_size = world_size
     else:
         print('Missing rank, host, world-size, checking environment!')
         parser.print_help()
-        exit(1)
+        sys.exit(1)
 
     msg = f'Starting with host={host} and port={os.environ["MASTER_PORT"]} and interface={nic}'
     logging.log(logging.INFO, msg)
@@ -242,25 +260,25 @@ def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=Non
             _transports=["uv"]  # Use LibUV backend for async/IO interaction
     )
     if rank != 0:
-        print(f'Starting worker-{rank} with world size={config.world_size}')
+        print(f'Starting worker-{rank} with world size={conf.world_size}')
         rpc.init_rpc(
                 f"client{rank}",
                 rank=rank,
-                world_size=config.world_size,
+                world_size=conf.world_size,
                 rpc_backend_options=options,
         )
-        client_node = Client(f'client{rank}', rank, config.world_size, config)
+        client_node = Client(f'client{rank}', rank, conf.world_size, conf)
         client_node.remote_registration()
     else:
-        print(f'Starting the PS (Fed) with world size={config.world_size}')
+        print(f'Starting the PS (Fed) with world size={conf.world_size}')
         rpc.init_rpc(
                 "federator",
                 rank=rank,
-                world_size=config.world_size,
+                world_size=conf.world_size,
                 rpc_backend_options=options
 
         )
-        federator_node = Federator('federator', 0, config.world_size, config)
+        federator_node = Federator('federator', 0, conf.world_size, conf)
         federator_node.run()
         federator_node.stop_all_clients()
     print('Ending program')

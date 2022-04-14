@@ -114,7 +114,7 @@ class ClusterConfig:
 
 @dataclass_json
 @dataclass
-class DistributedConfig(object):
+class DistributedConfig():
     execution_config: ExecutionConfig
     cluster_config: ClusterConfig = field(metadata=config(field_name="cluster"))
     config_path: Path = None

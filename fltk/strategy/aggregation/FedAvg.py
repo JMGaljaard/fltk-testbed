@@ -22,11 +22,11 @@ def fed_avg(parameters: Dict[str, Dict[str, torch.Tensor]], sizes: Dict[str, int
         for name in parameters[client].keys():
             try:
                 new_params[name].data += (parameters[client][name].data * sizes[client])
-            except AttributeError:
+            except:
                 new_params[name] = (parameters[client][name].data * sizes[client])
         sum_size += sizes[client]
 
-    for name, _ in new_params:
+    for name in new_params:
         # @TODO: Is .long() really required?
         new_params[name].data = new_params[name].data.long() / sum_size
 

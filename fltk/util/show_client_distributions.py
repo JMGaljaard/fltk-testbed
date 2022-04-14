@@ -1,10 +1,10 @@
+import logging
+
 import pandas as pd
 from tqdm import tqdm
 
 from fltk.core.distributed.client import DistClient
 from fltk.datasets.distributed import DistCIFAR10Dataset, DistCIFAR100Dataset, DistFashionMNISTDataset, DistDataset
-import logging
-
 from fltk.util.base_config import BareConfig
 
 logging.basicConfig(

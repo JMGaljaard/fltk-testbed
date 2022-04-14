@@ -1,4 +1,4 @@
-import copy
+# pylint: disable=missing-function-docstring,invalid-name
 from dataclasses import dataclass
 from enum import Enum, EnumMeta
 from pathlib import Path
@@ -8,9 +8,8 @@ import torch
 import yaml
 from torch.nn.modules.loss import _Loss
 
-from fltk.util.log import getLogger
-
 from fltk.util.definitions import Dataset, Nets, DataSampler, Optimizations, LogLevel, Aggregations
+from fltk.util.log import getLogger
 
 
 @dataclass
@@ -122,10 +121,3 @@ class Config:
             for k, v in content.items():
                 getLogger(__name__).debug(f'Inserting key "{k}" into config')
             return cls(**content)
-
-if __name__ == '__main__':
-    a = Config()
-    print(a)
-    import yaml
-    with open('./output.yaml', 'w') as file:
-        yaml.dump(a, file)

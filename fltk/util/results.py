@@ -1,10 +1,12 @@
 from dataclasses import dataclass
-from typing import Any
 import numpy as np
 
 
 @dataclass
 class EpochData:
+    """
+    Dataclass describing statistic corresponding to a learning epoch.
+    """
     epoch_id: int
     num_epochs: int
     duration_train: float
@@ -21,7 +23,7 @@ class EpochData:
     global_wall_time: float = 0
     global_epoch_id: int = 0
 
-    def to_csv_line(self):
+    def to_csv_line(self): # pylint: disable=missing-function-docstring
         delimeter = ','
         values = self.__dict__.values()
         values = [str(x) for x in values]

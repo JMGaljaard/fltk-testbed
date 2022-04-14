@@ -2,7 +2,7 @@ import csv
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, List, Type, TextIO
+from typing import List, Type, TextIO
 
 
 @dataclass

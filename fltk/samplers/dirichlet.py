@@ -1,9 +1,11 @@
-from fltk.samplers import DistributedSamplerWrapper
-from torch.utils.data import DistributedSampler, Dataset
-import numpy as np
 import logging
 import random
 from collections import Counter
+
+import numpy as np
+from torch.utils.data import Dataset
+
+from fltk.samplers import DistributedSamplerWrapper
 
 
 class DirichletSampler(DistributedSamplerWrapper):
@@ -35,8 +37,8 @@ class DirichletSampler(DistributedSamplerWrapper):
             indices.extend(selection)
 
         labels = [dataset.targets[i] for i in indices]
-        logging.info("nr of samplers in client with rank {}: {}".format(rank, len(indices)))
-        logging.info("distribution in client with rank {}: {}".format(rank, Counter(labels)))
+        logging.info(f"nr of samplers in client with rank {rank}: {len(indices)}")
+        logging.info(f"distribution in client with rank {rank}: {Counter(labels)}")
 
         random.seed(seed + self.client_id)  # give each client a unique shuffle
         random.shuffle(indices)  # shuffle indices to spread the labels

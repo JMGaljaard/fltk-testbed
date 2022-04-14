@@ -7,11 +7,10 @@ from typing import Dict, List, Tuple, Optional, OrderedDict, Union
 from uuid import UUID
 
 import schedule
-import yaml
 from kubeflow.pytorchjob import V1PyTorchJob, V1ReplicaSpec, V1PyTorchJobSpec
 from kubernetes import client
 from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container, V1PodTemplateSpec, \
-    V1VolumeMount, V1Toleration, V1Volume, V1PersistentVolumeClaimVolumeSource, V1ConfigMapVolumeSource, V1KeyToPath
+    V1VolumeMount, V1Toleration, V1Volume, V1PersistentVolumeClaimVolumeSource, V1ConfigMapVolumeSource
 
 from fltk.util.cluster.conversion import Convert
 from fltk.util.config import DistributedConfig
@@ -22,6 +21,9 @@ from fltk.util.task.task import DistributedArrivalTask, ArrivalTask
 
 @dataclass
 class Resource:
+    """
+    Dataclass describing a Kubernetes Pod's resources.
+    """
     node_name: str
     cpu_allocatable: int
     memory_allocatable: int
@@ -33,10 +35,13 @@ class Resource:
 
 @dataclass
 class BuildDescription:
+    """
+    Dataclass containing intermediate step objects for creating a PytorchV1JobDescription. Used by the builder function.
+    """
     resources = OrderedDict[str, V1ResourceRequirements]()
     typed_containers = OrderedDict[str, V1Container]()
     typed_templates = OrderedDict[str, V1PodTemplateSpec]()
-    id: Optional[UUID] = None
+    id: Optional[UUID] = None # pylint: disable=invalid-name
     spec: Optional[V1PyTorchJobSpec] = None
     tolerations: Optional[List[V1Toleration]] = None
 
@@ -61,7 +66,7 @@ class ResourceWatchDog:
         """
         self._v1: client.CoreV1Api
         self._logger = logging.getLogger('ResourceWatchDog')
-        self._Q = Convert()
+        self._Q = Convert() # pylint: disable=invalid-name
 
     def stop(self) -> None:
         """
@@ -109,9 +114,9 @@ class ResourceWatchDog:
             if not self._alive:
                 self._logger.info("Instructed to stop, stopping list_node watch on Kubernetes.")
                 return
-        except Exception as e:
-            self._logger.error(e)
-            raise e
+        except Exception as excep:
+            self._logger.error(excep)
+            raise excep
 
     def __monitor_pods(self) -> None:
         """
@@ -146,8 +151,8 @@ class ResourceWatchDog:
                         mem_lim += self._Q(lmts["memory"])
                 resource = Resource(node_name, alloc_cpu, alloc_mem, core_req, mem_req, core_lim, mem_lim)
                 new_resource_mapper[node_name] = resource
-            except Exception as e:
-                self._logger.error(f'Namespace lookup for {node_name} failed. Reason: {e}')
+            except Exception as excep:  # pylint: disable=broad-except
+                self._logger.error(f'Namespace lookup for {node_name} failed. Reason: {excep}')
 
         self._resource_lookup = new_resource_mapper
         self._logger.debug(self._resource_lookup)
@@ -159,22 +164,26 @@ class ClusterManager(metaclass=Singleton):
     requested and parsed. Currently, it mainly exists to start the ResourceWatchDog, which now only logs the amount of
     resources...
     """
-    __alive = False
-    __threadpool: ThreadPool = None
 
     def __init__(self):
         # When executing in a pod, load the incluster configuration according to
         # https://github.com/kubernetes-client/python/blob/master/examples/in_cluster_config.py#L21
+        self.__alive = False
+        self.__thread_pool: ThreadPool = ThreadPool(processes=2)
         self._v1 = client.CoreV1Api()
         self._logger = logging.getLogger('ClusterManager')
         self._watchdog = ResourceWatchDog()
 
     def start(self):
+        """
+        Function to start ClusterManager to start keeping track of resources.
+        @return: None
+        @rtype: None
+        """
         self._logger.info("Spinning up cluster manager...")
         # Set debugging to WARNING only, as otherwise DEBUG statements will flood the logs.
         client.rest.logger.setLevel(logging.WARNING)
         self.__alive = True
-        self.__thread_pool = ThreadPool(processes=2)
         self.__thread_pool.apply_async(self._watchdog.start)
         self.__thread_pool.apply_async(self._run)
 
@@ -215,12 +224,13 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask, federated=Tr
                    f'--decay {task.param_conf.lr_decay} --loss CrossEntropy '
                    f'--backend gloo')
     else:
-        command = (f'python3 -m fltk remote experiments/node.config.yaml')
+        command = ('python3 -m fltk remote experiments/node.config.yaml')
     return command.split(' ')
 
 
 def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V1ResourceRequirements,
-                           name: str = "pytorch", requires_mount: bool = False, experiment_name: str = None) -> V1Container:
+                           name: str = "pytorch", requires_mount: bool = False,
+                           experiment_name: str = None) -> V1Container:
     """
     Function to build the Master worker container. This requires the LOG PV to be mounted on the expected
     logging directory. Make sure that any changes in the Helm charts are also reflected here.
@@ -238,9 +248,9 @@ def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V
         ))
 
     volume_mounts.append(V1VolumeMount(
-                mount_path=f'/opt/federation-lab/experiments',
-                name=experiment_name,
-                read_only=True
+            mount_path='/opt/federation-lab/experiments',
+            name=experiment_name,
+            read_only=True
     ))
     # Create mount for configuration
     container = V1Container(name=name,
@@ -269,20 +279,40 @@ def _resource_dict(mem: Union[str, int], cpu: Union[str, int]) -> Dict[str, str]
 
 
 class DeploymentBuilder:
-    _buildDescription = BuildDescription()
+    """
+    Builder class to build a V1PytorchJob. This is to make construction of the complex required object easier.
+    Currently it requires the object to be built in order. As such, re-calling a specific function will require all
+    following functions to be called. This is due to the bottom-to-top construction of the configuration objects.
+
+    A later version might refactor to a jinja templating approach to be more flexible for re-construction.
+    """
+    _build_description = BuildDescription()
 
     def reset(self) -> None:
-        del self._buildDescription
-        self._buildDescription = BuildDescription()
+        """
+        Helper function to reset Build description, to start creating a new V1PytorchJob object.
+        @return: None
+        @rtype: None
+        """
+        del self._build_description
+        self._build_description = BuildDescription()
 
     def build_resources(self, arrival_task: ArrivalTask) -> None:
+        """
+        Build resources for a V1PytorchJob, specificing the amount of RAM and CPU (cores) for the Pods to be spawned
+        in the training job deployment.
+        @param arrival_task: Arrival task containing the description of the Job that is being built.
+        @type arrival_task: ArrivalTask
+        @return: None
+        @rtype: None
+        """
         system_reqs: Dict[str, SystemResources] = arrival_task.named_system_params()
         for tpe, sys_reqs in system_reqs.items():
             typed_req_dict = _resource_dict(mem=sys_reqs.memory,
                                             cpu=sys_reqs.cores)
             # Currently the request is set to the limits. You may want to change this.
-            self._buildDescription.resources[tpe] = client.V1ResourceRequirements(requests=typed_req_dict,
-                                                                                  limits=typed_req_dict)
+            self._build_description.resources[tpe] = client.V1ResourceRequirements(requests=typed_req_dict,
+                                                                                   limits=typed_req_dict)
 
     def build_container(self, task: ArrivalTask, conf: DistributedConfig, config_name_dict: Optional[Dict[str, str]]):
         """
@@ -296,22 +326,35 @@ class DeploymentBuilder:
         """
         # TODO: Implement cmd / config reference.
         cmd = _generate_command(conf, task)
-        for indx, (tpe, curr_resource) in enumerate(self._buildDescription.resources.items()):
-            self._buildDescription.typed_containers[tpe] = _build_typed_container(conf, cmd, curr_resource,
-                                                                                  requires_mount=not indx,
-                                                                                  experiment_name=config_name_dict[tpe])
+        for indx, (tpe, curr_resource) in enumerate(self._build_description.resources.items()):
+            container = _build_typed_container(conf, cmd, curr_resource,
+                                               requires_mount=not indx,
+                                               experiment_name=config_name_dict[tpe])
+            self._build_description.typed_containers[tpe] = container
 
-    def build_tolerations(self, tols: List[Tuple[str, Optional[str], str, str]] = None, specific_nodes=False):
+    def build_tolerations(self, tols: List[Tuple[str, Optional[str], str, str]] = None, specific_nodes=True) -> None:
+        """
+        Function to set the V1Tolerations in the job. This allows for scheduling pods on specific Kubernetes Nodes that
+        have specific Taints. Setting tols to an empyt list of `specific_nodes` to False, a Pod becomes schedulable on
+        any Node that has enough resources for the Pod to be scheduled.
+        @param tols: Toleration list.
+        @type tols: Optional[List]
+        @param specific_nodes: Boolean incidating whether specific nodes (i.e. Nodes with Taints) should be considered.
+        Seting to False allows for running on any availabe Node with enough resources.
+        @type specific_nodes: bool
+        @return: None
+        @rtype: None
+        """
         if not tols:
             if specific_nodes:
-                self._buildDescription.tolerations = [
+                self._build_description.tolerations = [
                     V1Toleration(key="fltk.node",
-                             operator="Exists",
-                             effect="NoSchedule")]
+                                 operator="Exists",
+                                 effect="NoSchedule")]
             else:
-                self._buildDescription.tolerations = []
+                self._build_description.tolerations = []
         else:
-            self._buildDescription.tolerations = \
+            self._build_description.tolerations = \
                 [V1Toleration(key=key, value=vl, operator=op, effect=effect) for key, vl, op, effect in tols]
 
     def build_template(self, config_name_dict: Optional[Dict[str, str]]) -> None:
@@ -335,19 +378,31 @@ class DeploymentBuilder:
                 # Use default file permission 0644
                 conf_map = V1ConfigMapVolumeSource(name=tpe_config_map_name)
                 volumes.append(V1Volume(name=tpe_config_map_name,
-                         config_map=conf_map))
-        for tpe, container in self._buildDescription.typed_containers.items():
+                                        config_map=conf_map))
+        for tpe, container in self._build_description.typed_containers.items():
             # TODO: Make this less hardcody
-            self._buildDescription.typed_templates[tpe] = \
+            self._build_description.typed_templates[tpe] = \
                 client.V1PodTemplateSpec(
                         metadata=client.V1ObjectMeta(labels={"app": "fltk-worker"}),
                         spec=client.V1PodSpec(containers=[container],
                                               volumes=volumes,
-                                              tolerations=self._buildDescription.tolerations))
+                                              tolerations=self._build_description.tolerations))
 
-    def build_spec(self, task: ArrivalTask, restart_policy: str = 'OnFailure') -> None:
+    def build_spec(self, task: ArrivalTask, restart_policy: str = 'Never') -> None:
+        """
+        Function to build V1JobSpec object that contains the specifications of the Pods to be spawned in Kubernetes.
+        Effectively this function creates the replica counts for the `Master` and `Worker` nodes in the train job
+        that is being constructed.
+        @param task: Arrival task containing the specifications of the replica counts.
+        @type task: ArrivalTask
+        @param restart_policy: Optional parameter to set the restart policy. By default it will not restart any pods
+        using the option "Never".
+        @type restart_policy: str
+        @return: None
+        @rtype: None
+        """
         pt_rep_spec = OrderedDict[str, V1ReplicaSpec]()
-        for tpe, tpe_template in self._buildDescription.typed_templates.items():
+        for tpe, tpe_template in self._build_description.typed_templates.items():
             typed_replica_spec = V1ReplicaSpec(
                     replicas=task.typed_replica_count(tpe),
                     restart_policy=restart_policy,
@@ -357,7 +412,7 @@ class DeploymentBuilder:
 
         job_spec = V1PyTorchJobSpec(pytorch_replica_specs=pt_rep_spec)
         job_spec.openapi_types = job_spec.swagger_types
-        self._buildDescription.spec = job_spec
+        self._build_description.spec = job_spec
 
     def construct(self) -> V1PyTorchJob:
         """
@@ -370,12 +425,12 @@ class DeploymentBuilder:
         job = V1PyTorchJob(
                 api_version="kubeflow.org/v1",
                 kind="PyTorchJob",
-                metadata=V1ObjectMeta(name=f'trainjob-{self._buildDescription.id}', namespace='test'),
-                spec=self._buildDescription.spec)
+                metadata=V1ObjectMeta(name=f'trainjob-{self._build_description.id}', namespace='test'),
+                spec=self._build_description.spec)
         return job
 
-    def create_identifier(self, task: DistributedArrivalTask):
-        self._buildDescription.id = task.id
+    def create_identifier(self, task: DistributedArrivalTask):  # pylint: disable=missing-function-docstring
+        self._build_description.id = task.id
 
 
 def construct_job(conf: DistributedConfig, task: DistributedArrivalTask,

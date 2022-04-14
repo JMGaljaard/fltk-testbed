@@ -55,6 +55,8 @@ class FedNova(Optimizer):
     def __init__(self, params, lr=0.05, momentum=0.9, dampening=0,
                  weight_decay=0, nesterov=False, variance=0, mu=0):
         # pylint: disable=too-many-arguments
+        self.etamu = None
+        self.tau_eff = None
         self.momentum = momentum
         self.mu = mu # pylint: disable=invalid-name
         self.ai_l1_norm = 0
@@ -86,7 +88,7 @@ class FedNova(Optimizer):
             closure (callable, optional): A closure that reevaluates the model
                 and returns the loss.
         """
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cuda" if torch.cuda.is_available() else "cpu" # pylint: disable=unused-variable
 
         loss = None
         if closure is not None:
@@ -158,10 +160,15 @@ class FedNova(Optimizer):
 
         return loss
 
-    def set_tau_eff(self, tau_eff):
+    def set_tau_eff(self, tau_eff): # pylint: disable=missing-function-docstring
         self.tau_eff = tau_eff
 
     def pre_communicate(self):
+        """
+        Function to perform pre-communication communications during Federated Learning for FedNova aggregration.
+        @return: None
+        @rtype: None
+        """
         for group in self.param_groups:
             for p in group['params']:
                 param_state = self.state[p]

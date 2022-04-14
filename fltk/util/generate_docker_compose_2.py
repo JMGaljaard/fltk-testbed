@@ -10,17 +10,17 @@ def load_yaml_file(file_path: Path):
         return yaml.full_load(file)
 
 
-def generate_client(id, template: dict, world_size: int, type='default', cpu_set=None, num_cpus=1):
+def generate_client(identifier, template: dict, world_size: int, tpe='default', cpu_set=None, num_cpus=1):
     local_template = copy.deepcopy(template)
     key_name = list(local_template.keys())[0]
-    container_name = f'client_{type}_{id}'
+    container_name = f'client_{tpe}_{identifier}'
     local_template[container_name] = local_template.pop(key_name)
     for key, item in enumerate(local_template[container_name]['environment']):
         if item == 'RANK={rank}':
-            local_template[container_name]['environment'][key] = item.format(rank=id)
+            local_template[container_name]['environment'][key] = item.format(rank=identifier)
         if item == 'WORLD_SIZE={world_size}':
             local_template[container_name]['environment'][key] = item.format(world_size=world_size)
-    local_template[container_name]['ports'] = [f'{5000+id}:5000']
+    local_template[container_name]['ports'] = [f'{5000 + identifier}:5000']
     if cpu_set:
         local_template[container_name]['cpuset'] = f'{cpu_set}'
     else:
@@ -62,18 +62,18 @@ def gen_client(name: str, client_dict: dict, base_path: Path):
     return client_descriptions
 
 
-def generate_clients_proporties(clients_dict: dict, path: Path):
+def generate_clients_proporties(clients_dict: dict, file_path: Path):
     results = []
     for k,v in clients_dict.items():
-        results += gen_client(k, v, path)
+        results += gen_client(k, v, file_path)
     return results
 
 def generate_compose_file_from_dict(system: dict):
-    path = Path(system['base_path'])
-    client_descriptions = generate_clients_proporties(system['clients'], path)
+    file_path = Path(system['base_path'])
+    client_descriptions = generate_clients_proporties(system['clients'], file_path)
     last_core_id = 0
     world_size = len(client_descriptions) + 1
-    system_template_path = path / 'system_stub.yml'
+    system_template_path = file_path / 'system_stub.yml'
 
     system_template: dict = load_yaml_file(system_template_path)
 
@@ -92,7 +92,7 @@ def generate_compose_file_from_dict(system: dict):
     else:
         system_template['services']['fl_server'].pop('cpuset')
     for idx, client_d in enumerate(client_descriptions):
-        stub_file = path / client_d['stub-file']
+        stub_file = file_path / client_d['stub-file']
         stub_data = load_yaml_file(stub_file)
         cpu_set = None
         if client_d['num_cores']:
@@ -132,5 +132,5 @@ if __name__ == '__main__':
     parser.add_argument('--clients', type=int, help='Set the number of clients in the system', default=None)
     args = parser.parse_args()
     path = Path(args.path)
-    results = generate_compose_file(path)
+    generate_compose_file(path)
     print('done')

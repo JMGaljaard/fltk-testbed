@@ -1,9 +1,9 @@
-import sys
+# pylint: disable=unused-variable,redefined-builtin
+import argparse
+import copy
 from pathlib import Path
 
 import yaml
-import copy
-import argparse
 
 # global_template_path = './deploy/templates'
 

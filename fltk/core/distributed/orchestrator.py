@@ -21,12 +21,13 @@ EXPERIMENT_DIR = 'experiments'
 __ENV = Environment(loader=FileSystemLoader(EXPERIMENT_DIR))
 
 
-def _prepare_experiment_maps(task: FederatedArrivalTask, uuid, replication: int = 1) -> (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
+def _prepare_experiment_maps(task: FederatedArrivalTask, u_id, replication: int = 1) -> \
+        (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
     template = __ENV.get_template('node.jinja.yaml')
     type_dict = collections.OrderedDict()
     name_dict = collections.OrderedDict()
     for tpe in task.type_map.keys():
-        name = str(f'{tpe}-{uuid}-{replication}').lower()
+        name = str(f'{tpe}-{u_id}-{replication}').lower()
         meta = V1ObjectMeta(name=name,
                             labels={'app.kubernetes.io/name': f"fltk.node.config.{tpe}"})
         # TODO: Replication / seed information
@@ -128,7 +129,7 @@ class Orchestrator(DistNode):
             self.__logger.debug("Still alive...")
             time.sleep(5)
 
-        logging.info(f'Experiment completed, currently does not support waiting.')
+        logging.info('Experiment completed, currently does not support waiting.')
 
     def run_federated(self, clear: bool = True) -> None:
         """
@@ -152,15 +153,6 @@ class Orchestrator(DistNode):
             while not self.__arrival_generator.arrivals.empty():
                 arrival: Arrival = self.__arrival_generator.arrivals.get()
                 unique_identifier: uuid.UUID = uuid.uuid4()
-
-                """
-                id: UUID = field(compare=False)
-                network: str = field(compare=False)
-                dataset: str = field(compare=False)
-                type_map: OrderedDict[str, int]
-                sys_config_map: Dict[str, SystemParameters]
-                param_config_map: Dict[str, HyperParameters]
-                """
                 # TODO: Add replication
                 task = FederatedArrivalTask(id=unique_identifier,
                                             network=arrival.get_network(),
@@ -194,7 +186,7 @@ class Orchestrator(DistNode):
             self.__logger.debug("Still alive...")
             time.sleep(5)
 
-        logging.info(f'Experiment completed, currently does not support waiting.')
+        logging.info('Experiment completed, currently does not support waiting.')
 
     def __clear_jobs(self):
         """
@@ -215,9 +207,8 @@ class Orchestrator(DistNode):
                         namespace,
                         PYTORCHJOB_PLURAL,
                         job_name)
-            except Exception as e:
-                self.__logger.warning(f'Could not delete: {job_name}')
-                print(e)
+            except Exception as excp:
+                self.__logger.warning(f'Could not delete: {job_name}. Reason: {excp}')
 
     def __create_config_maps(self, config_maps: Dict[str, V1ConfigMap]):
         for _, config_map in config_maps.items():
