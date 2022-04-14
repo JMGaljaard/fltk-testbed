@@ -10,27 +10,42 @@ from fltk.util.config import Config
 
 
 class Client(Node):
+    """
+    Federated experiment client s
+    """
     running = False
 
-    def __init__(self, id: str, rank: int, world_size: int, config: Config):
-        super().__init__(id, rank, world_size, config)
+    def __init__(self, identifier: str, rank: int, world_size: int, config: Config):
+        super().__init__(identifier, rank, world_size, config)
 
         self.loss_function = self.config.get_loss_function()()
         self.optimizer = get_optimizer(self.config.optimizer)(self.net.parameters(),
                                                    **self.config.optimizer_args)
-        self.scheduler = MinCapableStepLR(self.logger, self.optimizer,
+        self.scheduler = MinCapableStepLR(self.optimizer,
                                           self.config.scheduler_step_size,
                                           self.config.scheduler_gamma,
                                           self.config.min_lr)
 
     def remote_registration(self):
+        """
+        Function to perform registration to the remote. Currently, this will connect to the Federator Client. Future
+        version can provide functionality to register to an arbitrary Node, including other Clients.
+        @return: None.
+        @rtype: None
+        """
         self.logger.info('Sending registration')
-        self.message('federator', 'ping', 'new_sender', be_weird=True)
+        self.message('federator', 'ping', 'new_sender')
         self.message('federator', 'register_client', self.id, self.rank)
         self.running = True
         self._event_loop()
 
     def stop_client(self):
+        """
+        Function to stop client after training. This allows remote clients to stop the client within a specific
+        timeframe.
+        @return: None
+        @rtype: None
+        """
         self.logger.info('Got call to stop event loop')
         self.running = False
 
@@ -41,6 +56,13 @@ class Client(Node):
         self.logger.info('Exiting node')
 
     def train(self, num_epochs: int):
+        """
+        Function implementing federated learning training loop.
+        @param num_epochs: Number of epochs to run.
+        @type num_epochs: int
+        @return: Final running loss statistic and acquired parameters of the locally trained network.
+        @rtype: Tuple[float, Dict[str, torch.Tensor]]
+        """
         start_time = time.time()
 
         running_loss = 0.0
@@ -49,7 +71,7 @@ class Client(Node):
             self.dataset.train_sampler.set_epoch(num_epochs)
 
         number_of_training_samples = len(self.dataset.get_train_loader())
-        # self.logger.info(f'{self.id}: Number of training samples: {number_of_training_samples}')
+        self.logger.info(f'{self.id}: Number of training samples: {number_of_training_samples}')
 
         for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
             inputs, labels = inputs.to(self.device), labels.to(self.device)
@@ -66,27 +88,32 @@ class Client(Node):
             # Mark logging update step
             if i % self.config.log_interval == 0:
                 self.logger.info(
-                    '[%s] [%d, %5d] loss: %.3f' % (self.id, num_epochs, i, running_loss / self.config.log_interval))
+                        f'[{self.id}] [{num_epochs:d}, {i:5d}] loss: {running_loss / self.config.log_interval:.3f}')
                 final_running_loss = running_loss / self.config.log_interval
                 running_loss = 0.0
                 # break
 
         end_time = time.time()
         duration = end_time - start_time
-        # self.logger.info(f'Train duration is {duration} seconds')
+        self.logger.info(f'Train duration is {duration} seconds')
 
         return final_running_loss, self.get_nn_parameters(),
 
     def set_tau_eff(self, total):
         client_weight = self.get_client_datasize() / total
-        n = self.get_client_datasize()
-        E = self.config.epochs
-        B = 16  # nicely hardcoded :)
+        n = self.get_client_datasize() # pylint: disable=invalid-name
+        E = self.config.epochs # pylint: disable=invalid-name
+        B = 16  # nicely hardcoded :) # pylint: disable=invalid-name
         tau_eff = int(E * n / B) * client_weight
         if hasattr(self.optimizer, 'set_tau_eff'):
             self.optimizer.set_tau_eff(tau_eff)
 
     def test(self):
+        """
+        Function implementing federated learning test loop.
+        @return: Final running loss statistic and accuracy statistic.
+        @rtype: Tuple[float, float]
+        """
         start_time = time.time()
         correct = 0
         total = 0
@@ -99,7 +126,7 @@ class Client(Node):
 
                 outputs = self.net(images)
 
-                _, predicted = torch.max(outputs.data, 1)
+                _, predicted = torch.max(outputs.data, 1) # pylint: disable=no-member
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
@@ -116,14 +143,20 @@ class Client(Node):
         # class_recall = calculate_class_recall(confusion_mat)
         end_time = time.time()
         duration = end_time - start_time
-        # self.logger.info(f'Test duration is {duration} seconds')
+        self.logger.info(f'Test duration is {duration} seconds')
         return accuracy, loss
 
-    def get_client_datasize(self):
+    def get_client_datasize(self): # pylint: disable=missing-function-docstring
         return len(self.dataset.get_train_sampler())
 
     def exec_round(self, num_epochs: int) -> Tuple[Any, Any, Any, Any, float, float, float]:
-
+        """
+        Function as access point for the Federator Node to kick-off a remote learning round on a client.
+        @param num_epochs: Number of epochs to run
+        @type num_epochs: int
+        @return: Tuple containing the statistics of the training round.
+        @rtype: Tuple
+        """
         start = time.time()
 
         loss, weights = self.train(num_epochs)
@@ -138,8 +171,8 @@ class Client(Node):
 
         if hasattr(self.optimizer, 'pre_communicate'):  # aka fednova or fedprox
             self.optimizer.pre_communicate()
-        for k, v in weights.items():
-            weights[k] = v.cpu()
+        for k, value in weights.items():
+            weights[k] = value.cpu()
         return loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration
 
     def __del__(self):

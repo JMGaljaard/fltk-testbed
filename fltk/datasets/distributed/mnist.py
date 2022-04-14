@@ -1,19 +1,18 @@
+# pylint: disable=missing-class-docstring,invalid-name,missing-function-docstring
 from __future__ import annotations
-from fltk.datasets import DistDataset
-from torchvision import datasets, transforms
+
+from typing import TYPE_CHECKING
+
 from torch.utils.data import DataLoader
-# from fltk.strategy import get_sampler, get_augmentations, get_augmentations_tensor, UnifyingSampler
-from random import choice
-from PIL import Image
+from torchvision import datasets, transforms
 
-
-# typing:
-from typing import TYPE_CHECKING, Tuple, Any, List
-
+from fltk.datasets.distributed.dataset import DistDataset
 from fltk.samplers import get_sampler
 
+# from fltk.strategy import get_sampler, get_augmentations, get_augmentations_tensor, UnifyingSampler
+
 if TYPE_CHECKING:
-    from fltk.util import BareConfig
+    pass
 
 # class MNIST(datasets.MNIST):
 #     def __init__(self,  root:str, transform, augment:bool=False):

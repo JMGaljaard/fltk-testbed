@@ -1,9 +1,8 @@
-from fltk.samplers import DistributedSamplerWrapper
-from torch.utils.data import DistributedSampler, Dataset
-import numpy as np
-import logging
 import random
-from collections import Counter
+
+import numpy as np
+
+from fltk.samplers import DistributedSamplerWrapper
 
 
 class N_Labels(DistributedSamplerWrapper):

@@ -60,7 +60,7 @@ def plot_federator_accuracy(df: pd.DataFrame):
 
 def plot_clients_accuracy(df: pd.DataFrame):
     plt.figure()
-    g = sns.lineplot(data=df, x='round_id', y='accuracy', hue='node_name')
+    _ = sns.lineplot(data=df, x='round_id', y='accuracy', hue='node_name')
     plt.title('Client test accuracy')
     plt.tight_layout()
     plt.show()

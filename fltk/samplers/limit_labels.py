@@ -1,9 +1,8 @@
-from fltk.samplers import DistributedSamplerWrapper
-from torch.utils.data import DistributedSampler, Dataset
-import numpy as np
 import logging
 import random
-from collections import Counter
+
+from fltk.samplers import DistributedSamplerWrapper
+
 
 class LimitLabelsSampler(DistributedSamplerWrapper):
     """
@@ -15,9 +14,8 @@ class LimitLabelsSampler(DistributedSamplerWrapper):
         super().__init__(dataset, num_replicas, rank, seed)
 
         if self.n_clients % self.n_labels != 0:
-            logging.error(
-                "multiples of {} clients are needed for the 'limiting-labels' data distribution method, {} does not work".format(
-                    self.n_labels, self.n_clients))
+            logging.error(f"multiples of {self.n_labels} clients are needed for the 'limiting-labels' data distribution "
+                          f"method, {self.n_clients} does not work")
             return
 
         n_occurrences = limit * int(self.n_clients / self.n_labels)  # number of occurrences of each label
@@ -70,7 +68,7 @@ class LimitLabelsSampler(DistributedSamplerWrapper):
         # all clients get the same amount of data, the first portion is given to client with rank 1, the second to rank 2, etc
 
         labels = client_labels[self.client_id]
-        logging.info("Client {} gets labels {}".format(self.rank, client_labels[self.client_id]))
+        logging.info(f"Client {self.rank} gets labels {client_labels[self.client_id]}")
         indices = []
         ordered_by_label = self.order_by_label(dataset)
         for label in labels:

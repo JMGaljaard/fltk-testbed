@@ -1,3 +1,4 @@
+# pylint: disable=missing-class-docstring,invalid-name,missing-function-docstring
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -10,7 +11,7 @@ class MNIST_CNN(nn.Module):
         self.fc1 = nn.Linear(320, 50)
         self.fc2 = nn.Linear(50, 10)
 
-    def forward(self, x):
+    def forward(self, x): # pylint: disable=missing-function-docstring
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
         x = x.view(-1, 320)

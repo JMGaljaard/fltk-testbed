@@ -35,14 +35,14 @@ class Node:
     distributed: bool = True
     cuda: bool = False
     finished_init: bool = False
-    device = torch.device("cpu")
+    device = torch.device("cpu") # pylint: disable=no-member
     net: Any
     dataset: Any
     logger = getLogger(__name__)
 
-    def __init__(self, id: str, rank: int, world_size: int, config: Config):
+    def __init__(self, identifier: str, rank: int, world_size: int, config: Config):
         self.config = config
-        self.id = id
+        self.id = identifier # pylint: disable=invalid-name
         self.rank = rank
         self.world_size = world_size
         self.real_time = config.real_time
@@ -60,6 +60,13 @@ class Node:
         self.set_net(self.load_default_model())
 
     def init_dataloader(self, world_size: int = None):
+        """
+        Function for nodes to initialize the datalaoders used for training.
+        @param world_size: Worldsize of all training entities.
+        @type world_size: int
+        @return: None
+        @rtype: None
+        """
         config = copy.deepcopy(self.config)
         if world_size:
             config.world_size = world_size
@@ -69,6 +76,11 @@ class Node:
         self.logger.info('Done with init')
 
     def is_ready(self):
+        """
+        Helper function to establish whether a training Node has finished its initialization.
+        @return: Boolean indicating whether the training Node has finished
+        @rtype:
+        """
         return self.finished_init
 
     @staticmethod
@@ -78,29 +90,35 @@ class Node:
         This is the entry points for all incoming RPC communication.
         The class object (self) will be loaded from the global space
         and the callable method is executed within the context of self
-        :param method:
-        :param sender:
-        :param args:
-        :param kwargs:
-        :return:
+        :param method: Function to execute provided by remote client.
+        :param sender: Name of other Client that has request a function to be called.
+        :param args: Arguments to pass to function to execute.
+        :param kwargs: Keyword arguments to pass to function to execute.
+        :return: Method executed on Client object.
         """
         global global_vars
         global_self = global_vars['self']
-        if type(method) is str:
+        if isinstance(method, str):
             method = getattr(global_self, method)
             return method(*args, **kwargs)
-        else:
-            return method(global_self, *args, **kwargs)
+        return method(global_self, *args, **kwargs)
 
     def init_device(self):
+        """
+        Function to initialize learning accelerator, effectively performs nothing when the device to learn with is not
+        an Nvidia accelerator.
+        @return: Torch device corresponding to the device that was set to be initialized in the set configuration of
+        the Client.
+        @rtype: torch.device
+        """
         if self.cuda and not torch.cuda.is_available():
             self.logger.warning('Unable to configure device for GPU because cuda.is_available() == False')
         if self.cuda and torch.cuda.is_available():
             self.logger.info("Configure device for GPU (Cuda)")
-            return torch.device("cuda:0")
-        else:
-            self.logger.info("Configure device for CPU")
-            return torch.device("cpu")
+            return torch.device("cuda:0") # pylint: disable=no-member
+
+        self.logger.info("Configure device for CPU")
+        return torch.device("cpu") # pylint: disable=no-member
 
     def set_net(self, net):
         """
@@ -143,7 +161,7 @@ class Node:
 
                 model.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
         else:
-            self.logger.warning("Could not find model: {}".format(model_file_path))
+            self.logger.warning(f"Could not find model: {model_file_path}")
         return model
 
 
@@ -160,7 +178,7 @@ class Node:
         else:
             self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
 
-    def message(self, other_node: str, method: Callable, *args, **kwargs) -> torch.Future:
+    def message(self, other_node: str, method: Callable, *args, **kwargs) -> torch.Future: # pylint: disable=no-member
         """
         All communication with other nodes should go through this method.
         The attribute real_time determines if the communication should use RPC or if it is a direct object call.
@@ -172,7 +190,7 @@ class Node:
             return rpc.rpc_sync(other_node, func, args=args_list,  kwargs=kwargs)
         return method(other_node, *args, **kwargs)
 
-    def message_async(self, other_node: str, method: Callable, *args, **kwargs) -> torch.Future:
+    def message_async(self, other_node: str, method: Callable, *args, **kwargs) -> torch.Future: # pylint: disable=no-member
         """
         This is the async version of 'message'.
         All communication with other nodes should go through this method.

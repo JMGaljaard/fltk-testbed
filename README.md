@@ -418,8 +418,12 @@ before running into trouble later.
 
 ```bash
 cd charts
-helm install flearner ./orchestrator --namespace test -f fltk-values.yaml
+helm install flearner ./orchestrator --namespace test -f fltk-values.yaml --set-file orchestrator.configuration=./configs/quantities/kubernetes.conf
 ```
+
+**N.B.** Passing the `--set-file` flag is optional, but will take by default the 
+`benchmarking/example_cloud_experiment.json` file. This follows the symlink in `charts/orchestrator/configs/`, 
+as Helm does not allow for accessing files outside a charts directory.
 
 This will spawn an `fl-server` Pod in the `test` Namespace, which will spawn Pods (using `V1PyTorchJobs`), that
 run experiments. It will currently make use of the [`configs/example_cloud_experiment.json`](configs/benchmarking/example_cloud_experiment.json)

@@ -1,6 +1,9 @@
 import threading
 
 class Singleton(type):
+    """
+    Helper class defining a Singleton object for Python meta-classes.
+    """
     _lock = threading.Lock()
     _instances = {}
 

@@ -2,7 +2,7 @@ import copy
 from pathlib import Path
 import os
 import yaml
-from fltk.util.generate_docker_compose_2 import generate_compose_file, generate_compose_file_from_dict
+from fltk.util.generate_docker_compose_2 import generate_compose_file_from_dict
 
 
 def rm_tree(pth: Path):
@@ -24,7 +24,7 @@ def check_num_clients_consistency(cfg_data: dict):
             print('[Warning]\t Number of docker clients is not equal to the num_clients property!')
 
 
-def generate(base_path: Path):
+def generate(base_path: Path, config_path: Path, **kwargs):
     descr_path = base_path / 'descr.yaml'
 
     exp_cfg_list = [x for x in base_path.iterdir() if '.cfg' in x.suffixes]
@@ -74,7 +74,7 @@ def generate(base_path: Path):
 #     print('Done')
 
 
-def run(base_path: Path):
+def run(base_path: Path, config_path: Path, **kwargs):
     print(f'Run {base_path}')
     print(list(base_path.iterdir()))
     descr_path = base_path / 'descr.yaml'
@@ -112,7 +112,6 @@ def run(base_path: Path):
                 # print(f'Running cmd: "{cmd}"')
                 # os.system(cmd)
                 first_prefix = ''
-        pass
     else:
         print('Switching to direct mode')
         for exp_cfg_file in exp_files:
@@ -120,9 +119,7 @@ def run(base_path: Path):
                 # cmd = f'export OPTIONAL_PARAMS="--prefix={replication_id}";export EXP_CONFIG_FILE="{exp_cfg_file}"; docker-compose --compatibility up {first_prefix};'
                 cmd = f'python3 -m fltk single {exp_cfg_file} --prefix={replication_id}'
                 cmd_list.append(cmd)
-        pass
 
-    [print(x) for x in cmd_list]
     for cmd in cmd_list:
         print(f'Running cmd: "{cmd}"')
         os.system(cmd)

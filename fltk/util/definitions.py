@@ -1,3 +1,4 @@
+# pylint: disable=invalid-name,missing-class-docstring
 ######### Definitions #########
 # 1. Datasets                 #
 # 2. Networks (models)        #
@@ -6,7 +7,6 @@
 # 5. Data samplers            #
 # 6. Optimizers               #
 ###############################
-# Use enums instead of dataclasses?
 from enum import Enum, unique
 
 

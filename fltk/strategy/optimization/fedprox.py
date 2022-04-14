@@ -56,15 +56,15 @@ class FedProx(Optimizer):
 
         self.itr = 0
         self.a_sum = 0
-        self.mu = mu
+        self.mu = mu # pylint: disable=invalid-name
         self.loss = None
 
         if lr is not required and lr < 0.0:
-            raise ValueError("Invalid learning rate: {}".format(lr))
+            raise ValueError(f"Invalid learning rate: {lr}")
         if momentum < 0.0:
-            raise ValueError("Invalid momentum value: {}".format(momentum))
+            raise ValueError(f"Invalid momentum value: {momentum}")
         if weight_decay < 0.0:
-            raise ValueError("Invalid weight_decay value: {}".format(weight_decay))
+            raise ValueError(f"Invalid weight_decay value: {weight_decay}")
 
         defaults = dict(lr=lr, momentum=momentum, dampening=dampening,
                         weight_decay=weight_decay, nesterov=nesterov, variance=variance)
@@ -95,23 +95,22 @@ class FedProx(Optimizer):
             momentum = group['momentum']
             dampening = group['dampening']
             nesterov = group['nesterov']
-            
 
-            for p in group['params']:
+            for p in group['params']: # pylint: disable=invalid-name
                 if p.grad is None:
                     continue
                 d_p = p.grad.data
 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
-                
+
                 param_state = self.state[p]
                 if 'old_init' not in param_state:
-                    param_state['old_init'] = torch.clone(p.data).detach()
+                    param_state['old_init'] = torch.clone(p.data).detach() # pylint: disable=no-member
 
                 if momentum != 0:
                     if 'momentum_buffer' not in param_state:
-                        buf = param_state['momentum_buffer'] = torch.clone(d_p).detach()
+                        buf = param_state['momentum_buffer'] = torch.clone(d_p).detach() # pylint: disable=no-member
                     else:
                         buf = param_state['momentum_buffer']
                         buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
@@ -139,9 +138,9 @@ class FedProx(Optimizer):
 
     def pre_communicate(self):
         for group in self.param_groups:
-            for p in group['params']:
+            for p in group['params']: # pylint: disable=invalid-name
                 param_state = self.state[p]
                 if 'old_init' in param_state:
                     del param_state['old_init']
                 if 'momentum_buffer' in param_state:
-                     param_state['momentum_buffer'].zero_()
+                    param_state['momentum_buffer'].zero_()

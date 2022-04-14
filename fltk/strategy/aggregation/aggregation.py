@@ -13,22 +13,9 @@ def average_nn_parameters_simple(parameters):
     return new_params
 
 
-def average_nn_parameters(parameters):
-    """
-    Averages passed parameters.
-    :param parameters: nn model named parameters
-    :type parameters: list
-    """
-    new_params = {}
-    for name in parameters[0].keys():
-        new_params[name] = sum([param[name].data for param in parameters]) / len(parameters)
-
-    return new_params
-
-
 def average_nn_parameters(parameters, sizes):
     """
-    Federated Average passed parameters.
+    @deprecated Federated Average passed parameters.
     :param parameters: nn model named parameters
     :type parameters: list
     :param sizes:
@@ -37,14 +24,14 @@ def average_nn_parameters(parameters, sizes):
     new_params = {}
     sum_size = 0
     for client in parameters:
-        for name in parameters[client].keys():
+        for key, _ in parameters[client].items():
             try:
-                new_params[name].data += (parameters[client][name].data * sizes[client])
-            except Exception as e:
-                new_params[name] = (parameters[client][name].data * sizes[client])
+                new_params[key].data += (parameters[client][key].data * sizes[client])
+            except Exception: # pylint: disable=broad-except
+                new_params[key] = (parameters[client][key].data * sizes[client])
         sum_size += sizes[client]
 
-    for name in new_params:
-        new_params[name].data /= sum_size
+    for key, _ in new_params.items():
+        new_params[key].data /= sum_size
 
     return new_params

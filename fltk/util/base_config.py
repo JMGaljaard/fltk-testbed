@@ -1,7 +1,8 @@
+# pylint: disable-all
+import json
 from datetime import datetime
 
 import torch
-import json
 
 from fltk.datasets.distributed import DistCIFAR10Dataset, DistCIFAR100Dataset, DistFashionMNISTDataset
 from fltk.datasets.distributed.mnist import DistMNISTDataset
@@ -14,6 +15,9 @@ SEED = 1
 torch.manual_seed(SEED)
 
 class BareConfig:
+    """
+    @deprecated This configuration file is deprecated and to be removed in a later version of the code base.
+    """
 
     def __init__(self):
         # self.logger = logger
@@ -141,7 +145,7 @@ class BareConfig:
     # Methods #
     ###########
 
-    def merge_yaml(self, cfg = {}):
+    def merge_yaml(self, cfg=None):
         """
         total_epochs: 20
         epochs_per_cycle: 2
@@ -154,6 +158,8 @@ class BareConfig:
         :param yaml_config:
         :return:
         """
+        if cfg is None:
+            cfg = {}
         if 'total_epochs' in cfg:
             self.epochs = cfg['total_epochs']
         if 'epochs_per_cycle' in cfg:
@@ -215,12 +221,12 @@ class BareConfig:
             self.node_groups = cfg['node_groups']
         if 'termination_percentage' in cfg:
             self.termination_percentage = cfg['termination_percentage']
-        
+
         if 'epochs_per_round' in cfg:
             self.epochs_per_round = cfg['epochs_per_round']
         if 'freeze_clients' in cfg:
             self.freeze_clients = cfg['freeze_clients']
-            
+
 
 
     def init_logger(self, logger):
@@ -243,7 +249,7 @@ class BareConfig:
 
     def get_optimizer(self):
         return self.optimizer
-    
+
     def get_sampler_args(self):
         return tuple(self.data_sampler_args)
 

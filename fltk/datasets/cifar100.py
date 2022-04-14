@@ -6,6 +6,9 @@ from .dataset import Dataset
 
 
 class CIFAR100Dataset(Dataset):
+    """
+    CIFAR100 Dataset implementation for Federated learning experiments.
+    """
 
     DEFAULT_TRANSFORM = transforms.Compose([
         transforms.RandomHorizontalFlip(),

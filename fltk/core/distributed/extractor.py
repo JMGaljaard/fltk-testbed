@@ -23,7 +23,7 @@ def download_datasets(args: Namespace, config: DistributedConfig):
     root = str(data_path)
 
     if not data_path.is_dir():
-        os.mkdirs(root, exist_ok=True)
+        os.mkdirs(root, exist_ok=True) # pylint: disable=no-member
 
     # Prepare MNIST
     MNIST(root=root, download=True)

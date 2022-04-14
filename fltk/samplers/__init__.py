@@ -10,12 +10,22 @@ from ..util.log import getLogger
 
 
 def get_sampler(dataset, args):
+    """
+    Helper function to get DataSampler configured with corresponding arguments. Returns None when invalid sampler
+    configuration was provided.
+    @param dataset: Dataset to pass to DataSampler during instantiation.
+    @type dataset: Dataset
+    @param args: Configuration object containing arguments to DataSampler instantiation.
+    @type args: Any
+    @return: Datasampler setup with arguments provided by args and dataset.
+    @rtype: Optional[DataSampler]
+    """
     logger = getLogger(__name__)
     sampler = None
     if args.get_distributed():
         method = args.get_sampler()
-        logger.debug(
-            "Using {} sampler method, with args: {}".format(method, args.get_sampler_args()))
+        msg = f"Using {method} sampler method, with args: {args.get_sampler_args()}"
+        logger.debug(msg)
 
         if method == DataSampler.uniform:
             sampler = UniformSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank())
@@ -35,7 +45,8 @@ def get_sampler(dataset, args):
             sampler = DirichletSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                        args=args.get_sampler_args())
         else:  # default
-            logger.warning("Unknown sampler " + method + ", using uniform instead")
+            msg = f"Unknown sampler {method}, using uniform instead"
+            logger.warning(msg)
             sampler = UniformSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank())
 
     return sampler

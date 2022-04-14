@@ -1,3 +1,4 @@
+# pylint: disable=missing-function-docstring,missing-class-docstring,invalid-name
 from .dataset import Dataset
 from torchvision import datasets
 from torchvision import transforms

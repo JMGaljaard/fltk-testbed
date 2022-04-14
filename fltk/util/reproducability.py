@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 
-def cuda_reproducible_backend(cuda: bool) -> None:
+def _cuda_reproducible_backend(cuda: bool) -> None:
     """
     Function to set the CUDA backend to reproducible (i.e. deterministic) or to default configuration (per PyTorch
     1.9.1).
@@ -40,6 +40,6 @@ def init_reproducibility(torch_seed: int = 42, cuda: bool = False, numpy_seed: i
     torch.manual_seed(torch_seed)
     if cuda:
         torch.cuda.manual_seed_all(torch_seed)
-        cuda_reproducible_backend(True)
+        _cuda_reproducible_backend(True)
     np.random.seed(numpy_seed)
     os.environ['PYTHONHASHSEED'] = str(hash_seed)

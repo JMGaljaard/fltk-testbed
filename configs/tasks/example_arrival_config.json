@@ -1,34 +1,80 @@
 [
   {
-    "jobClassParameters": [
-      {
-        "networkConfiguration": {
-          "network": "FashionMNISTCNN",
-          "dataset": "MNIST"
-        },
-        "systemParameters": {
-          "dataParallelism": "1",
-          "executorCores": "750m",
-          "executorMemory": "1Gi",
-          "action": "train"
-        },
-        "hyperParameters": {
-          "batchSize": "128",
-          "maxEpoch": "5",
-          "learningRate": "0.01",
-          "learningrateDecay": "0.0002"
-        },
-        "classProbability": 0.1,
-        "priorities": [
-          {
-            "priority": 1,
-            "probability": 1
+    "jobClassParameters": {
+      "networkConfiguration": {
+        "network": "FashionMNISTCNN",
+        "lossFunction": "CrossEntropyLoss",
+        "dataset": "mnist"
+      },
+      "systemParameters": {
+        "dataParallelism": null,
+        "configurations": {
+          "Master": {
+            "cores": "1000m",
+            "memory": "1Gi"
+          },
+          "Worker": {
+            "cores": "750m",
+            "memory": "1Gi"
           }
-        ]
+        }
+      },
+      "hyperParameters": {
+        "default": {
+          "batchSize": 128,
+          "testBatchSize": 1000,
+          "learningRateDecay": 0.0002,
+          "optimizerConfig": {
+            "type": "SGD",
+            "learningRate": 0.01,
+            "momentum": 0.1
+          },
+          "schedulerConfig": {
+            "schedulerStepSize": 50,
+            "schedulerGamma": 0.5,
+            "minimumLearningRate": 1e-10
+          }
+        },
+        "configurations": {
+          "Master": null,
+          "Worker": {
+            "batchSize": 500,
+            "optimizerConfig": {
+              "learningRate": 0.05
+            },
+            "schedulerConfig": {
+              "schedulerStepSize": 2000
+            }
+          }
+        }
+      },
+      "learningParameters": {
+        "totalEpochs": 0,
+        "rounds": 5,
+        "epochsPerRound": 1,
+        "cuda": false,
+        "clientsPerRound": 2,
+        "dataSampler": {
+          "type": "uniform",
+          "qValue": 0.07,
+          "seed": 42,
+          "shuffle": true
+        },
+        "aggregation": "FedAvg"
+      },
+      "experimentConfiguration": {
+        "randomSeed": [
+          1,
+          41,
+          42,
+          43,
+          430
+        ],
+        "workerReplication": {
+          "Master": 1,
+          "Worker": 2
+        }
       }
-    ],
-    "lambda": 20,
-    "preemptJobs": 0
+    }
   }
 ]
-

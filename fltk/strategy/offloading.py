@@ -6,12 +6,12 @@ class OffloadingStrategy(Enum):
     DEADLINE = 2
     SWYH = 3
     FREEZE = 4
-    MODEL_OFFLOAD = 5,
-    TIFL_BASIC = 6,
-    TIFL_ADAPTIVE = 7,
-    DYN_TERMINATE = 8,
-    DYN_TERMINATE_SWYH = 9,
-    MODEL_OFFLOAD_STRICT = 10,
+    MODEL_OFFLOAD = 5
+    TIFL_BASIC = 6
+    TIFL_ADAPTIVE = 7
+    DYN_TERMINATE = 8
+    DYN_TERMINATE_SWYH = 9
+    MODEL_OFFLOAD_STRICT = 10
     MODEL_OFFLOAD_STRICT_SWYH = 11
 
     @classmethod
