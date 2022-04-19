@@ -301,9 +301,7 @@ class Federator(Node):
         self.logger.info('Continue with rest [1]')
         time.sleep(3)
 
-        # updated_model = FedAvg(client_weights, client_sizes)
         updated_model = self.aggregation_method(client_weights, client_sizes)
-        # updated_model = average_nn_parameters_simple(list(client_weights.values()))
         self.update_nn_parameters(updated_model)
 
         test_accuracy, test_loss = self.test(self.net)
