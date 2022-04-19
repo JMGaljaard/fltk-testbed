@@ -146,3 +146,5 @@ docker-compose.yml
 refactor-notes.md
 experiments/**/exps/*
 *.test.py
+
+logging/*
