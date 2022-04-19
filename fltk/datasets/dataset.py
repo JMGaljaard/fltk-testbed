@@ -84,12 +84,12 @@ class Dataset:
         :type Y: numpy.Array()
         :return: torch.utils.data.DataLoader
         """
-        X_torch = torch.from_numpy(X).float()
+        X_torch = torch.from_numpy(X).float() # pylint: disable=no-member
 
         if "classification_problem" in kwargs and kwargs["classification_problem"] == False:
-            Y_torch = torch.from_numpy(Y).float()
+            Y_torch = torch.from_numpy(Y).float()  # pylint: disable=no-member
         else:
-            Y_torch = torch.from_numpy(Y).long()
+            Y_torch = torch.from_numpy(Y).long() # pylint: disable=no-member
         dataset = TensorDataset(X_torch, Y_torch)
 
         kwargs.pop("classification_problem", None)

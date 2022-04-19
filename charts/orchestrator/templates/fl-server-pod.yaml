@@ -15,7 +15,7 @@ spec:
         - fltk
       args:
         - cluster
-        - configs/{{ .Values.orchestrator.configurationFile }}
+        - {{ .Values.orchestrator.experimentFile }}
       env:
         - name: PYTHONUNBUFFERED
           value: "1"
@@ -31,8 +31,13 @@ spec:
         - mountPath: /opt/federation-lab/output
           name: fl-server-claim
           readOnly: true
+        - mountPath: /opt/federation-lab/config
+          name: fltk-orchestrator-config
   restartPolicy: Never
   volumes:
     - name: fl-server-claim
       persistentVolumeClaim:
         claimName: fl-server-claim
+    - name: fltk-orchestrator-config
+      configMap:
+        name: fltk-orchestrator-config

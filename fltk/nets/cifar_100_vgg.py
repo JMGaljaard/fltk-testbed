@@ -1,4 +1,5 @@
-import torch.nn as nn
+# pylint: disable=missing-class-docstring,invalid-name,missing-function-docstring
+import torch
 
 cfg = {
     'A': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
@@ -14,37 +15,37 @@ def make_layers(cfg, batch_norm=False):
     input_channel = 3
     for l in cfg:
         if l == 'M':
-            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+            layers += [torch.nn.MaxPool2d(kernel_size=2, stride=2)]
             continue
 
-        layers += [nn.Conv2d(input_channel, l, kernel_size=3, padding=1)]
+        layers += [torch.nn.Conv2d(input_channel, l, kernel_size=3, padding=1)]
 
         if batch_norm:
-            layers += [nn.BatchNorm2d(l)]
+            layers += [torch.nn.BatchNorm2d(l)]
 
-        layers += [nn.ReLU(inplace=True)]
+        layers += [torch.nn.ReLU(inplace=True)]
         input_channel = l
 
-    return nn.Sequential(*layers)
+    return torch.nn.Sequential(*layers)
 
 
-class Cifar100VGG(nn.Module):
+class Cifar100VGG(torch.nn.Module):
 
     def __init__(self, features=make_layers(cfg['D'], batch_norm=True), num_class=100):
         super(Cifar100VGG, self).__init__()
         self.features = features
 
-        self.classifier = nn.Sequential(
-            nn.Linear(512, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, num_class)
+        self.classifier = torch.nn.Sequential(
+            torch.nn.Linear(512, 4096),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.Dropout(),
+            torch.nn.Linear(4096, 4096),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.Dropout(),
+            torch.nn.Linear(4096, num_class)
         )
 
-    def forward(self, x):
+    def forward(self, x): # pylint: disable=missing-function-docstring
         output = self.features(x)
         output = output.view(output.size()[0], -1)
         output = self.classifier(output)

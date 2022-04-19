@@ -1,0 +1,27 @@
+client_name: # name can be anything
+#    container_name: federation-lab-client2 # what the name for this container would be
+    cpuset: '{cpu_set}'
+    restart: "no" # if it crashes for example
+    build: . # look for the docker file where this file is currently located
+    volumes:
+      - ./data:/opt/federation-lab/data
+#      - ./docker_data:/opt/federation-lab/data
+      - ./default_models:/opt/federation-lab/default_models
+      - ./data_loaders:/opt/federation-lab/data_loaders
+      - ./fltk:/opt/federation-lab/fltk
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RANK={rank}
+      - WORLD_SIZE={world_size}
+      - EXP_CONFIG=${EXP_CONFIG_FILE}
+      - MASTER_HOSTNAME=10.5.0.11
+      - NIC=eth0
+      - OPTIONAL_PARAMS=${OPTIONAL_PARAMS}
+    ports:
+      - "5002:5000" # {machine-port}:{docker-port}
+    depends_on:
+      - "fl_server"
+    deploy:
+      resources:
+        limits:
+          cpus: '{num_cpus}'

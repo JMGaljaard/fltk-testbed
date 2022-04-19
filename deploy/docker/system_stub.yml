@@ -1,0 +1,30 @@
+# creating a multi-container docker
+version: "3.3"
+services:
+  fl_server: # name can be anything
+    container_name: federation-lab-server # what the name for this container would be
+    cpuset: '0-2'
+    restart: "no" # if it crashes for example
+    build: . # look for the docker file where this file is currently located
+    volumes:
+#      - ./data/MNIST:/opt/federation-lab/data/MNIST
+      - ./data:/opt/federation-lab/data
+      - ./output:/opt/federation-lab/output
+      - ./fltk:/opt/federation-lab/fltk
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RANK=0
+      - WORLD_SIZE={world_size}
+      - EXP_CONFIG=${EXP_CONFIG_FILE}
+      - MASTER_HOSTNAME=10.5.0.11
+      - NIC=eth0
+      - OPTIONAL_PARAMS=${OPTIONAL_PARAMS}
+    ports:
+      - "5000:5000" # {machine-port}:{docker-port}
+    networks:
+      default:
+        ipv4_address: 10.5.0.11
+networks:
+  default:
+    external:
+      name: local_network_dev

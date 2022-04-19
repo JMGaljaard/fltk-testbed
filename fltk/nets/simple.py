@@ -1,10 +1,11 @@
+# pylint: disable=missing-function-docstring,missing-class-docstring,invalid-name
 import numpy as np
 import torch
-import torch.nn as nn
+
 import torch.nn.functional as F
 
 
-class SimpleNet(nn.Module):
+class SimpleNet(torch.nn.Module):
     def __init__(self, name=None, created_time=None):
         super(SimpleNet, self).__init__()
         self.created_time = created_time
@@ -48,23 +49,23 @@ class SimpleNet(nn.Module):
                 # no cuda
                 # random_tensor = (torch.cuda.FloatTensor(shape).random_(0, 100) <= coefficient_transfer).type(
                 #     torch.cuda.FloatTensor)
-                random_tensor = (torch.FloatTensor(shape).random_(0, 100) <= coefficient_transfer).type(
-                    torch.FloatTensor)
+                random_tensor = (torch.FloatTensor(shape).random_(0, 100) <= coefficient_transfer).type( # pylint: disable=no-member
+                    torch.FloatTensor) # pylint: disable=no-member
                 negative_tensor = (random_tensor * -1) + 1
                 # own_state[name].copy_(param)
                 own_state[name].copy_(param.clone())
 
 
-class SimpleMnist(SimpleNet):
+class SimpleMnist(SimpleNet):  # pylint: disable=missing-class-docstring
     def __init__(self, name=None, created_time=None):
         super(SimpleMnist, self).__init__(name, created_time)
-        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
-        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
-        self.conv2_drop = nn.Dropout2d()
-        self.fc1 = nn.Linear(320, 50)
-        self.fc2 = nn.Linear(50, 10)
+        self.conv1 = torch.nn.Conv2d(1, 10, kernel_size=5)
+        self.conv2 = torch.nn.Conv2d(10, 20, kernel_size=5)
+        self.conv2_drop = torch.nn.Dropout2d()
+        self.fc1 = torch.nn.Linear(320, 50)
+        self.fc2 = torch.nn.Linear(50, 10)
 
-    def forward(self, x):
+    def forward(self, x): # pylint: disable=missing-function-docstring
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
         x = x.view(-1, 320)

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dataclasses_json import config, dataclass_json
 
-from fltk.nets.util.reproducability import init_reproducibility
+from fltk.util import init_reproducibility
 
 
 @dataclass_json
@@ -114,7 +114,7 @@ class ClusterConfig:
 
 @dataclass_json
 @dataclass
-class BareConfig(object):
+class DistributedConfig():
     execution_config: ExecutionConfig
     cluster_config: ClusterConfig = field(metadata=config(field_name="cluster"))
     config_path: Path = None

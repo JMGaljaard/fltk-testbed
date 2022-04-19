@@ -5,20 +5,23 @@ from typing import List, Tuple
 
 import numpy as np
 import torch
-import torch.distributed as dist
 from sklearn.metrics import confusion_matrix
 from torch.utils.tensorboard import SummaryWriter
 
+from fltk.core.distributed.dist_node import DistNode
 from fltk.nets.util import calculate_class_precision, calculate_class_recall, save_model, load_model_from_file
 from fltk.schedulers import MinCapableStepLR, LearningScheduler
+from fltk.util.config import DistributedConfig
 from fltk.util.config.arguments import LearningParameters
-from fltk.util.config.base_config import BareConfig
 from fltk.util.results import EpochData
 
 
-class Client(object):
+class DistClient(DistNode):
+    """
+    TODO: Combine with Client and differentiate between Federated and Distributed Learnign through better inheritance.
+    """
 
-    def __init__(self, rank: int, task_id: str, world_size: int, config: BareConfig = None,
+    def __init__(self, rank: int, task_id: str, world_size: int, config: DistributedConfig = None,
                  learning_params: LearningParameters = None):
         """
         @param rank: PyTorch rank provided by KubeFlow setup.
@@ -88,22 +91,21 @@ class Client(object):
         self._logger.info(f"Tearing down Client {self._id}")
         self.tb_writer.close()
 
-    def _init_device(self, cuda_device: torch.device = torch.device(f'cpu')):
+    def _init_device(self, default_device: torch.device = torch.device('cpu')): # pylint: disable=no-member
         """
         Initialize Torch to use available devices. Either prepares CUDA device, or disables CUDA during execution to run
         with CPU only inference/training.
-        @param cuda_device: Torch device to use, refers to the CUDA device to be used in case there are multiple.
+        @param default_device: Torch device to use, refers to the CUDA device to be used in case there are multiple.
         Defaults to the first cuda device when CUDA is enabled at index 0.
-        @type cuda_device: torch.device
+        @type default_device: torch.device
         @return: None
         @rtype: None
         """
         if self.config.cuda_enabled() and torch.cuda.is_available():
-            return torch.device(dist.get_rank())
-        else:
-            # Force usage of CPU
-            torch.cuda.is_available = lambda: False
-            return cuda_device
+            return torch.device('cuda') # pylint: disable=no-member
+        # Force usage of CPU
+        torch.cuda.is_available = lambda: False
+        return default_device
 
     def load_default_model(self):
         """
@@ -147,7 +149,7 @@ class Client(object):
 
             running_loss += float(loss.detach().item())
             if i % log_interval == 0:
-                self._logger.info('[%d, %5d] loss: %.3f' % (epoch, i, running_loss / log_interval))
+                self._logger.info(f'[{epoch:d}, {i:5d}] loss: {running_loss / log_interval:.3f}')
                 final_running_loss = running_loss / log_interval
                 running_loss = 0.0
         self.scheduler.step()
@@ -186,7 +188,7 @@ class Client(object):
                 outputs = self.model(images)
                 # Currently the FLTK framework assumes that a classification task is performed (hence max).
                 # Future work may add support for non-classification training.
-                _, predicted = torch.max(outputs.data, 1)
+                _, predicted = torch.max(outputs.data, 1) # pylint: disable=no-member
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
@@ -201,19 +203,19 @@ class Client(object):
         class_precision: np.array = calculate_class_precision(confusion_mat)
         class_recall: np.array = calculate_class_recall(confusion_mat)
 
-        self._logger.debug('Test set: Accuracy: {}/{} ({:.0f}%)'.format(correct, total, accuracy))
-        self._logger.debug('Test set: Loss: {}'.format(loss))
-        self._logger.debug("Confusion Matrix:\n" + str(confusion_mat))
-        self._logger.debug("Class precision: {}".format(str(class_precision)))
-        self._logger.debug("Class recall: {}".format(str(class_recall)))
+        self._logger.debug(f'Test set: Accuracy: {correct}/{total} ({accuracy:.0f}%)')
+        self._logger.debug(f'Test set: Loss: {loss}')
+        self._logger.debug(f"Confusion Matrix:\n{confusion_mat}")
+        self._logger.debug(f"Class precision: {class_precision}")
+        self._logger.debug(f"Class recall: {class_recall}")
 
         return accuracy, loss, class_precision, class_recall, confusion_mat
 
     def run_epochs(self) -> List[EpochData]:
         """
         Function to run training epochs using the pre-set Hyper-Parameters.
-        @return: A list of data gathered during the execution, containing progress information such as accuracy. See also
-        EpochData.
+        @return: A list of data gathered during the execution, containing progress information such as accuracy.
+        See also the EpochData dataclass.
         @rtype: List[EpochData]
         """
         max_epoch = self.learning_params.max_epoch + 1
@@ -225,7 +227,6 @@ class Client(object):
             # Let only the 'master node' work on training. Possibly DDP can be used
             # to have a distributed test loader as well to speed up (would require
             # aggregation of data.
-            # Example https://github.com/fabio-deep/Distributed-Pytorch-Boilerplate/blob/0206247150720ca3e287e9531cb20ef68dc9a15f/src/datasets.py#L271-L303.
             elapsed_time_train = datetime.datetime.now() - start_time_train
             train_time_ms = int(elapsed_time_train.total_seconds() * 1000)
 
