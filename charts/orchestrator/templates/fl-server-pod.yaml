@@ -15,7 +15,8 @@ spec:
         - fltk
       args:
         - cluster
-        - {{ .Values.orchestrator.experimentFile }}
+        - {{ .Values.orchestrator.runtime.configurationFile }}
+        - {{ .Values.orchestrator.runtime.experimentFile }}
       env:
         - name: PYTHONUNBUFFERED
           value: "1"

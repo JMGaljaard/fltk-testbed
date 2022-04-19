@@ -1,5 +1,6 @@
 orchestrator:
-    cpu: 200m
+    cpu: 500m
     memory: 500Mi
-    configurationFile: configs/tasks/example_arrival_config.json
-    experimentFile: configs/tasks/example_arrival_config.json
+    runtime:
+      configurationFile: configs/example_arrival_config.json
+      experimentFile: configs/federated_tasks/example_arrival_config.json
