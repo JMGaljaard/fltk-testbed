@@ -15,6 +15,7 @@ from fltk.core.distributed import DistClient
 from fltk.core.distributed import Orchestrator
 from fltk.core.distributed.extractor import download_datasets
 from fltk.core.federator import Federator
+from fltk.nets.util.reproducability import init_reproducibility
 from fltk.util.cluster.client import ClusterManager
 from fltk.util.config import DistributedConfig, Config
 from fltk.util.config.arguments import LearningParameters, extract_learning_parameters
@@ -41,7 +42,7 @@ def launch_distributed_client(task_id: str, conf: DistributedConfig = None,
     @param task_id: String representation (should be unique) corresponding to a client.
     @type task_id: str
     @param conf: Configuration for components, needed for spinning up components of the Orchestrator.
-    @type conf: BareConfig
+    @type conf: DistributedConfig
     @param learning_params: Parsed configuration of Hyper-Parameters for learning.
     @type: LearningParameters
     @return: None
@@ -71,7 +72,7 @@ def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None, 
     @type args: Namespace
     @param config: Configuration for execution of Orchestrators components, needed for spinning up components of the
     Orchestrator.
-    @type config: BareConfig
+    @type config: Optional[DistributedConfig]
     @return: None
     @rtype: None
     """
@@ -86,7 +87,7 @@ def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None, 
         logging.info("Pointing configuration to in cluster configuration.")
         conf.cluster_config.load_incluster_namespace()
         conf.cluster_config.load_incluster_image()
-    arrival_generator = DistributedExperimentGenerator() if simulate_arrivals else FederatedArrivalGenerator()
+    arrival_generator = (DistributedExperimentGenerator if simulate_arrivals else FederatedArrivalGenerator)(args.experiment)
     cluster_manager = ClusterManager()
 
     orchestrator = Orchestrator(cluster_manager, arrival_generator, conf)
@@ -114,7 +115,7 @@ def launch_extractor(base_path: Path, config_path: Path, args: Namespace = None,
     @param args: Arguments passed from CLI.
     @type args: Namespace
     @param conf: Parsed configuration file passed from the CLI.
-    @type conf: BareConfig
+    @type conf: Optional[DistributedConfig]
     @return: None
     @rtype: None
     """
@@ -295,5 +296,5 @@ def launch_cluster(arg_path, conf_path, args: Namespace = None, config: Distribu
                         datefmt='%m-%d %H:%M')
     # Set the seed for arrivals, torch seed is mostly ignored. Set the `arrival_seed` to a different value
     # for each repetition that you want to run an experiment with.
-    config.set_seed()
+    init_reproducibility(config.execution_config)
     launch_orchestrator(args=args, conf=config)

@@ -1,6 +1,6 @@
 # pylint: disable=missing-class-docstring,invalid-name
 import torch
-import torch.torch.nn.functional as F
+import torch.nn.functional as F
 
 class Cifar10CNN(torch.nn.Module):
 

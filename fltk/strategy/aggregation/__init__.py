@@ -1,10 +1,5 @@
-from typing import Callable
-
-import torch
-
-from fltk.util.definitions import Aggregations
-from .FedAvg import fed_avg
-from .aggregation import average_nn_parameters, average_nn_parameters_simple
+from fltk.util.config.definitions.aggregate import Aggregations
+from .fed_avg import fed_avg
 
 
 def get_aggregation(name: Aggregations):

@@ -1,3 +1,4 @@
+import abc
 import copy
 import os
 from typing import Callable, Any
@@ -12,18 +13,7 @@ from fltk.util.log import getLogger
 global_vars = {}
 
 
-def _remote_method_direct(method, other_node: str, *args, **kwargs):
-    """
-    Utility function for RPC communication between nodes
-    :param method: A callable
-    :param other_node: reference to other node
-    :return: any
-    """
-    args = [method, other_node] + list(args)
-    return rpc.rpc_sync(other_node, method, args=args, kwargs=kwargs)
-
-
-class Node:
+class Node(abc.ABC):
     """
     Implementation of any participating node.
     It handles communication and the basic functions for Deep Learning.

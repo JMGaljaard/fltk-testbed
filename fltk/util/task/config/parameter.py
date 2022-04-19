@@ -7,7 +7,7 @@ from typing import List, Optional, OrderedDict, Any, Union, Tuple, Type, Dict, M
 from dataclasses_json import dataclass_json, LetterCase, config
 from torch.nn.modules.loss import _Loss
 
-from fltk.util.definitions import Aggregations, DataSampler, Optimizations, Dataset, Nets
+from fltk.util.config.definitions import DataSampler, Nets, Aggregations, Optimizations, Dataset
 
 
 def _none_factory():
@@ -22,7 +22,8 @@ class OptimizerConfig:
     """
     type: Optional[Optimizations] = None
     momentum: Optional[Union[float, Tuple[float]]] = None
-    lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory) # pylint: disable=invalid-name
+    lr: Optional[float] = field(metadata=config(field_name="learningRate"),
+                                default_factory=_none_factory)  # pylint: disable=invalid-name
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -46,7 +47,8 @@ class HyperParameterConfiguration:
                                                         default_factory=_none_factory)
     scheduler_config: Optional[SchedulerConfig] = field(metadata=config(field_name="schedulerConfig"),
                                                         default_factory=_none_factory)
-    bs: Optional[int] = field(metadata=config(field_name="batchSize"), default_factory=_none_factory)  # pylint: disable=invalid-name
+    bs: Optional[int] = field(metadata=config(field_name="batchSize"),
+                              default_factory=_none_factory)  # pylint: disable=invalid-name
     test_bs: Optional[int] = field(metadata=config(field_name="testBatchSize"), default_factory=_none_factory)
     lr_decay: Optional[float] = field(metadata=config(field_name="learningRateDecay"), default_factory=_none_factory)
 
@@ -74,7 +76,7 @@ def merge_optional(default_dict: Dict[str, Any], update_dict: Dict[str, Any], tp
     @rtype: dict
     """
     default_copy = default_dict.copy()
-    for k, v in default_copy.items(): # pylint: disable=invalid-name
+    for k, v in default_copy.items():  # pylint: disable=invalid-name
         if k in update_dict:
             if all(isinstance(e, MutableMapping) for e in (v, update_dict[k])):
                 update_dict[k] = merge_optional(v, update_dict[k], tpe)
@@ -83,7 +85,7 @@ def merge_optional(default_dict: Dict[str, Any], update_dict: Dict[str, Any], tp
 
     # Base case
     update = list(filter(lambda item: item[1] is not None, update_dict.items()))
-    for k, v in update: # pylint: disable=invalid-name
+    for k, v in update:  # pylint: disable=invalid-name
         if not isinstance(v, dict):
             logging.info(f'Updating {k} from {default_copy[k]} to {v} for {tpe}')
         default_copy[k] = v
@@ -304,7 +306,7 @@ class TrainTask:
         self.learning_parameters = job_parameters.learning_parameters
 
 
-class ExperimentParser(): # pylint: disable=too-few-public-methods
+class ExperimentParser():  # pylint: disable=too-few-public-methods
     """
     Simple parser object to load configuration files into Dataclass objects.
     """
@@ -320,5 +322,6 @@ class ExperimentParser(): # pylint: disable=too-few-public-methods
         """
         with open(self.__config_path, 'r') as config_file:
             config_dict = json.load(config_file)
-            job_list = [JobDescription.from_dict(job_description) for job_description in config_dict] # pylint: disable=no-member
+            job_list = [JobDescription.from_dict(job_description) for job_description in
+                        config_dict]  # pylint: disable=no-member
         return job_list

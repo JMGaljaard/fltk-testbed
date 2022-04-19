@@ -11,7 +11,7 @@ from typing import Dict, List, Union, OrderedDict, Optional
 
 import numpy as np
 
-from fltk.util.definitions import Nets
+from fltk.util.config.definitions.net import Nets
 from fltk.datasets.dataset import Dataset
 from fltk.util.singleton import Singleton
 from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser, JobClassParameter, \
@@ -28,21 +28,18 @@ class ArrivalGenerator(metaclass=Singleton): # pylint: disable=too-many-instance
     job_dict: OrderedDict[str, JobDescription] = None
     logger: logging.Logger = None
     arrivals: "Queue[Arrival]" = Queue()
-    __default_config: Path = Path('configs/tasks/example_arrival_config.json')
 
     start_time: float = -1
     stop_time: float = -1
     alive: bool = False
 
-    def load_config(self, alternative_path: Path = None):
+    def load_config(self):
         """
         Load configuration from default path, if alternative path is not provided.
-        @param alternative_path: Optional non-default location to load the configuration from.
-        @type alternative_path: Path
         @return: None
         @rtype: None
         """
-        parser = ExperimentParser(config_path=alternative_path or self.__default_config)
+        parser = ExperimentParser(config_path=self.configuration_path)
         experiment_descriptions = parser.parse()
         self.job_dict = collections.OrderedDict(
                 {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions)})
@@ -210,7 +207,7 @@ class FederatedArrivalGenerator(ArrivalGenerator):
     configuration maps). Distributed Learning Generator will be matched new execution later.
     """
 
-    def __init__(self, custom_config: Path = None):
+    def __init__(self, custom_config: Path):
         super(FederatedArrivalGenerator, self).__init__(custom_config)
         self.load_config()
 

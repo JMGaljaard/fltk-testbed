@@ -5,7 +5,7 @@ from .q_sampler import Probability_q_Sampler
 from .dirichlet import DirichletSampler
 from .limit_labels import LimitLabelsSampler
 from .limit_labels_flex import LimitLabelsSamplerFlex
-from ..util.definitions import DataSampler
+from ..util.config.definitions import DataSampler
 from ..util.log import getLogger
 
 

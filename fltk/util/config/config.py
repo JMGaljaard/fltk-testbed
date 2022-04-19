@@ -1,6 +1,7 @@
 # pylint: disable=missing-function-docstring,invalid-name
 from dataclasses import dataclass
 from enum import Enum, EnumMeta
+from logging import getLogger
 from pathlib import Path
 from typing import Type
 
@@ -8,8 +9,12 @@ import torch
 import yaml
 from torch.nn.modules.loss import _Loss
 
-from fltk.util.definitions import Dataset, Nets, DataSampler, Optimizations, LogLevel, Aggregations
-from fltk.util.log import getLogger
+from fltk.util.config.definitions import DataSampler
+from fltk.util.config.definitions.net import Nets
+from fltk.util.config.definitions.aggregate import Aggregations
+from fltk.util.config.definitions.logging import LogLevel
+from fltk.util.config.definitions.dataset import Dataset
+from fltk.util.config.definitions.optim import Optimizations
 
 
 @dataclass

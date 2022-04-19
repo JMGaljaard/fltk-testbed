@@ -29,7 +29,7 @@ class DistClient(DistNode):
         @param task_id: String id representing the UID of the training task
         @type task_id: str
         @param config: Parsed configuration file representation to extract runtime information from.
-        @type config: BareConfig
+        @type config: DistributedConfig
         @param learning_params: Hyper-parameter configuration to be used during the training process by the learner.
         @type learning_params: LearningParameters
         """

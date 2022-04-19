@@ -3,6 +3,8 @@ import os
 import numpy as np
 import torch
 
+from fltk.util.config.distributed_config import ExecutionConfig
+
 
 def cuda_reproducible_backend(cuda: bool) -> None:
     """
@@ -21,25 +23,20 @@ def cuda_reproducible_backend(cuda: bool) -> None:
         torch.backends.cudnn.deterministic = False
 
 
-def init_reproducibility(torch_seed: int = 42, cuda: bool = False, numpy_seed: int = 43, hash_seed: int = 44) -> None:
+def init_reproducibility(config: ExecutionConfig) -> None:
     """
     Function to pre-set all seeds for libraries used during training. Allows for re-producible network initialization,
     and non-deterministic number generation. Allows to prevent 'lucky' draws in network initialization.
-    @param torch_seed: Integer seed to use for the PyTorch PRNG and CUDA PRNG.
-    @type torch_seed: int
-    @param cuda: Flag to indicate whether the CUDA backend needs to be
-    @type cuda: bool
-    @param numpy_seed: Integer seed to use for NumPy's PRNG.
-    @type numpy_seed: int
-    @param hash_seed: Integer seed to use for Pythons Hash function PRNG, will set the
-    @type hash_seed: int
-
+    @param config: Execution configuration for the experiments to be run on the remote cluster.
+    @type config: ExecutionConfig
     @return: None
     @rtype: None
     """
+    random_seed = config.reproducibility.arrival_seed
+    torch_seed = config.reproducibility.torch_seed
     torch.manual_seed(torch_seed)
-    if cuda:
+    if config.cuda:
         torch.cuda.manual_seed_all(torch_seed)
         cuda_reproducible_backend(True)
-    np.random.seed(numpy_seed)
-    os.environ['PYTHONHASHSEED'] = str(hash_seed)
+    np.random.seed(random_seed)
+    os.environ['PYTHONHASHSEED'] = str(random_seed)

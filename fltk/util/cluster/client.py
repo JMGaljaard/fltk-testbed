@@ -437,7 +437,7 @@ def construct_job(conf: DistributedConfig, task: DistributedArrivalTask,
                   config_name_dict: Optional[Dict[str, str]] = None) -> V1PyTorchJob:
     """
     Function to build a Job, based on the specifications of an ArrivalTask, and the general configuration of the
-    BareConfig.
+    DistributedConfig.
     @param conf: configuration object that contains specifics to properly start a client.
     @type conf: DistributedConfig
     @param task: Learning task for which a job description must be made.

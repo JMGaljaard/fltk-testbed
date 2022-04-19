@@ -1,5 +1,5 @@
 from fltk.datasets.distributed import DistMNISTDataset, DistFashionMNISTDataset, DistCIFAR100Dataset, DistCIFAR10Dataset
-from fltk.util.definitions import Dataset
+from fltk.util.config.definitions.dataset import Dataset
 
 
 def available_datasets():

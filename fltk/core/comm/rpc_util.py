@@ -24,7 +24,14 @@ def _remote_method_async_by_info(method, worker_info, *args, **kwargs):
     args = [method, worker_info] + list(args)
     return rpc.rpc_async(worker_info, _call_method, args=args, kwargs=kwargs)
 
+
 def _remote_method_direct(method, other_node: str, *args, **kwargs):
+    """
+    Utility function for RPC communication between nodes.
+    :param method: A callable
+    :param other_node: reference to other node
+    :return: any
+    """
+
     args = [method, other_node] + list(args)
-    # return rpc.rpc_sync(other_node, _call_method, args=args, kwargs=kwargs)
     return rpc.rpc_sync(other_node, method, args=args, kwargs=kwargs)

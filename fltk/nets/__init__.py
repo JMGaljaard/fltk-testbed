@@ -2,7 +2,7 @@ from typing import Type, Dict
 
 import torch
 
-from fltk.util.definitions import Nets
+from ..util.config.definitions.net import Nets
 from .cifar_100_resnet import Cifar100ResNet
 from .cifar_100_vgg import Cifar100VGG, vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn
 from .cifar_10_cnn import Cifar10CNN
