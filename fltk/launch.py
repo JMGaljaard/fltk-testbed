@@ -291,7 +291,7 @@ def launch_cluster(arg_path, conf_path, args: Namespace = None, config: Distribu
     Function to launch Orchestrator for execution with provided configurations. Currently, this assumes that a single
     Orchestrator is started that manages all the training jobs withing the K8s cluster.
     """
-    logging.info("Starting in cluster mode.")
+    logging.info(f"Starting in cluster mode{' (locally)' if args.local else ''}.")
     logging.basicConfig(level=logging.DEBUG,
                         datefmt='%m-%d %H:%M')
     # Set the seed for arrivals, torch seed is mostly ignored. Set the `arrival_seed` to a different value
