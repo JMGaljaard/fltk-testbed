@@ -15,8 +15,8 @@ spec:
         - fltk
       args:
         - cluster
-        - {{ .Values.orchestrator.runtime.configurationFile }}
-        - {{ .Values.orchestrator.runtime.experimentFile }}
+        - {{ .Values.fltk.configDir }}/{{ .Values.orchestrator.runtime.configurationFile }}  # The configuration file (generator settings & logging)
+        - {{ .Values.fltk.configDir }}/{{ .Values.orchestrator.runtime.experimentFile }}     # The experiment file (arrivals)
       env:
         - name: PYTHONUNBUFFERED
           value: "1"
@@ -29,16 +29,21 @@ spec:
           cpu: {{ (.Values.orchestrator.cpu | int) }}
           memory: {{ (.Values.orchestrator.memory | int) }}
       volumeMounts:
-        - mountPath: /opt/federation-lab/output
-          name: fl-server-claim
+        - name: fl-server-log-volume
+          mountPath: {{ .Values.fltk.workDir }}/output
           readOnly: true
-        - mountPath: /opt/federation-lab/config
-          name: fltk-orchestrator-config
+        - name: fltk-orchestrator-config-volume
+          mountPath: {{ .Values.fltk.workDir }}/{{ .Values.fltk.configDir }}
+          readOnly: true
   restartPolicy: Never
   volumes:
-    - name: fl-server-claim
+    - name: fl-server-log-volume
       persistentVolumeClaim:
         claimName: fl-server-claim
-    - name: fltk-orchestrator-config
-      configMap:
-        name: fltk-orchestrator-config
+    - name: fltk-orchestrator-config-volume
+      projected:
+        sources:
+        - configMap:
+            name: fltk-orchestrator-config
+        - configMap:
+            name: fltk-experiment-config

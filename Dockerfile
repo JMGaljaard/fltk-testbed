@@ -18,13 +18,16 @@ RUN apt-get update \
 # Setup pip3.9
 RUN apt install -y curl python3.9-distutils
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-RUN python3.9 get-pip.py
+RUN python3 get-pip.py
 # Add Pre-downloaded models (otherwise needs be run every-time)
 ADD data/ data/
 
 # Use cache for pip, otherwise we repeatedly pull from repository
-COPY requirements-cpu.txt ./requirements.txt
-RUN --mount=type=cache,target=/root/.cache/pip,mode=0777 python3.9 -m pip install -r requirements.txt
+
+# Make type of docker image comatible
+ARG req_type
+COPY requirements-${REQUIREMENT_TYPE:-cpu}.txt ./requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip,mode=0777 python3 -m pip install -r requirements.txt
 
 # Add FLTK and configurations
 ADD fltk fltk

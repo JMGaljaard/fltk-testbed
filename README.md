@@ -417,9 +417,14 @@ should. You may also skip this step and work on your code, but it might be good 
 before running into trouble later.
 
 ```bash
-cd charts
-helm install flearner ./orchestrator --namespace test -f fltk-values.yaml --set-file orchestrator.configuration=./configs/quantities/kubernetes.conf
+helm install flearner charts/orchestrator --namespace test -f charts/fltk-values.yaml\
+  --set-file orchestrator.experiment=./configs/federated_tasks/example_arrival_config.json,\
+  orchestrator.configuration=./configs/example_cloud_experiment.json
 ```
+
+To debug the deployment append with the `--debug` flag, note that you may need to uninstall a prior deployment.
+Alternatively, you can use the `upgrade` argument, however, currently the orchestrator does not support updated
+releases. Pull requests are welcome for adding this functionality.
 
 **N.B.** Passing the `--set-file` flag is optional, but will take by default the 
 `benchmarking/example_cloud_experiment.json` file. This follows the symlink in `charts/orchestrator/configs/`, 
