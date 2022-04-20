@@ -3,6 +3,8 @@ from dataclasses import field, dataclass
 from typing import OrderedDict, List, Optional
 from uuid import UUID
 
+from fltk.datasets.dataset import Dataset
+from fltk.util.config.definitions import Nets
 from fltk.util.task.config import SystemParameters, HyperParameters
 from fltk.util.task.config.parameter import SystemResources, LearningParameters, \
     OptimizerConfig, SamplerConfiguration
@@ -14,8 +16,10 @@ class ArrivalTask(abc.ABC):
     DataClass representation of an ArrivalTask, representing all the information needed to spawn a new learning task.
     """
     id: UUID = field(compare=False) # pylint: disable=invalid-name
-    network: str = field(compare=False)
-    dataset: str = field(compare=False)
+    network: Nets = field(compare=False)
+    dataset: Dataset = field(compare=False)
+    seed: int = field(compare=False)
+    replication: int = field(compare=False)
 
     @abc.abstractmethod
     def named_system_params(self, *args, **kwargs) -> OrderedDict[str, SystemResources]:
@@ -77,7 +81,7 @@ class DistributedArrivalTask(ArrivalTask):
         return parallelism_dict[replica_type]
 
 
-@dataclass
+@dataclass(order=True)
 class FederatedArrivalTask(ArrivalTask):
     """
     Task describing configuration objects for running FederatedLearning experiments on K8s.
@@ -87,6 +91,7 @@ class FederatedArrivalTask(ArrivalTask):
     hyper_parameters: HyperParameters
     system_parameters: SystemParameters
     learning_parameters: LearningParameters
+    priority: int = 1
 
     def named_system_params(self) -> OrderedDict[str, SystemResources]:
         """

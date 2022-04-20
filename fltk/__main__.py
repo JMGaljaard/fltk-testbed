@@ -35,7 +35,8 @@ def _save_get(args, param) -> Optional[Any]:
 def _get_distributed_config(args) -> Optional[DistributedConfig]:
     config = None
     try:
-        with open(args.config, 'r', encoding='utf-8') as config_file:
+        with open(args.config, 'r') as config_file:
+            logging.info("Loading file {args.config}")
             config = DistributedConfig.from_dict(json.load(config_file)) # pylint: disable=no-member
             config.config_path = Path(args.config)
     except Exception as excep: # pylint: disable=broad-except

@@ -31,7 +31,7 @@ def _prepare_experiment_maps(task: FederatedArrivalTask, u_id, replication: int 
         meta = V1ObjectMeta(name=name,
                             labels={'app.kubernetes.io/name': f"fltk.node.config.{tpe}"})
         # TODO: Replication / seed information
-        filled_template = template.render(task=task, tpe=tpe, replication=replication, seed=42)
+        filled_template = template.render(task=task, tpe=tpe, replication=replication)
         type_dict[tpe] = V1ConfigMap(data={'node.config.yaml': filled_template}, metadata=meta)
         name_dict[tpe] = name
     return type_dict, name_dict
@@ -149,14 +149,16 @@ class Orchestrator(DistNode):
         while self._alive and time.time() - start_time < self._config.get_duration():
             # 1. Check arrivals
             # If new arrivals, store them in arrival list
-            # TODO: Make sure to account for repetitions
             while not self.__arrival_generator.arrivals.empty():
                 arrival: Arrival = self.__arrival_generator.arrivals.get()
                 unique_identifier: uuid.UUID = uuid.uuid4()
-                # TODO: Add replication
+                repl = arrival.task.replication
+                seed = arrival.task.experiment_configuration.random_seed[repl]
                 task = FederatedArrivalTask(id=unique_identifier,
                                             network=arrival.get_network(),
                                             dataset=arrival.get_dataset(),
+                                            seed=seed,
+                                            replication=repl,
                                             type_map=arrival.get_experiment_config().worker_replication,
                                             system_parameters=arrival.get_system_config(),
                                             hyper_parameters=arrival.get_parameter_config(),

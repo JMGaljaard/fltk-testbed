@@ -220,8 +220,10 @@ class FederatedArrivalGenerator(ArrivalGenerator):
 
         description: JobDescription
         for job_name, description in self.job_dict.items():
-            train_task = TrainTask(job_name, description.job_class_parameters, description.priority,
-                                   description.get_experiment_configuration())
+            for repl, seed in enumerate(description.job_class_parameters.experiment_configuration.random_seed):
+                replication_name = f"{job_name}_{repl}_{seed}"
+                train_task = TrainTask(replication_name, description.job_class_parameters, description.priority,
+                                       description.get_experiment_configuration(), replication=repl)
 
-            arrival = Arrival(None, train_task, job_name)
-            self.arrivals.put(arrival)
+                arrival = Arrival(None, train_task, job_name)
+                self.arrivals.put(arrival)

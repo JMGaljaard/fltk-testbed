@@ -8,7 +8,7 @@ shuffle: {{ task.get_sampler_param(tpe, 'shuffle') }}
 scheduler_step_size: {{ task.get_scheduler_param(tpe, 'scheduler_step_size') }}
 scheduler_gamma: {{ task.get_scheduler_param(tpe, 'scheduler_gamma') }}
 min_lr: {{ task.get_scheduler_param(tpe, 'min_lr') }}
-rng_seed: {{ seed }}
+rng_seed: {{ task.get_net_param('seed') }}
 optimizer: {{ task.get_optimizer_param(tpe, 'type').value }}
 optimizer_args: {{ task.get_optimizer_args(tpe) }}
 distributed: true
@@ -18,6 +18,6 @@ dataset_name: {{ task.get_net_param('dataset').value }}
 net_name: {{ task.get_net_param('network').value }}
 data_sampler: {{ task.get_sampler_param(tpe, 'type').value }}
 data_sampler_args: {{ task.get_sampler_args(tpe) }}
-replication_id: {{ replication }}
+replication_id: {{ task.get_net_param('replication')  }}
 real_time: true
 save_data_append: true

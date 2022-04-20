@@ -284,9 +284,10 @@ class TrainTask:
     hyper_parameters: HyperParameters = field(compare=False)
     learning_parameters: LearningParameters = field(compare=False)
     identifier: str = field(compare=False)
+    replication: Optional[int] = 0
 
     def __init__(self, identity: str, job_parameters: JobClassParameter, priority: Priority = None,
-                 experiment_config: ExperimentConfiguration = None):
+                 experiment_config: ExperimentConfiguration = None, replication = None):
         """
         Overridden init method for dataclass, to allow for 'exploding' a JobDescription object to a flattened object.
         @param job_parameters:
@@ -304,7 +305,7 @@ class TrainTask:
             self.priority = priority.priority
         self.experiment_configuration = experiment_config
         self.learning_parameters = job_parameters.learning_parameters
-
+        self.replication = replication
 
 class ExperimentParser():  # pylint: disable=too-few-public-methods
     """
