@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fltk-orchestrator-config
+data:
+  configuration.fltk.json: |-
+{{ if .Values.orchestrator.configuration }}
+{{ .Values.orchestrator.configuration | indent 4 }}
+{{ else if .Values.orchestrator.provided.configurationFile }}
+{{ .Files.Get .Values.orchestrator.provided.configurationFile | indent 4 }}
+{{ end }}

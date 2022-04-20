@@ -4,9 +4,6 @@ from pathlib import Path
 
 from dataclasses_json import config, dataclass_json
 
-from fltk.nets.util.reproducability import init_reproducibility
-
-
 @dataclass_json
 @dataclass
 class GeneralNetConfig:
@@ -114,23 +111,15 @@ class ClusterConfig:
 
 @dataclass_json
 @dataclass
-class BareConfig(object):
+class DistributedConfig():
+    """
+    Configuration Dataclass for shared configurations between experiments. This regards your general setup, describing
+    elements like the utilization of CUDA accelerators, format of logging file names, whether to save experiment data
+    and the likes.
+    """
     execution_config: ExecutionConfig
     cluster_config: ClusterConfig = field(metadata=config(field_name="cluster"))
     config_path: Path = None
-
-    def set_seed(self) -> None:
-        """
-        Set seeds for better reproducibility, and prevent testing random initialization of the model,
-        i.e. 'lucky draws' in network initialization.
-        @return: None
-        @rtype: None
-        """
-        init_reproducibility(
-                torch_seed=self.execution_config.reproducibility.torch_seed,
-                cuda=self.execution_config.cuda,
-                numpy_seed=self.execution_config.reproducibility.arrival_seed
-        )
 
     def get_duration(self) -> int:
         """

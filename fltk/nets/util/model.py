@@ -6,7 +6,7 @@ from typing import Union
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from fltk.util.config.base_config import BareConfig
+from fltk.util.config import DistributedConfig
 from fltk.util.results import EpochData
 
 
@@ -21,9 +21,9 @@ def flatten_params(model_description: Union[torch.nn.Module, OrderedDict]):
         parameters = model_description.parameters()
     else:
         parameters = model_description.values()
-    l = [torch.flatten(p) for p in parameters]
-    flat = torch.cat(l).view(-1, 1)
-    return flat
+    parameter_list = [torch.flatten(p) for p in parameters] # pylint: disable=no-member
+    flat_params = torch.cat(parameter_list).view(-1, 1) # pylint: disable=no-member
+    return flat_params
 
 
 def recover_flattened(flat_params, model):
@@ -35,29 +35,29 @@ def recover_flattened(flat_params, model):
     :return: the params, reshaped to the ones in the model, with the same order as those in the model
     """
     indices = []
-    s = 0
-    for p in model.parameters():
-        size = p.shape[0]
-        indices.append((s, s + size))
-        s += size
-    l = [flat_params[s:e] for (s, e) in indices]
-    for i, p in enumerate(model.parameters()):
-        l[i] = l[i].view(*p.shape)
-    return l
+    acc_size = 0
+    for param in model.parameters():
+        size = param.shape[0]
+        indices.append((acc_size, acc_size + size))
+        acc_size += size
+    recovered_params = [flat_params[acc_size:e] for (acc_size, e) in indices]
+    for indx, param in enumerate(model.parameters()):
+        recovered_params[indx] = recovered_params[indx].view(*param.shape)
+    return recovered_params
 
 
-def initialize_default_model(config: BareConfig, model_class) -> torch.nn.Module:
+def initialize_default_model(conf: DistributedConfig, model_class) -> torch.nn.Module:
     """
     Load a default model dictionary into a torch model.
     @param model:
     @type model:
-    @param config:
-    @type config:
+    @param conf:
+    @type conf:
     @return:
     @rtype:
     """
     model = model_class()
-    default_model_path = f"{config.get_default_model_folder_path()}/{model_class.__name__}.model"
+    default_model_path = f"{conf.get_default_model_folder_path()}/{model_class.__name__}.model"
     model.load_state_dict(torch.load(default_model_path))
     return model
 
@@ -79,10 +79,10 @@ def load_model_from_file(model: torch.nn.Module, model_file_path: Path) -> None:
     if model_file_path.is_file():
         try:
             model.load_state_dict(torch.load(model_file_path))
-        except Exception as e:
+        except Exception: # pylint: disable=broad-except
             logging.warning("Couldn't load model. Attempting to map CUDA tensors to CPU to solve error.")
     else:
-        logging.warning("Could not find model: {}".format(model_file_path))
+        logging.warning(f'Could not find model: {model_file_path}')
         raise FileExistsError(f"Cannot load model file {model_file_path} into {model}...")
 
 

@@ -14,9 +14,9 @@ class Convert:
 
     def __init__(self, path: Path = None):
         if path:
-            self.__Registry = UnitRegistry(filename=str(path))
+            self.__Registry = UnitRegistry(filename=str(path)) # pylint: disable=invalid-name
         else:
-            self.__Registry = UnitRegistry(filename=str(self.CONVERSION_PATH))
+            self.__Registry = UnitRegistry(filename=str(self.CONVERSION_PATH)) # pylint: disable=invalid-name
 
     def __call__(self, value: Union[str, int]) -> int:
         """

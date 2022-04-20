@@ -24,6 +24,8 @@ Currently, it is assumed that Distributed Learning is performed (and *not* Feder
 extension of the project is planned to implement a `FederatedClient` that allows for a more realistic simulation of 
 *Federated* Learning experiments.
 
+### (Distributed Learning)
+
 **General protocol:**
 
 1. Client creation and spawning by the Orchestrator (using KubeFlows Pytorch-Operator)
@@ -38,7 +40,29 @@ extension of the project is planned to implement a `FederatedClient` that allows
 * Data between clients (`WORLD_SIZE > 1`) is not shared
 * Hardware can heterogeneous
 * The location of devices matters (network latency and bandwidth)
+* Communication is performed through RPC, aggregation is performed with `AllReduce`.
+
+### Federated Learning
+**General protocol:**
+
+1. Client selection by the Federator.
+2. The selected clients download the model.
+3. Local training on the clients for X number of epochs
+4. Weights/gradients of the trained model are send to the Federator
+5. Federator aggregates the weights/gradients to create a new and improved model
+6. Updated model is shared to the clients
+7. Repeat step 1 to 6 until convergence/stopping condition.
+
+**Important notes:**
+
+* Data between clients is not shared to each other
+* The data is non-IID
+* Hardware can heterogeneous
+* The location of devices matters (network latency and bandwidth)
 * Communication can be costly
+
+
+
 
 ### Overview of deployed project
 When deploying the system, the following diagram shows how the system operates. `PyTorchJob`s are launched by the 
@@ -76,6 +100,23 @@ project
 │       └── task                       * Arrival/TrainTask generation
 └── logging                      # Default logging location
 ```
+
+## Execution modes
+Federatd Learning experiments can be set up in various ways (Simulation, Emulation, or fully distributed). Not all have the same requirements and thus some setup are more suited then others depending on the experiment.
+
+### Simulation
+With the method as single machine is used to execute all the different nodes in the system.
+The execution is done in a sequential manner, i.e. first node 1 is executed, then node 2, and so on. One of the upsides of this option is the ability to use GPU acceleration for the computations.
+
+### Docker-Compose (Emulation)
+With systems like docker we can emulate a federated learning system on a single machine. Each node is allocated to one or more CPU cores and executed in an isolated container. This allows for real-time experiments where timing is important and where the execution of clients have effect on eachother. Docker also allows for containers to be limited by CPU speed, RAM, and network properties.
+
+### Real distributed (Google Cloud)
+In this case, the code is deployed natively on a machine, for example a cluster. 
+The is the closest real-world approximation when experimenting with Federated Learning systems. This allows for real-time experiments where timing is important and where the execution of clients have effect on eachother. A downside of this method is the shear number of machines needed to run an experiment. Additionally the compute speed and other hardware spcifications are more difficult to limit.
+
+### Hybrid
+The Docker (Compose) and real-distributed method can be mixed in a hybrid system. For example two servers can run a set of docker containers that are linked to each other. Similarly, a set of docker images on a server can participate in a system with real distributed machines. 
 
 ## Models
 
@@ -376,12 +417,21 @@ should. You may also skip this step and work on your code, but it might be good 
 before running into trouble later.
 
 ```bash
-cd charts
-helm install flearner ./orchestrator --namespace test -f fltk-values.yaml
+helm install flearner charts/orchestrator --namespace test -f charts/fltk-values.yaml\
+  --set-file orchestrator.experiment=./configs/federated_tasks/example_arrival_config.json,\
+  orchestrator.configuration=./configs/example_cloud_experiment.json
 ```
 
+To debug the deployment append with the `--debug` flag, note that you may need to uninstall a prior deployment.
+Alternatively, you can use the `upgrade` argument, however, currently the orchestrator does not support updated
+releases. Pull requests are welcome for adding this functionality.
+
+**N.B.** Passing the `--set-file` flag is optional, but will take by default the 
+`benchmarking/example_cloud_experiment.json` file. This follows the symlink in `charts/orchestrator/configs/`, 
+as Helm does not allow for accessing files outside a charts directory.
+
 This will spawn an `fl-server` Pod in the `test` Namespace, which will spawn Pods (using `V1PyTorchJobs`), that
-run experiments. It will currently make use of the [`configs/example_cloud_experiment.json`](./configs/example_cloud_experiment.json)
+run experiments. It will currently make use of the [`configs/example_cloud_experiment.json`](configs/benchmarking/example_cloud_experiment.json)
 default configuration. As described in the [values](./charts/orchestrator/values.yaml) file of the `Orchestrator`s Helm chart
 
 

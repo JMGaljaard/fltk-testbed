@@ -1,35 +1,36 @@
-import torch.nn as nn
+# pylint: disable=missing-class-docstring,invalid-name
+import torch
 import torch.nn.functional as F
 
-class Cifar10CNN(nn.Module):
+class Cifar10CNN(torch.nn.Module):
 
     def __init__(self):
         super(Cifar10CNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.pool1 = nn.MaxPool2d(kernel_size=2)
+        self.conv1 = torch.nn.Conv2d(3, 32, kernel_size=3, padding=1)
+        self.bn1 = torch.nn.BatchNorm2d(32)
+        self.conv2 = torch.nn.Conv2d(32, 32, kernel_size=3, padding=1)
+        self.bn2 = torch.nn.BatchNorm2d(32)
+        self.pool1 = torch.nn.MaxPool2d(kernel_size=2)
 
-        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm2d(64)
-        self.conv4 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
-        self.bn4 = nn.BatchNorm2d(64)
-        self.pool2 = nn.MaxPool2d(kernel_size=2)
+        self.conv3 = torch.nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.bn3 = torch.nn.BatchNorm2d(64)
+        self.conv4 = torch.nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.bn4 = torch.nn.BatchNorm2d(64)
+        self.pool2 = torch.nn.MaxPool2d(kernel_size=2)
 
-        self.conv5 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.bn5 = nn.BatchNorm2d(128)
-        self.conv6 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
-        self.bn6 = nn.BatchNorm2d(128)
-        self.pool3 = nn.MaxPool2d(kernel_size=2)
+        self.conv5 = torch.nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn5 = torch.nn.BatchNorm2d(128)
+        self.conv6 = torch.nn.Conv2d(128, 128, kernel_size=3, padding=1)
+        self.bn6 = torch.nn.BatchNorm2d(128)
+        self.pool3 = torch.nn.MaxPool2d(kernel_size=2)
 
-        self.fc1 = nn.Linear(128 * 4 * 4, 128)
+        self.fc1 = torch.nn.Linear(128 * 4 * 4, 128)
 
-        self.softmax = nn.Softmax()
-        self.fc2 = nn.Linear(128, 10)
+        self.softmax = torch.nn.Softmax()
+        self.fc2 = torch.nn.Linear(128, 10)
 
-    def forward(self, x):
+    def forward(self, x): # pylint: disable=missing-function-docstring
         x = self.bn1(F.relu(self.conv1(x)))
         x = self.bn2(F.relu(self.conv2(x)))
         x = self.pool1(x)

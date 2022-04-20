@@ -1,3 +1,8 @@
+*.csv
+*.json
+*.png
+*.pdf
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -133,6 +138,13 @@ venv-*
 data/**
 !data/.gitkeep
 output
+docker_data
 .idea
+*.tmp.txt
+docker-compose.yml
 
-logging/**/events.out.**
+refactor-notes.md
+experiments/**/exps/*
+*.test.py
+
+logging/*

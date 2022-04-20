@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fltk-experiment-config
+data:
+  experiment.fltk.json: |-
+{{ if .Values.orchestrator.experiment }}
+{{ .Values.orchestrator.experiment | indent 4 }}
+{{ else if .Values.orchestrator.provided.experimentFile }}
+{{ .Files.Get .Values.orchestrator.provided.experimentFile | indent 4 }}
+{{ end }}
