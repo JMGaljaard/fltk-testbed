@@ -73,7 +73,7 @@ class Config:
     # Save data in append mode. Thereby flushing on every append to file.
     # This could be useful when a system is likely to crash midway an experiment
     save_data_append: bool = False
-    output_path: Path = Path('output_test_2')
+    output_path: Path = Path('logging')
 
     def __init__(self, **kwargs) -> None:
         enum_fields = [x for x in self.__dataclass_fields__.items() if isinstance(x[1].type, Enum) or isinstance(x[1].type, EnumMeta)]
@@ -89,7 +89,6 @@ class Config:
             if name == 'output_location':
                 self.output_path = Path(value)
         self.update_rng_seed()
-
 
     def update_rng_seed(self):
         torch.manual_seed(self.rng_seed)

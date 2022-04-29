@@ -21,7 +21,25 @@ EXPERIMENT_DIR = 'experiments'
 __ENV = Environment(loader=FileSystemLoader(EXPERIMENT_DIR))
 
 
-def _prepare_experiment_maps(task: FederatedArrivalTask, u_id, replication: int = 1) -> \
+def _generate_experiment_path_name(task: ArrivalTask, u_id: str, config: DistributedConfig):
+    """
+    Helper function to generate experiment name for logging without conflicts
+    @param task: Arrival task for Task realted information.
+    @type task: ArrivalTask
+    @param u_id: Unique identifier string corresponding to the experiment.
+    @type u_id: str
+    @param config: Distributed configuration for logging directory configuration.
+    @type config: DistributedConfig
+    @return: String representation of the logging path for a specific experiment.
+    @rtype: str
+    """
+    log_dir = config.execution_config.log_path
+    experiment_name = f"{task.dataset}_{task.network}_{u_id}_{task.replication}"
+    full_path = f"{log_dir}/{experiment_name}"
+    return full_path
+
+
+def _prepare_experiment_maps(task: FederatedArrivalTask, config: DistributedConfig, u_id: str, replication: int = 1) -> \
         (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
     template = __ENV.get_template('node.jinja.yaml')
     type_dict = collections.OrderedDict()
@@ -30,8 +48,8 @@ def _prepare_experiment_maps(task: FederatedArrivalTask, u_id, replication: int 
         name = str(f'{tpe}-{u_id}-{replication}').lower()
         meta = V1ObjectMeta(name=name,
                             labels={'app.kubernetes.io/name': f"fltk.node.config.{tpe}"})
-        # TODO: Replication / seed information
-        filled_template = template.render(task=task, tpe=tpe, replication=replication)
+        exp_path = _generate_experiment_path_name(task, u_id, config)
+        filled_template = template.render(task=task, tpe=tpe, replication=replication, experiment_path=exp_path)
         type_dict[tpe] = V1ConfigMap(data={'node.config.yaml': filled_template}, metadata=meta)
         name_dict[tpe] = name
     return type_dict, name_dict
@@ -171,7 +189,7 @@ class Orchestrator(DistNode):
                 # Do blocking request to priority queue
                 curr_task = self.pending_tasks.get()
                 self.__logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
-                config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task, curr_task.id, 1)
+                config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task, self._config, curr_task.id, 1)
                 job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
 
                 self.__create_config_maps(config_dict)
