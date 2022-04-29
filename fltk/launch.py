@@ -1,6 +1,8 @@
 # pylint: disable=unused-argument
 import logging
 import os
+from typing import Callable, Type, Optional, List, NewType
+
 import sys
 from argparse import Namespace
 from multiprocessing.pool import ThreadPool
@@ -21,6 +23,14 @@ from fltk.util.config import DistributedConfig, Config
 from fltk.util.config.arguments import LearningParameters, extract_learning_parameters
 from fltk.util.task.generator.arrival_generator import DistributedExperimentGenerator, FederatedArrivalGenerator
 
+# Define types for clarity in execution
+Rank = NewType('Rank', int)
+NIC = NewType('NIC', str)
+Host = NewType('Host', int)
+Prefix = NewType('Prefix', str)
+launch_signature = Callable[[Path, Path, Optional[Rank], Optional[NIC], Optional[Host], Optional[Prefix],
+                             Optional[Namespace], Optional[DistributedConfig]], None]
+
 
 def should_distribute() -> bool:
     """
@@ -35,9 +45,9 @@ def should_distribute() -> bool:
     return dist.is_available() and world_size > 1
 
 
-def launch_distributed_client(task_id: str, conf: DistributedConfig = None,
-                              learning_params: LearningParameters = None,
-                              namespace: Namespace = None):
+def exec_distributed_client(task_id: str, conf: DistributedConfig = None,
+                            learning_params: LearningParameters = None,
+                            namespace: Namespace = None):
     """
     @param task_id: String representation (should be unique) corresponding to a client.
     @type task_id: str
@@ -65,7 +75,7 @@ def launch_distributed_client(task_id: str, conf: DistributedConfig = None,
     print(epoch_data)
 
 
-def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None, simulate_arrivals=False):
+def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, simulate_arrivals: bool = False):
     """
     Default runner for the Orchestrator that is based on KubeFlow
     @param args: Commandline arguments passed to the execution. Might be removed in a future commit.
@@ -87,7 +97,8 @@ def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None, 
         logging.info("Pointing configuration to in cluster configuration.")
         conf.cluster_config.load_incluster_namespace()
         conf.cluster_config.load_incluster_image()
-    arrival_generator = (DistributedExperimentGenerator if simulate_arrivals else FederatedArrivalGenerator)(args.experiment)
+    arrival_generator = (DistributedExperimentGenerator if simulate_arrivals else FederatedArrivalGenerator)(
+            args.experiment)
     cluster_manager = ClusterManager()
 
     orchestrator = Orchestrator(cluster_manager, arrival_generator, conf)
@@ -108,64 +119,103 @@ def launch_orchestrator(args: Namespace = None, conf: DistributedConfig = None, 
     logging.info("Stopped execution of Orchestrator...")
 
 
-def launch_extractor(base_path: Path, config_path: Path, args: Namespace = None, conf: DistributedConfig = None,
-                     **kwargs):
+def launch_extractor(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC] = None,
+                     host: Optional[Host] = None,
+                     prefix: Optional[Prefix] = None, args: Optional[Namespace] = None,
+                     conf: Optional[DistributedConfig] = None):
     """
     Extractor launch function, will only download all models and quit execution.
-    @param args: Arguments passed from CLI.
+
+    @param arg_path: Base argument path for Local/Federated execution.
+    @type arg_path: Path
+    @param conf_path: Configuration file path for local/Federated execution.
+    @type conf_path: Path
+    @param rank: (Optional) rank of the worker/Node for the algorithm.
+    @type rank: Rank
+    @param nic: (Optional) Name of the Network Interface Card to use in Docker execution.
+    @type nic: NIC
+    @param host: (Optional) Name of the (Master) host name to use in Docker execution.
+    @type host: Host
+    @param prefix: (Optional) Experiment name prefix to use in Local execution.
+    @type prefix: Prefix
+    @param args: (Optional) Parsed argument from arg parse containing arguments passed to the program.
     @type args: Namespace
-    @param conf: Parsed configuration file passed from the CLI.
-    @type conf: Optional[DistributedConfig]
+    @param conf: (Optional) Distributed configuration object for running in a Kubernetes cluster.
+    @type conf: DistributedConfig
     @return: None
     @rtype: None
     """
     download_datasets(args, conf)
 
 
-def launch_client(arg_path, conf_path, args: Namespace = None, configuration: DistributedConfig = None, **kwargs):
+def launch_client(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC] = None, host: Optional[Host] = None,
+                  prefix: Optional[Prefix] = None, args: Optional[Namespace] = None,
+                  conf: Optional[DistributedConfig] = None):
     """
     Client launch function.
-    @param arg_path:
-    @type arg_path:
-    @param conf_path:
-    @type conf_path:
-    @param args:
-    @type args:
-    @param configuration:
-    @type configuration:
-    @param kwargs:
-    @type kwargs:
+
+    @param arg_path: Base argument path for Local/Federated execution.
+    @type arg_path: Path
+    @param conf_path: Configuration file path for local/Federated execution.
+    @type conf_path: Path
+    @param rank: (Optional) rank of the worker/Node for the algorithm.
+    @type rank: Rank
+    @param nic: (Optional) Name of the Network Interface Card to use in Docker execution.
+    @type nic: NIC
+    @param host: (Optional) Name of the (Master) host name to use in Docker execution.
+    @type host: Host
+    @param prefix: (Optional) Experiment name prefix to use in Local execution.
+    @type prefix: Prefix
+    @param args: (Optional) Parsed argument from arg parse containing arguments passed to the program.
+    @type args: Namespace
+    @param conf: (Optional) Distributed configuration object for running in a Kubernetes cluster.
+    @type conf: DistributedConfig
+    @return: None
+    @rtype: None
     """
     logging.info("Starting in client mode")
 
     learning_params = extract_learning_parameters(args)
     # Set the seed for PyTorch, numpy seed is mostly ignored. Set the `torch_seed` to a different value
     # for each repetition that you want to run an experiment with.
-    configuration.set_seed()
+    conf.set_seed()
     task_id = args.task_id
-    launch_distributed_client(task_id, conf=configuration, learning_params=learning_params, namespace=args)
+    exec_distributed_client(task_id, conf=conf, learning_params=learning_params, namespace=args)
     logging.info("Stopping client...")
 
 
-def launch_single(base_path: Path, config_path: Path, prefix: str = None, **kwargs):
+def launch_single(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC] = None, host: Optional[Host] = None,
+                  prefix: Optional[Prefix] = None, args: Optional[Namespace] = None,
+                  conf: Optional[DistributedConfig] = None):
     """
     Single runner launch function.
-    @param base_path:
-    @type base_path:
-    @param config_path:
-    @type config_path:
-    @param prefix:
-    @type prefix:
-    @param kwargs:
-    @type kwargs:
+
+    @param arg_path: Base argument path for Local/Federated execution.
+    @type arg_path: Path
+    @param conf_path: Configuration file path for local/Federated execution.
+    @type conf_path: Path
+    @param rank: (Optional) rank of the worker/Node for the algorithm.
+    @type rank: Rank
+    @param nic: (Optional) Name of the Network Interface Card to use in Docker execution.
+    @type nic: NIC
+    @param host: (Optional) Name of the (Master) host name to use in Docker execution.
+    @type host: Host
+    @param prefix: (Optional) Experiment name prefix to use in Local execution.
+    @type prefix: Prefix
+    @param args: (Optional) Parsed argument from arg parse containing arguments passed to the program.
+    @type args: Namespace
+    @param conf: (Optional) Distributed configuration object for running in a Kubernetes cluster.
+    @type conf: DistributedConfig
+    @return: None
+    @rtype: None
     """
     # We can iterate over all the experiments in the directory and execute it, as long as the system remains the same!
     # System = machines and its configuration
-    print(config_path)
-    conf = Config.FromYamlFile(config_path)
-    conf.world_size = conf.num_clients + 1
-    conf.replication_id = prefix
-    federator_node = Federator('federator', 0, conf.world_size, conf)
+    print(conf_path)
+    s_conf = Config.FromYamlFile(conf_path)
+    s_conf.world_size = conf.num_clients + 1
+    s_conf.replication_id = prefix
+    federator_node = Federator('federator', 0, conf.world_size, s_conf)
     federator_node.run()
 
 
@@ -210,47 +260,47 @@ def _retrieve_network_params_from_config(conf: Config, nic=None, host=None):
     return nic, host
 
 
-def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=None, host=None, prefix: str = None,
-                  **kwargs):
+def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC] = None, host: Optional[Host] = None,
+                  prefix: Optional[Prefix] = None, args: Optional[Namespace] = None,
+                  conf: Optional[DistributedConfig] = None):
     """
     Function to launch a remote experiment. When launched in K8s, configuration will be set by KubeFlow, meaning that
     many parameters will be None. When launched in docker, parameters are provided by the callee through passed argument
     flags.
-    @param base_path:
-    @type base_path:
-    @param config_path:
-    @type config_path:
-    @param rank:
-    @type rank:
-    @param parser:
-    @type parser:
-    @param nic:
-    @type nic:
-    @param host:
-    @type host:
-    @param prefix:
-    @type prefix:
-    @param kwargs:
-    @type kwargs:
-    @return:
-    @rtype:
+
+    @param arg_path: Base argument path for Local/Federated execution.
+    @type arg_path: Path
+    @param conf_path: Configuration file path for local/Federated execution.
+    @type conf_path: Path
+    @param rank: (Optional) rank of the worker/Node for the algorithm.
+    @type rank: Rank
+    @param nic: (Optional) Name of the Network Interface Card to use in Docker execution.
+    @type nic: NIC
+    @param host: (Optional) Name of the (Master) host name to use in Docker execution.
+    @type host: Host
+    @param prefix: (Optional) Experiment name prefix to use in Local execution.
+    @type prefix: Prefix
+    @param args: (Optional) Parsed argument from arg parse containing arguments passed to the program.
+    @type args: Namespace
+    @param conf: (Optional) Distributed configuration object for running in a Kubernetes cluster.
+    @type conf: DistributedConfig
+    @return: None
+    @rtype: None
     """
-    conf = Config.FromYamlFile(config_path)
-    conf.world_size = conf.num_clients + 1
-    conf.replication_id = prefix
+    r_conf = Config.FromYamlFile(conf_path)
+    r_conf.world_size = r_conf.num_clients + 1
+    r_conf.replication_id = prefix
     if rank and not (nic and host):
         print("Getting parameters from configuration file")
-        nic, host = _retrieve_network_params_from_config(conf, nic, host)
+        nic, host = _retrieve_network_params_from_config(r_conf, nic, host)
         _retrieve_or_init_env(nic, host)
     elif not rank:
         print("Retrieving environmental configurations!")
         rank, world_size, master_port = _retrieve_env_config()
         print(f"Retrieved: rank {rank} w_s {world_size} m_p {master_port}")
-        conf.world_size = world_size
+        r_conf.world_size = world_size
     else:
-        print('Missing rank, host, world-size, checking environment!')
-        parser.print_help()
-        sys.exit(1)
+        raise Exception('Missing rank, host, world-size, checking environment!')
 
     msg = f'Starting with host={host} and port={os.environ["MASTER_PORT"]} and interface={nic}'
     logging.log(logging.INFO, msg)
@@ -261,40 +311,61 @@ def launch_remote(base_path: Path, config_path: Path, rank: int, parser, nic=Non
             _transports=["uv"]  # Use LibUV backend for async/IO interaction
     )
     if rank != 0:
-        print(f'Starting worker-{rank} with world size={conf.world_size}')
+        print(f'Starting worker-{rank} with world size={r_conf.world_size}')
         rpc.init_rpc(
                 f"client{rank}",
                 rank=rank,
-                world_size=conf.world_size,
+                world_size=r_conf.world_size,
                 rpc_backend_options=options,
         )
-        client_node = Client(f'client{rank}', rank, conf.world_size, conf)
+        client_node = Client(f'client{rank}', rank, r_conf.world_size, r_conf)
         client_node.remote_registration()
     else:
-        print(f'Starting the PS (Fed) with world size={conf.world_size}')
+        print(f'Starting the PS (Fed) with world size={r_conf.world_size}')
         rpc.init_rpc(
                 "federator",
                 rank=rank,
-                world_size=conf.world_size,
+                world_size=r_conf.world_size,
                 rpc_backend_options=options
 
         )
-        federator_node = Federator('federator', 0, conf.world_size, conf)
+        federator_node = Federator('federator', 0, r_conf.world_size, r_conf)
         federator_node.run()
         federator_node.stop_all_clients()
     print('Ending program')
     exit(0)
 
 
-def launch_cluster(arg_path, conf_path, args: Namespace = None, config: DistributedConfig = None, **kwargs):
+def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC] = None, host: Optional[Host] = None,
+                   prefix: Optional[Prefix] = None, args: Optional[Namespace] = None,
+                   conf: Optional[DistributedConfig] = None) -> None:
     """
     Function to launch Orchestrator for execution with provided configurations. Currently, this assumes that a single
     Orchestrator is started that manages all the training jobs withing the K8s cluster.
+
+    @param arg_path: Base argument path for Local/Federated execution.
+    @type arg_path: Path
+    @param conf_path: Configuration file path for local/Federated execution.
+    @type conf_path: Path
+    @param rank: (Optional) rank of the worker/Node for the algorithm.
+    @type rank: Rank
+    @param nic: (Optional) Name of the Network Interface Card to use in Docker execution.
+    @type nic: NIC
+    @param host: (Optional) Name of the (Master) host name to use in Docker execution.
+    @type host: Host
+    @param prefix: (Optional) Experiment name prefix to use in Local execution.
+    @type prefix: Prefix
+    @param args: (Optional) Parsed argument from arg parse containing arguments passed to the program.
+    @type args: Namespace
+    @param conf: (Optional) Distributed configuration object for running in a Kubernetes cluster.
+    @type conf: DistributedConfig
+    @return: None
+    @rtype: None
     """
     logging.info(f"Starting in cluster mode{' (locally)' if args.local else ''}.")
     logging.basicConfig(level=logging.DEBUG,
                         datefmt='%m-%d %H:%M')
     # Set the seed for arrivals, torch seed is mostly ignored. Set the `arrival_seed` to a different value
     # for each repetition that you want to run an experiment with.
-    init_reproducibility(config.execution_config)
-    launch_orchestrator(args=args, conf=config)
+    init_reproducibility(conf.execution_config)
+    exec_orchestrator(args=args, conf=conf)

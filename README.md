@@ -377,12 +377,20 @@ This requires you to have enabled the GCR in your GCE project beforehand. Make s
 Docker Buildkit, or remove the `DOCKER_BUILDKIT=1` part from the command before running (this might require additional changes
 in the Dockerfile).
 
+**N.B.** When running for the first time, make sure to have downloaded the Datasets used in the repo.
+This can be done by executing the following command with an activated environment.
+
+```bash
+python3 -m fltk extractor configs/example_cloud_experiment.json
+```
+
+To build the container and push to your GCR repository, execute the following commands.
 ```bash
 DOCKER_BUILDKIT=1 docker build . --tag gcr.io/test-bed-distml/fltk
 docker push gcr.io/test-bed-distml/fltk
 ```
 
-**N.B.** when running in Minikube, you can also set up a local registry. An example of how this can be quickly achieved 
+**N.B.** when running in Minikube, you can also set up a local registry. An example of how this can be achieved 
 can be found [in this Medium post by Shashank Srivastava](https://shashanksrivastava.medium.com/how-to-set-up-minikube-to-use-your-local-docker-registry-10a5b564883).
 
 

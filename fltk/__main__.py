@@ -1,18 +1,18 @@
 import argparse
 import json
 import logging
-import sys
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, Dict
+
+import sys
 
 from fltk.launch import launch_extractor, launch_client, launch_single, \
-    launch_remote, launch_cluster
+    launch_remote, launch_cluster, launch_signature
 from fltk.util.config import DistributedConfig
 from fltk.util.config.arguments import create_all_subparsers
 from fltk.util.generate_experiments import generate, run
 
-
-__run_op_dict = {
+__run_op_dict: Dict[str, launch_signature] = {
     'util-generate': generate,
     'util-run': run,
     'remote': launch_remote,
@@ -37,9 +37,9 @@ def _get_distributed_config(args) -> Optional[DistributedConfig]:
     try:
         with open(args.config, 'r') as config_file:
             logging.info("Loading file {args.config}")
-            config = DistributedConfig.from_dict(json.load(config_file)) # pylint: disable=no-member
+            config = DistributedConfig.from_dict(json.load(config_file))  # pylint: disable=no-member
             config.config_path = Path(args.config)
-    except Exception as excep: # pylint: disable=broad-except
+    except Exception as excep:  # pylint: disable=broad-except
         msg = f"Failed to get distributed config: {excep}"
         logging.info(msg)
     return config
@@ -64,22 +64,26 @@ def __main__():
     arg_path, conf_path = None, None
     try:
         arg_path = Path(args.path)
-    except Exception as _: # pylint: disable=broad-except
+    except Exception as _:  # pylint: disable=broad-except
         print('No argument path is provided.')
     try:
         conf_path = Path(args.config)
-    except Exception as _: # pylint: disable=broad-except
+    except Exception as _:  # pylint: disable=broad-except
         print('No configuration path is provided.')
 
-    __run_op_dict[args.action](arg_path, conf_path,
-                               rank=_save_get(args, 'rank'),
-                               parser=parser,
-                               nic=_save_get(args, 'nic'),
-                               host=_save_get(args, 'host'),
-                               prefix=_save_get(args, 'prefix'),
-                               args=args,
-                               config=distributed_config)
-
+    try:
+        launch_fn: launch_signature = __run_op_dict[args.action]
+        launch_fn(arg_path, conf_path,
+                  _save_get(args, 'rank'),
+                  _save_get(args, 'nic'),
+                  _save_get(args, 'host'),
+                  _save_get(args, 'prefix'),
+                  args,
+                  distributed_config)
+    except Exception as e:
+        print(f"Failed with reason: {e}")
+        parser.print_help()
+        sys.exit(1)
     sys.exit(0)
 
 
