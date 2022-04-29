@@ -11,7 +11,7 @@ from fltk.util.config import Config
 
 class Client(Node):
     """
-    Federated experiment client s
+    Federated experiment client.
     """
     running = False
 
