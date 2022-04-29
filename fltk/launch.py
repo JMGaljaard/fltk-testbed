@@ -1,9 +1,8 @@
 # pylint: disable=unused-argument
 import logging
 import os
-from typing import Callable, Type, Optional, List, NewType
+from typing import Callable, Optional, NewType
 
-import sys
 from argparse import Namespace
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
@@ -19,8 +18,10 @@ from fltk.core.distributed.extractor import download_datasets
 from fltk.core.federator import Federator
 from fltk.nets.util.reproducability import init_reproducibility
 from fltk.util.cluster.client import ClusterManager
-from fltk.util.config import DistributedConfig, Config
+from fltk.util.cluster.worker import should_distribute
+from fltk.util.config import DistributedConfig, Config, retrieve_config_network_params
 from fltk.util.config.arguments import LearningParameters, extract_learning_parameters
+from fltk.util.env import retrieve_or_init_env, retrieve_env_config
 from fltk.util.task.generator.arrival_generator import DistributedExperimentGenerator, FederatedArrivalGenerator
 
 # Define types for clarity in execution
@@ -32,23 +33,12 @@ launch_signature = Callable[[Path, Path, Optional[Rank], Optional[NIC], Optional
                              Optional[Namespace], Optional[DistributedConfig]], None]
 
 
-def should_distribute() -> bool:
-    """
-    Function to check whether distributed execution is needed.
-
-    Note: the WORLD_SIZE environmental variable needs to be set for this to work (larger than 1).
-    PytorchJobs launched from KubeFlow automatically set this property.
-    @return: Indicator for distributed execution.
-    @rtype: bool
-    """
-    world_size = int(os.environ.get('WORLD_SIZE', 1))
-    return dist.is_available() and world_size > 1
-
-
 def exec_distributed_client(task_id: str, conf: DistributedConfig = None,
                             learning_params: LearningParameters = None,
                             namespace: Namespace = None):
     """
+    Helper function to start the execution of the distributed client training loop.
+
     @param task_id: String representation (should be unique) corresponding to a client.
     @type task_id: str
     @param conf: Configuration for components, needed for spinning up components of the Orchestrator.
@@ -219,47 +209,6 @@ def launch_single(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
     federator_node.run()
 
 
-def _retrieve_or_init_env(nic=None, host=None):
-    """
-    Function
-    @param nic:
-    @type nic:
-    @param host:
-    @type host:
-    @return:
-    @rtype:
-    """
-    if host:
-        os.environ['MASTER_ADDR'] = host
-    os.environ['MASTER_PORT'] = '5000'
-    if nic:
-        os.environ['GLOO_SOCKET_IFNAME'] = nic
-        os.environ['TP_SOCKET_IFNAME'] = nic
-
-
-def _retrieve_env_config():
-    """
-    Helper function to get environmental configuration variables. These are provided in case the experiment is run
-    in an K8s cluster.
-    @return: Tuple containing the parsed rank, world_size, and port that may have been set in the environment.
-    @rtype: Tuple[int, int, int]
-    """
-    rank, world_size, port = (int(os.environ.get('RANK')), int(os.environ.get('WORLD_SIZE')),
-                              int(os.environ["MASTER_PORT"]))
-    return rank, world_size, port
-
-
-def _retrieve_network_params_from_config(conf: Config, nic=None, host=None):
-    if hasattr(conf, 'system'):
-        system_attr = getattr(conf, 'system')
-        if 'federator' in system_attr:
-            if 'hostname' in system_attr['federator'] and not host:
-                host = system_attr['federator']['hostname']
-            if 'nic' in system_attr['federator'] and not nic:
-                nic = system_attr['federator']['nic']
-    return nic, host
-
-
 def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC] = None, host: Optional[Host] = None,
                   prefix: Optional[Prefix] = None, args: Optional[Namespace] = None,
                   conf: Optional[DistributedConfig] = None):
@@ -292,11 +241,11 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
     r_conf.replication_id = prefix
     if rank and not (nic and host):
         print("Getting parameters from configuration file")
-        nic, host = _retrieve_network_params_from_config(r_conf, nic, host)
-        _retrieve_or_init_env(nic, host)
+        nic, host = retrieve_config_network_params(r_conf, nic, host)
+        retrieve_or_init_env(nic, host)
     elif not rank:
         print("Retrieving environmental configurations!")
-        rank, world_size, master_port = _retrieve_env_config()
+        rank, world_size, master_port = retrieve_env_config()
         print(f"Retrieved: rank {rank} w_s {world_size} m_p {master_port}")
         r_conf.world_size = world_size
     else:
