@@ -419,6 +419,27 @@ many small files is slow (as they will be compressed individually). The command 
 kubectl cp --namespace test fl-extractor:/opt/federation-lab/logging ./logging
 ```
 
+⚠️ Make sure to test your configurations before running your experiments, to ensure that your data is written in a
+persistent fashion. Writing to a directory that is not mounted to an NFS disk may result in dataloss.
+
+⚠️ For federated learning experiments, data is written by the Federator to a disk, as such only a single mount of an
+NFS is needed  (see for example how [`V1PytorchTrainJob`](fltk/util/cluster/client.py)s are constructed by the Orchestrator).
+It is advisable to load the data of Federated learning experiments using the `pandas` library, this can be done as follows.
+For data exploration, using a Jupyter Notebook may be advisable.
+
+```python
+import pandas as pd
+experiment_file = 'path/to/your/experiment.csv'
+df = pd.read_csv(experiment_file)
+
+df
+```
+This should display the contents of the csv file parsed into a `pd.DataFrame`, which should have the following schema.
+```
+round_id,train_duration,test_duration,round_duration,num_epochs,trained_items,accuracy,train_loss,test_loss,timestamp,node_name,confusion_matrix
+```
+
+
 ### Launching an experiment
 We have now completed the setup of the project and can continue by running actual experiments. If no errors occur, this
 should. You may also skip this step and work on your code, but it might be good to test your deployment
@@ -469,4 +490,5 @@ Which will collect and run all the tests in the repository, and show in `verbose
 
 ## Known issues / Limitations
 
-* Currently, there is no GPU support in the Docker containers.
+* Currently, there is no GPU support in the Docker containers, for this the `Dockerfile` will need to be updated to
+accomodate for this.
