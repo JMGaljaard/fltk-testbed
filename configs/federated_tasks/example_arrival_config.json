@@ -14,8 +14,8 @@
             "memory": "1Gi"
           },
           "Worker": {
-            "cores": "2000m",
-            "memory": "2Gi"
+            "cores": "750m",
+            "memory": "1Gi"
           }
         }
       },
@@ -64,7 +64,11 @@
       },
       "experimentConfiguration": {
         "randomSeed": [
-          1
+          1,
+          41,
+          42,
+          43,
+          430
         ],
         "workerReplication": {
           "Master": 1,
