@@ -1,6 +1,8 @@
-import time
 from typing import Tuple, Any
 
+import numpy as np
+import sklearn
+import time
 import torch
 
 from fltk.core.node import Node
@@ -20,7 +22,7 @@ class Client(Node):
 
         self.loss_function = self.config.get_loss_function()()
         self.optimizer = get_optimizer(self.config.optimizer)(self.net.parameters(),
-                                                   **self.config.optimizer_args)
+                                                              **self.config.optimizer_args)
         self.scheduler = MinCapableStepLR(self.optimizer,
                                           self.config.scheduler_step_size,
                                           self.config.scheduler_gamma,
@@ -101,18 +103,18 @@ class Client(Node):
 
     def set_tau_eff(self, total):
         client_weight = self.get_client_datasize() / total
-        n = self.get_client_datasize() # pylint: disable=invalid-name
-        E = self.config.epochs # pylint: disable=invalid-name
+        n = self.get_client_datasize()  # pylint: disable=invalid-name
+        E = self.config.epochs  # pylint: disable=invalid-name
         B = 16  # nicely hardcoded :) # pylint: disable=invalid-name
         tau_eff = int(E * n / B) * client_weight
         if hasattr(self.optimizer, 'set_tau_eff'):
             self.optimizer.set_tau_eff(tau_eff)
 
-    def test(self):
+    def test(self) -> Tuple[float, float, np.array]:
         """
         Function implementing federated learning test loop.
-        @return: Final running loss statistic and accuracy statistic.
-        @rtype: Tuple[float, float]
+        @return: Statistics on test-set given a (partially) trained model; accuracy, loss, and confusion matrix.
+        @rtype: Tuple[float, float, np.array]
         """
         start_time = time.time()
         correct = 0
@@ -126,7 +128,7 @@ class Client(Node):
 
                 outputs = self.net(images)
 
-                _, predicted = torch.max(outputs.data, 1) # pylint: disable=no-member
+                _, predicted = torch.max(outputs.data, 1)  # pylint: disable=no-member
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
@@ -134,34 +136,35 @@ class Client(Node):
                 pred_.extend(predicted.cpu().numpy())
 
                 loss += self.loss_function(outputs, labels).item()
+
+        # Calculate learning statistics
         loss /= len(self.dataset.get_test_loader().dataset)
         accuracy = 100.0 * correct / total
-        # confusion_mat = confusion_matrix(targets_, pred_)
-        # accuracy_per_class = confusion_mat.diagonal() / confusion_mat.sum(1)
-        #
-        # class_precision = calculate_class_precision(confusion_mat)
-        # class_recall = calculate_class_recall(confusion_mat)
+
+        confusion_mat = sklearn.metrics.confusion_matrix(targets_, pred_)
+
         end_time = time.time()
         duration = end_time - start_time
         self.logger.info(f'Test duration is {duration} seconds')
-        return accuracy, loss
+        return accuracy, loss, confusion_mat
 
-    def get_client_datasize(self): # pylint: disable=missing-function-docstring
+    def get_client_datasize(self):  # pylint: disable=missing-function-docstring
         return len(self.dataset.get_train_sampler())
 
-    def exec_round(self, num_epochs: int) -> Tuple[Any, Any, Any, Any, float, float, float]:
+    def exec_round(self, num_epochs: int) -> Tuple[Any, Any, Any, Any, float, float, float, np.array]:
         """
         Function as access point for the Federator Node to kick-off a remote learning round on a client.
         @param num_epochs: Number of epochs to run
         @type num_epochs: int
-        @return: Tuple containing the statistics of the training round.
-        @rtype: Tuple
+        @return: Tuple containing the statistics of the training round; loss, weights, accuracy, test_loss, make-span,
+        training make-span, testing make-span, and confusion matrix.
+        @rtype: Tuple[Any, Any, Any, Any, float, float, float, np.array]
         """
         start = time.time()
 
         loss, weights = self.train(num_epochs)
         time_mark_between = time.time()
-        accuracy, test_loss = self.test()
+        accuracy, test_loss, test_conf_matrix = self.test()
 
         end = time.time()
         round_duration = end - start
@@ -173,7 +176,7 @@ class Client(Node):
             self.optimizer.pre_communicate()
         for k, value in weights.items():
             weights[k] = value.cpu()
-        return loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration
+        return loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration, test_conf_matrix
 
     def __del__(self):
         self.logger.info(f'Client {self.id} is stopping')

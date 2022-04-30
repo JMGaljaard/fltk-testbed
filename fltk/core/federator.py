@@ -1,8 +1,11 @@
 import copy
+
+import numpy as np
+import sklearn
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Tuple
 
 import torch
 
@@ -80,8 +83,8 @@ class Federator(Node):
                 client_name = f'client{client_id}'
                 client = Client(client_name, client_id, world_size, copy.deepcopy(self.config))
                 self.clients.append(
-                    LocalClient(client_name, client, 0, DataContainer(client_name, self.config.output_path,
-                                                                      ClientRecord, self.config.save_data_append)))
+                        LocalClient(client_name, client, 0, DataContainer(client_name, self.config.output_path,
+                                                                          ClientRecord, self.config.save_data_append)))
                 self.logger.info(f'Client "{client_name}" created')
 
     def register_client(self, client_name: str, rank: int):
@@ -98,8 +101,8 @@ class Federator(Node):
         if self.config.single_machine:
             self.logger.warning('This function should not be called when in single machine mode!')
         self.clients.append(
-            LocalClient(client_name, client_name, rank, DataContainer(client_name, self.config.output_path,
-                                                                      ClientRecord, self.config.save_data_append)))
+                LocalClient(client_name, client_name, rank, DataContainer(client_name, self.config.output_path,
+                                                                          ClientRecord, self.config.save_data_append)))
 
     def stop_all_clients(self):
         """
@@ -202,14 +205,15 @@ class Federator(Node):
             # responses.append((client, _remote_method_async(Client.set_tau_eff, client.ref, total)))
         # torch.futures.wait_all([x[1] for x in responses])
 
-    def test(self, net):
+    def test(self, net) -> Tuple[float, float, np.array]:
         """
         Function to test the learned global model by the Federator. This does not take the client distributions in
         account but is centralized.
         @param net: Global network to be tested on the Federator centralized testing dataset.
         @type net: torch.nn.Module
-        @return: Accuracy and loss of the global network on a (subset) of the testing data.
-        @rtype: Tuple[float, float]
+        @return: Accuracy and loss of the global network on a (subset) of the testing data, and the confusion matrix
+        corresponding to the models' predictions.
+        @rtype: Tuple[float, float, np.array]
         """
         start_time = time.time()
         correct = 0
@@ -233,15 +237,12 @@ class Federator(Node):
                 loss += self.loss_function(outputs, labels).item()
         loss /= len(self.dataset.get_test_loader().dataset)
         accuracy = 100.0 * correct / total
-        # confusion_mat = confusion_matrix(targets_, pred_)
-        # accuracy_per_class = confusion_mat.diagonal() / confusion_mat.sum(1)
-        #
-        # class_precision = calculate_class_precision(confusion_mat)
-        # class_recall = calculate_class_recall(confusion_mat)
+        confusion_mat = sklearn.metrics.confusion_matrix(targets_, pred_)
+
         end_time = time.time()
         duration = end_time - start_time
         self.logger.info(f'Test duration is {duration} seconds')
-        return accuracy, loss
+        return accuracy, loss, confusion_mat
 
     def exec_round(self, com_round_id: int):
         """
@@ -271,18 +272,16 @@ class Federator(Node):
         # Client training
         training_futures: List[torch.Future] = []  # pylint: disable=no-member
 
-        # def cb_factory(future: torch.Future, method, client, client_weights, client_sizes, num_epochs, name):
-        #     future.then(lambda x: method(x, client, client_weights, client_sizes, num_epochs, client.name))
-
-        def training_cb(fut: torch.Future, client_ref: LocalClient, client_weights, client_sizes, # pylint: disable=no-member
+        def training_cb(fut: torch.Future, client_ref: LocalClient, client_weights, client_sizes,
                         num_epochs):  # pylint: disable=no-member
-            train_loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration = fut.wait()
+            train_loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration, c_mat = fut.wait()
             self.logger.info(f'Training callback for client {client_ref.name} with accuracy={accuracy}')
             client_weights[client_ref.name] = weights
             client_data_size = self.message(client_ref.ref, Client.get_client_datasize)
             client_sizes[client_ref.name] = client_data_size
-            client_ref.exp_data.append(ClientRecord(com_round_id, train_duration, test_duration, round_duration,
-                                                    num_epochs, 0, accuracy, train_loss, test_loss))
+            c_record = ClientRecord(com_round_id, train_duration, test_duration, round_duration, num_epochs, 0,
+                                    accuracy, train_loss, test_loss, confusion_matrix=c_mat)
+            client_ref.exp_data.append(c_record)
 
         for client in selected_clients:
             future = self.message_async(client.ref, Client.exec_round, num_epochs)
@@ -304,10 +303,12 @@ class Federator(Node):
         updated_model = self.aggregation_method(client_weights, client_sizes)
         self.update_nn_parameters(updated_model)
 
-        test_accuracy, test_loss = self.test(self.net)
+        test_accuracy, test_loss, conf_mat = self.test(self.net)
         self.logger.info(f'[Round {com_round_id:>3}] Federator has a accuracy of {test_accuracy} and loss={test_loss}')
 
         end_time = time.time()
         duration = end_time - start_time
-        self.exp_data.append(FederatorRecord(len(selected_clients), com_round_id, duration, test_loss, test_accuracy))
+        record = FederatorRecord(len(selected_clients), com_round_id, duration, test_loss, test_accuracy,
+                                 confusion_matrix=conf_mat)
+        self.exp_data.append(record)
         self.logger.info(f'[Round {com_round_id:>3}] Round duration is {duration} seconds')

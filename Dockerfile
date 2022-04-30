@@ -15,10 +15,11 @@ WORKDIR /opt/federation-lab
 RUN apt-get update \
     && apt-get install -y python3.9
 
-# Setup pip3.9
+# Setup pip3.9 for dependencies
 RUN apt install -y curl python3.9-distutils
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
 RUN python3 get-pip.py
+
 # Add Pre-downloaded models (otherwise needs be run every-time)
 ADD data/ data/
 

@@ -1,4 +1,6 @@
 import csv
+
+import numpy as np
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,7 +22,7 @@ class FederatorRecord(DataRecord):
     # Accuracy per class?
     timestamp: float = time.time()
     node_name: str = ''
-
+    confusion_matrix: np.array = None
 
 @dataclass
 class ClientRecord(DataRecord):
@@ -36,9 +38,14 @@ class ClientRecord(DataRecord):
     # Accuracy per class?
     timestamp: float = time.time()
     node_name: str = ''
+    confusion_matrix: np.array = None
 
 
 class DataContainer:
+    """
+    Datacontainer class for collecting experiment data. By default an 'Excel' compatible format is used by numpy and
+    the csv library. As such, it is adviced to use a library such as `pandas` to load data for analysis purposes.
+    """
     records: List[DataRecord]
     file_name: str
     file_handle: TextIO
@@ -76,8 +83,16 @@ class DataContainer:
             self.file_handle.flush()
 
     def save(self):
+        """
+        Function to save the encapsulated data to the experiment file. The format is by default 'excel' compatible,
+        resulting in the capability of loading complex objects such as ndarrays as a field.
+        @return: None
+        @rtype: None
+        """
         if self.append_mode:
             return
+        import numpy as np
+        np.set_printoptions(linewidth=10**6)
         dw = csv.DictWriter(self.file_handle, self.record_type.__annotations__)
         dw.writeheader()
         # print(f'Saving {len(self.records)} for node {self.name}')
