@@ -445,6 +445,7 @@ def construct_job(conf: DistributedConfig, task: DistributedArrivalTask,
     @return: KubeFlow compatible PyTorchJob description to create a Job with the requested system and hyper parameters.
     @rtype: V1PyTorchJob
     """
+
     dp_builder = DeploymentBuilder()
     dp_builder.create_identifier(task)
     dp_builder.build_resources(task)

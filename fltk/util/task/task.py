@@ -9,6 +9,7 @@ from fltk.util.task.config import SystemParameters, HyperParameters
 from fltk.util.task.config.parameter import SystemResources, LearningParameters, \
     OptimizerConfig, SamplerConfiguration
 
+MASTER_REPLICATION: int = 1  # Static master replication value, dictated by PytorchTrainingJobs
 
 @dataclass
 class ArrivalTask(abc.ABC):
@@ -59,6 +60,7 @@ class DistributedArrivalTask(ArrivalTask):
     param_conf: HyperParameters = field(compare=False)
     priority: int
 
+
     def named_system_params(self, types: Optional[List[str]] = None) -> OrderedDict[str, SystemParameters]:
         """
         Helper function to get named system parameters for types. Default follows the naming convention of KubeFlow,
@@ -76,8 +78,8 @@ class DistributedArrivalTask(ArrivalTask):
         return ret_dict
 
     def typed_replica_count(self, replica_type):
-        parallelism_dict = {'Master': 1,
-                            'Worker': self.sys_conf.data_parallelism - 1}
+        parallelism_dict = {'Master': MASTER_REPLICATION,
+                            'Worker': self.sys_conf.data_parallelism - MASTER_REPLICATION}
         return parallelism_dict[replica_type]
 
 
@@ -87,7 +89,6 @@ class FederatedArrivalTask(ArrivalTask):
     Task describing configuration objects for running FederatedLearning experiments on K8s.
     """
 
-    type_map: OrderedDict[str, int]
     hyper_parameters: HyperParameters
     system_parameters: SystemParameters
     learning_parameters: LearningParameters
