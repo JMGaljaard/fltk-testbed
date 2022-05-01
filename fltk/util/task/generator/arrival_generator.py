@@ -118,9 +118,11 @@ class Arrival:
         return self.task.learning_parameters
 
 
-class DistributedExperimentGenerator(ArrivalGenerator):
+class SimulatedArrivalGenerator(ArrivalGenerator):
     """
-    Distributed experiments (on K8s) Experiment generator.
+    Experiments (on K8s) generator that simulates the arrival of training tasks according to a pre-defined distribution.
+    As such, a set of clients can be simulated that submit various types of training jobs. See also
+    BatchArrivalGenerator for an implementation that will directly schedule all arrivals on the cluster.
     """
     job_dict: Dict[str, JobDescription] = None
 
@@ -128,7 +130,7 @@ class DistributedExperimentGenerator(ArrivalGenerator):
     _decrement = 10
 
     def __init__(self, custom_config: Path = None):
-        super(DistributedExperimentGenerator, self).__init__(custom_config or self.configuration_path)
+        super(SimulatedArrivalGenerator, self).__init__(custom_config or self.configuration_path)
         self.load_config()
 
     def set_logger(self, name: str = None):
@@ -201,14 +203,17 @@ class DistributedExperimentGenerator(ArrivalGenerator):
         self.logger.info(msg)
 
 
-class FederatedArrivalGenerator(ArrivalGenerator):
+class BatchArrivalGenerator(ArrivalGenerator):
     """
-    Arrival Generator implementation for Federated Learning (i.e. spawning sequential experiments with
-    configuration maps). Distributed Learning Generator will be matched new execution later.
+    Experiments (on K8s) generator that directly generates all arrivals to be executed. This will rely on the scheduling
+    policy of Kubeflows' Pytorch TrainOperator.
+    This allows for running batches of train jobs, e.g. to run a certain experiment configuration with a number of
+    replications in a fire-and-forget fashion. SimulatedArrivalGenerator for an implementation that will simulate
+    arrivals following a pre-defined distribution.
     """
 
     def __init__(self, custom_config: Path):
-        super(FederatedArrivalGenerator, self).__init__(custom_config)
+        super(BatchArrivalGenerator, self).__init__(custom_config)
         self.load_config()
 
     def set_logger(self, name: str = None):
