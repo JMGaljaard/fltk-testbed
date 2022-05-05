@@ -239,10 +239,19 @@ class JobClassParameter:
     network_configuration: NetworkConfiguration
     system_parameters: SystemParameters
     hyper_parameters: HyperParameters
-    learning_parameters: LearningParameters
     experiment_configuration: ExperimentConfiguration
-    class_probability: Optional[float] = field(default_factory=_none_factory)
-    priorities: Optional[List[Priority]] = field(default_factory=_none_factory)
+    class_probability: Optional[float]
+    priorities: Optional[List[Priority]]
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass(frozen=True)
+class DistributedJobClassParameter(JobClassParameter):
+    pass
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass(frozen=True)
+class FederatedJobClassParameter(JobClassParameter):
+    learning_parameters: LearningParameters
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -255,7 +264,7 @@ class JobDescription:
     preemtible_jobs: indicates whether the jobs can be pre-emptively rescheduled by the scheduler. This is currently
     not implemented in FLTK, but could be added as a project (advanced)
     """
-    job_class_parameters: JobClassParameter
+    job_class_parameters: Union[DistributedJobClassParameter, FederatedJobClassParameter]
     preemtible_jobs: Optional[float] = field(default_factory=_none_factory)
     arrival_statistic: Optional[float] = field(default_factory=_none_factory)
     priority: Optional[Priority] = None
