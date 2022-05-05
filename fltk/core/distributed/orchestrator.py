@@ -3,7 +3,7 @@ import logging
 import time
 import uuid
 from queue import PriorityQueue
-from typing import List, OrderedDict, Dict
+from typing import List, OrderedDict, Dict, Type, Union
 
 from jinja2 import Environment, FileSystemLoader
 from kubeflow.pytorchjob import PyTorchJobClient
@@ -14,6 +14,7 @@ from kubernetes.client import V1ConfigMap, V1ObjectMeta
 from fltk.core.distributed.dist_node import DistNode
 from fltk.util.cluster.client import construct_job, ClusterManager
 from fltk.util.config import DistributedConfig
+from fltk.util.task import get_job_arrival_class
 from fltk.util.task.generator.arrival_generator import ArrivalGenerator, Arrival
 from fltk.util.task.task import DistributedArrivalTask, FederatedArrivalTask, ArrivalTask
 
@@ -39,7 +40,7 @@ def _generate_experiment_path_name(task: ArrivalTask, u_id: str, config: Distrib
     return full_path
 
 
-def _prepare_experiment_maps(task: FederatedArrivalTask, config: DistributedConfig, u_id: str, replication: int = 1) -> \
+def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig, u_id: str, replication: int = 1) -> \
         (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
     template = __ENV.get_template('node.jinja.yaml')
     type_dict = collections.OrderedDict()
@@ -149,7 +150,7 @@ class Orchestrator(DistNode):
 
         logging.info('Experiment completed, currently does not support waiting.')
 
-    def run_federated(self, clear: bool = True) -> None:
+    def run_batch(self, clear: bool = True) -> None:
         """
         Main loop of the Orchestrator.
         @param clear: Boolean indicating whether a previous deployment needs to be cleaned up (i.e. lingering jobs that
@@ -163,36 +164,32 @@ class Orchestrator(DistNode):
         start_time = time.time()
         if clear:
             self.__clear_jobs()
-        # TODO: Set duration correctly/till everything is done
         while self._alive and time.time() - start_time < self._config.get_duration():
             # 1. Check arrivals
             # If new arrivals, store them in arrival list
             while not self.__arrival_generator.arrivals.empty():
-                arrival: Arrival = self.__arrival_generator.arrivals.get()
+                arrival = self.__arrival_generator.arrivals.get()
                 unique_identifier: uuid.UUID = uuid.uuid4()
-                repl = arrival.task.replication
-                seed = arrival.task.experiment_configuration.random_seed[repl]
-                task = FederatedArrivalTask(id=unique_identifier,
-                                            network=arrival.get_network(),
-                                            dataset=arrival.get_dataset(),
-                                            seed=seed,
-                                            replication=repl,
-                                            type_map=arrival.get_experiment_config().worker_replication,
-                                            system_parameters=arrival.get_system_config(),
-                                            hyper_parameters=arrival.get_parameter_config(),
-                                            learning_parameters=arrival.get_learning_config())
+                task_type: Type[ArrivalTask] = get_job_arrival_class(arrival.task.experiment_type)
+                task = task_type(arrival=arrival,
+                                 u_id=unique_identifier,
+                                 repl=arrival.task.replication)
 
                 self.__logger.debug(f"Arrival of: {task}")
                 self.pending_tasks.put(task)
 
             while not self.pending_tasks.empty():
                 # Do blocking request to priority queue
-                curr_task = self.pending_tasks.get()
+                curr_task: ArrivalTask = self.pending_tasks.get()
                 self.__logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
-                config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task, self._config, curr_task.id, 1)
+                configmap_name_dict = None
+                # Create persistent logging information. A these will not be deleted by the Orchestrator, as such
+                # allow you to retrieve information of experiments even after removing the PytorchJob after completion.
+                if isinstance(curr_task, FederatedArrivalTask):
+                    config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task, self._config, curr_task.id, 1)
+                    self.__create_config_maps(config_dict)
                 job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
 
-                self.__create_config_maps(config_dict)
                 # Hack to overcome limitation of KubeFlow version (Made for older version of Kubernetes)
                 self.__logger.info(f"Deploying on cluster: {curr_task.id}")
                 self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)

@@ -22,7 +22,7 @@ from fltk.util.cluster.worker import should_distribute
 from fltk.util.config import DistributedConfig, Config, retrieve_config_network_params
 from fltk.util.config.arguments import LearningParameters, extract_learning_parameters
 from fltk.util.env import retrieve_or_init_env, retrieve_env_config
-from fltk.util.task.generator.arrival_generator import SimulatedArrivalGenerator, BatchArrivalGenerator
+from fltk.util.task.generator.arrival_generator import SimulatedArrivalGenerator, SequentialArrivalGenerator
 
 # Define types for clarity in execution
 Rank = NewType('Rank', int)
@@ -87,7 +87,7 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, si
         logging.info("Pointing configuration to in cluster configuration.")
         conf.cluster_config.load_incluster_namespace()
         conf.cluster_config.load_incluster_image()
-    arrival_generator = (SimulatedArrivalGenerator if simulate_arrivals else BatchArrivalGenerator)(
+    arrival_generator = (SimulatedArrivalGenerator if simulate_arrivals else SequentialArrivalGenerator)(
             args.experiment)
     cluster_manager = ClusterManager()
 
@@ -101,7 +101,7 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, si
     logging.info("Starting arrival generator")
     pool.apply_async(arrival_generator.start, args=[conf.get_duration()])
     logging.info("Starting orchestrator")
-    pool.apply(orchestrator.run if simulate_arrivals else orchestrator.run_federated)
+    pool.apply(orchestrator.run if simulate_arrivals else orchestrator.run_batch)
 
     pool.close()
     pool.join()
