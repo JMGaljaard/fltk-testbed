@@ -16,7 +16,7 @@ from fltk.util.cluster.conversion import Convert
 from fltk.util.config import DistributedConfig
 from fltk.util.singleton import Singleton
 from fltk.util.task.config.parameter import SystemResources
-from fltk.util.task.task import DistributedArrivalTask, ArrivalTask
+from fltk.util.task.task import DistributedArrivalTask, ArrivalTask, FederatedArrivalTask
 
 
 @dataclass
@@ -202,7 +202,7 @@ class ClusterManager(metaclass=Singleton):
         self._stop()
 
 
-def _generate_command(config: DistributedConfig, task: ArrivalTask, federated=True) -> List[str]:
+def _generate_command(config: DistributedConfig, task: ArrivalTask) -> List[str]:
     """
     Function to generate commands for containers to start working with. Either a federated learnign command
     will be realized, or a distributed learning command. Note that distributed learning commands will be revised
@@ -216,15 +216,19 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask, federated=Tr
     @return:
     @rtype:
     """
-    if not federated:
+    # TODO: Refactor fltk client command with configuration maps.
+    federated = isinstance(task, FederatedArrivalTask)
+    if federated:
+        # Perform Federated Learning experiment.
+        command = ('python3 -m fltk remote experiments/node.config.yaml')
+    else:
+        # Perform Distributed Learning experiment.
         command = (f'python3 -m fltk client {config.config_path} {task.id} '
                    f'--model {task.network} --dataset {task.dataset} '
-                   f'--optimizer Adam --max_epoch {task.param_conf.max_epoch} '
-                   f'--batch_size {task.param_conf.bs} --learning_rate {task.param_conf.lr} '
-                   f'--decay {task.param_conf.lr_decay} --loss CrossEntropy '
+                   f'--optimizer Adam --max_epoch {task.hyper_parameters.max_epoch} '
+                   f'--batch_size {task.hyper_parameters.bs} --learning_rate {task.hyper_parameters.lr} '
+                   f'--decay {task.hyper_parameters.lr_decay} --loss CrossEntropy '
                    f'--backend gloo')
-    else:
-        command = ('python3 -m fltk remote experiments/node.config.yaml')
     return command.split(' ')
 
 
@@ -429,11 +433,11 @@ class DeploymentBuilder:
                 spec=self._build_description.spec)
         return job
 
-    def create_identifier(self, task: DistributedArrivalTask):  # pylint: disable=missing-function-docstring
+    def create_identifier(self, task: ArrivalTask):  # pylint: disable=missing-function-docstring
         self._build_description.id = task.id
 
 
-def construct_job(conf: DistributedConfig, task: DistributedArrivalTask,
+def construct_job(conf: DistributedConfig, task: ArrivalTask,
                   config_name_dict: Optional[Dict[str, str]] = None) -> V1PyTorchJob:
     """
     Function to build a Job, based on the specifications of an ArrivalTask, and the general configuration of the

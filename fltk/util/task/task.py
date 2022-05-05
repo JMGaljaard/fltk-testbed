@@ -1,4 +1,5 @@
 import abc
+import uuid
 from dataclasses import field, dataclass
 from typing import OrderedDict, List, Optional
 from uuid import UUID
@@ -8,19 +9,25 @@ from fltk.util.config.definitions import Nets
 from fltk.util.task.config import SystemParameters, HyperParameters
 from fltk.util.task.config.parameter import SystemResources, LearningParameters, \
     OptimizerConfig, SamplerConfiguration
+from fltk.util.task.generator.arrival_generator import Arrival
 
 MASTER_REPLICATION: int = 1  # Static master replication value, dictated by PytorchTrainingJobs
+
 
 @dataclass
 class ArrivalTask(abc.ABC):
     """
     DataClass representation of an ArrivalTask, representing all the information needed to spawn a new learning task.
     """
-    id: UUID = field(compare=False) # pylint: disable=invalid-name
+    id: UUID = field(compare=False)  # pylint: disable=invalid-name
     network: Nets = field(compare=False)
     dataset: Dataset = field(compare=False)
     seed: int = field(compare=False)
     replication: int = field(compare=False)
+    type_map: Optional[OrderedDict[str, int]]
+    system_parameters: SystemParameters = field(compare=False)
+    hyper_parameters: HyperParameters = field(compare=False)
+    priority: Optional[int]
 
     @abc.abstractmethod
     def named_system_params(self, *args, **kwargs) -> OrderedDict[str, SystemResources]:
@@ -56,10 +63,20 @@ class DistributedArrivalTask(ArrivalTask):
     The tasks are by default sorted according to priority.
     """
 
-    sys_conf: SystemParameters = field(compare=False)
-    param_conf: HyperParameters = field(compare=False)
-    priority: int
-
+    def __init__(self, arrival: Arrival, u_id: uuid.UUID, repl: int):
+        super(DistributedArrivalTask, self).__init__(
+                id=u_id,
+                network=arrival.get_network(),
+                dataset=arrival.get_dataset(),
+                seed=arrival.get_experiment_config().random_seed[repl],
+                replication=repl,
+                type_map={
+                    'Master': MASTER_REPLICATION,
+                    'Worker': arrival.task.system_parameters.data_parallelism - MASTER_REPLICATION
+                },
+                system_parameters=arrival.get_system_config(),
+                hyper_parameters=arrival.get_parameter_config(),
+                priority=arrival.get_priority())
 
     def named_system_params(self, types: Optional[List[str]] = None) -> OrderedDict[str, SystemParameters]:
         """
@@ -73,13 +90,12 @@ class DistributedArrivalTask(ArrivalTask):
         """
         if types is None:
             types = ['Master', 'Worker']
-        ret_dict = OrderedDict[str, SystemParameters](
-                [(tpe, self.sys_conf) for tpe in types])
+        ret_dict = OrderedDict[str, SystemParameters]([(tpe, self.system_parameters) for tpe in types])
         return ret_dict
 
     def typed_replica_count(self, replica_type):
         parallelism_dict = {'Master': MASTER_REPLICATION,
-                            'Worker': self.sys_conf.data_parallelism - MASTER_REPLICATION}
+                            'Worker': self.system_parameters.data_parallelism - MASTER_REPLICATION}
         return parallelism_dict[replica_type]
 
 
@@ -89,11 +105,20 @@ class FederatedArrivalTask(ArrivalTask):
     Task describing configuration objects for running FederatedLearning experiments on K8s.
     """
 
-    type_map: OrderedDict[str, int]
-    hyper_parameters: HyperParameters
-    system_parameters: SystemParameters
     learning_parameters: LearningParameters
-    priority: int = 1
+
+    def __init__(self, arrival: Arrival, u_id: uuid.UUID, repl: int):
+        super(FederatedArrivalTask, self).__init__(
+                id=u_id,
+                network=arrival.get_network(),
+                dataset=arrival.get_dataset(),
+                seed=arrival.get_experiment_config().random_seed[repl],
+                replication=repl,
+                type_map=arrival.get_experiment_config().worker_replication,
+                system_parameters=arrival.get_system_config(),
+                hyper_parameters=arrival.get_parameter_config(),
+                priority=arrival.get_priority())
+        self.learning_parameters = arrival.task.learning_parameters
 
     def named_system_params(self) -> OrderedDict[str, SystemResources]:
         """

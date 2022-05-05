@@ -7,10 +7,15 @@ from typing import List, Optional, OrderedDict, Any, Union, Tuple, Type, Dict, M
 from dataclasses_json import dataclass_json, LetterCase, config
 from torch.nn.modules.loss import _Loss
 
-from fltk.util.config.definitions import DataSampler, Nets, Aggregations, Optimizations, Dataset
+from fltk.util.config.definitions import DataSampler, Nets, Aggregations, Optimizations, Dataset, ExperimentType
 
 
-def _none_factory():
+def _none_factory() -> None:
+    """
+    Helper function to construct a default 'None' value.
+    @return: Default None value.
+    @rtype: None
+    """
     return None
 
 
@@ -22,8 +27,7 @@ class OptimizerConfig:
     """
     type: Optional[Optimizations] = None
     momentum: Optional[Union[float, Tuple[float]]] = None
-    lr: Optional[float] = field(metadata=config(field_name="learningRate"),
-                                default_factory=_none_factory)  # pylint: disable=invalid-name
+    lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory)
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -48,7 +52,7 @@ class HyperParameterConfiguration:
     scheduler_config: Optional[SchedulerConfig] = field(metadata=config(field_name="schedulerConfig"),
                                                         default_factory=_none_factory)
     bs: Optional[int] = field(metadata=config(field_name="batchSize"),
-                              default_factory=_none_factory)  # pylint: disable=invalid-name
+                              default_factory=_none_factory)
     test_bs: Optional[int] = field(metadata=config(field_name="testBatchSize"), default_factory=_none_factory)
     lr_decay: Optional[float] = field(metadata=config(field_name="learningRateDecay"), default_factory=_none_factory)
 
@@ -92,7 +96,7 @@ def merge_optional(default_dict: Dict[str, Any], update_dict: Dict[str, Any], tp
     return default_copy
 
 
-def merge_optional_dataclass(default: T, update: T, data_type: Type, learner_type: str):
+def merge_optional_dataclass(default: T, update: T, data_type: Type[T], learner_type: str) -> T:
     """
     Function to merge two dataclasses of same type to update a default object with an update dataclass containing
     only a few set parameters.
@@ -101,15 +105,15 @@ def merge_optional_dataclass(default: T, update: T, data_type: Type, learner_typ
     @param update: Update dataclass to merge into default.
     @type update: T
     @param data_type: Type of the two dataclasses.
-    @type data_type: Type
+    @type data_type: Type[T]
     @param learner_type: String representation of learner type.
     @type learner_type: str
     @return: Instance of the passed data_type.
     @rtype: T
     """
     if isinstance(update, default.__class__):
-        return data_type.from_dict(
-                merge_optional(default.to_dict(), update.to_dict(), learner_type))  # pylint: disable=no-member
+        merged = data_type.from_dict(merge_optional(default.to_dict(), update.to_dict(), learner_type))  # pylint: disable=no-member
+        return merged
     raise Exception(f"Cannot merge dataclasses of different type: {default.__class__} and {update.__class__}")
 
 
@@ -227,7 +231,7 @@ class ExperimentConfiguration:
     accordingly in the configuration file.
     """
     random_seed: List[int]
-    worker_replication: OrderedDict[str, int]
+    worker_replication: Optional[OrderedDict[str, int]] = None
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -240,18 +244,9 @@ class JobClassParameter:
     system_parameters: SystemParameters
     hyper_parameters: HyperParameters
     experiment_configuration: ExperimentConfiguration
-    class_probability: Optional[float]
-    priorities: Optional[List[Priority]]
-
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass(frozen=True)
-class DistributedJobClassParameter(JobClassParameter):
-    pass
-
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass(frozen=True)
-class FederatedJobClassParameter(JobClassParameter):
-    learning_parameters: LearningParameters
+    class_probability: Optional[float] = None
+    learning_parameters: Optional[LearningParameters] = None
+    priorities: Optional[List[Priority]] = None
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -262,9 +257,10 @@ class JobDescription:
     Currently, the arrival statistics is the lambda value used in a Poisson arrival process.
 
     preemtible_jobs: indicates whether the jobs can be pre-emptively rescheduled by the scheduler. This is currently
-    not implemented in FLTK, but could be added as a project (advanced)
+    not implemented in FLTK, but could be added as a project (advanced).
     """
-    job_class_parameters: Union[DistributedJobClassParameter, FederatedJobClassParameter]
+    experiment_type: ExperimentType = field(metadata=config(field_name='type'))
+    job_class_parameters: JobClassParameter
     preemtible_jobs: Optional[float] = field(default_factory=_none_factory)
     arrival_statistic: Optional[float] = field(default_factory=_none_factory)
     priority: Optional[Priority] = None
@@ -286,17 +282,19 @@ class TrainTask:
 
     Dataclass is ordered, to allow for ordering of arrived tasks in a PriorityQueue (for scheduling).
     """
-    priority: int
     network_configuration: NetworkConfiguration = field(compare=False)
     experiment_configuration: ExperimentConfiguration = field(compare=False)
     system_parameters: SystemParameters = field(compare=False)
     hyper_parameters: HyperParameters = field(compare=False)
-    learning_parameters: LearningParameters = field(compare=False)
+    learning_parameters: Optional[LearningParameters] = field(compare=False)
     identifier: str = field(compare=False)
     replication: Optional[int] = 0
+    priority: Optional[int] = None
+    experiment_type: ExperimentType = None
 
     def __init__(self, identity: str, job_parameters: JobClassParameter, priority: Priority = None,
-                 experiment_config: ExperimentConfiguration = None, replication = None):
+                 experiment_config: ExperimentConfiguration = None, replication = None,
+                 experiment_type: ExperimentType = None):
         """
         Overridden init method for dataclass, to allow for 'exploding' a JobDescription object to a flattened object.
         @param job_parameters:
@@ -315,6 +313,7 @@ class TrainTask:
         self.experiment_configuration = experiment_config
         self.learning_parameters = job_parameters.learning_parameters
         self.replication = replication
+        self.experiment_type = experiment_type
 
 class ExperimentParser():  # pylint: disable=too-few-public-methods
     """
