@@ -1,6 +1,6 @@
 [
   {
-    "type": "federated",
+    "type": "distributed",
     "jobClassParameters": {
       "networkConfiguration": {
         "network": "FashionMNISTCNN",
@@ -8,14 +8,10 @@
         "dataset": "mnist"
       },
       "systemParameters": {
-        "dataParallelism": null,
+        "dataParallelism": 3,
         "configurations": {
-          "Master": {
+          "default": {
             "cores": "1000m",
-            "memory": "1Gi"
-          },
-          "Worker": {
-            "cores": "750m",
             "memory": "1Gi"
           }
         }
@@ -38,43 +34,13 @@
         },
         "configurations": {
           "Master": null,
-          "Worker": {
-            "batchSize": 500,
-            "optimizerConfig": {
-              "learningRate": 0.05
-            },
-            "schedulerConfig": {
-              "schedulerStepSize": 2000
-            }
-          }
+          "Worker": null
         }
-      },
-      "learningParameters": {
-        "totalEpochs": 0,
-        "rounds": 5,
-        "epochsPerRound": 1,
-        "cuda": false,
-        "clientsPerRound": 2,
-        "dataSampler": {
-          "type": "uniform",
-          "qValue": 0.07,
-          "seed": 42,
-          "shuffle": true
-        },
-        "aggregation": "FedAvg"
       },
       "experimentConfiguration": {
         "randomSeed": [
-          1,
-          41,
-          42,
-          43,
-          430
-        ],
-        "workerReplication": {
-          "Master": 1,
-          "Worker": 2
-        }
+          1
+        ]
       }
     }
   }
