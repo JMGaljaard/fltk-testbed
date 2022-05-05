@@ -5,3 +5,4 @@ from .dataset import Dataset
 from .logging import LogLevel
 from .net import Nets
 from .optim import Optimizations
+from .experiment_type import ExperimentType
