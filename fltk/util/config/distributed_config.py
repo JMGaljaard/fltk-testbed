@@ -13,9 +13,6 @@ class GeneralNetConfig:
     save_model_path: str = 'models'
     epoch_save_start_suffix: str = 'cloud_experiment'
     epoch_save_end_suffix: str = 'cloud_experiment'
-    scheduler_step_size = 50
-    scheduler_gamma = 0.5
-    min_lr = 1e-10
 
 
 @dataclass_json
@@ -153,30 +150,6 @@ class DistributedConfig():
         base_log = Path(self.execution_config.tensorboard.record_dir)
         experiment_dir = Path(f"{self.execution_config.experiment_prefix}_{client_id}_{network_name}_{experiment_id}")
         return base_log.joinpath(experiment_dir)
-
-    def get_scheduler_step_size(self) -> int:
-        """
-        Function to get the step_size of the Learning Rate decay scheduler/
-        @return: Learning rate scheduler step-size.
-        @rtype: int
-        """
-        return self.execution_config.general_net.scheduler_step_size
-
-    def get_scheduler_gamma(self) -> float:
-        """
-        Function to get multiplication factor for LR update from config.
-        @return: Multiplication factor for LR update
-        @rtype: float
-        """
-        return self.execution_config.general_net.scheduler_gamma
-
-    def get_min_lr(self) -> float:
-        """
-        Function to get the minimum learning rate from config.
-        @return: Minimum learning rate of training process.
-        @rtype: float
-        """
-        return self.execution_config.general_net.min_lr
 
     def get_data_path(self) -> Path:
         """

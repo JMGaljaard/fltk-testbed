@@ -40,9 +40,12 @@ def _generate_experiment_path_name(task: ArrivalTask, u_id: str, config: Distrib
     return full_path
 
 
-def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig, u_id: str, replication: int = 1) -> \
+def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig, u_id: uuid.UUID, replication: int = 1) -> \
         (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
-    template = __ENV.get_template('node.jinja.yaml')
+    if isinstance(task, FederatedArrivalTask):
+        template = __ENV.get_template('node.jinja.yaml')
+    else:
+        template = __ENV.get_template('dist_node.jinja.yaml')
     type_dict = collections.OrderedDict()
     name_dict = collections.OrderedDict()
     for tpe in task.type_map.keys():
@@ -185,9 +188,9 @@ class Orchestrator(DistNode):
                 configmap_name_dict = None
                 # Create persistent logging information. A these will not be deleted by the Orchestrator, as such
                 # allow you to retrieve information of experiments even after removing the PytorchJob after completion.
-                if isinstance(curr_task, FederatedArrivalTask):
-                    config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task, self._config, curr_task.id, 1)
-                    self.__create_config_maps(config_dict)
+
+                config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task, self._config, curr_task.id, 1)
+                self.__create_config_maps(config_dict)
                 job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
 
                 # Hack to overcome limitation of KubeFlow version (Made for older version of Kubernetes)

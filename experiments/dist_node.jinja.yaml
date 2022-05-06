@@ -1,0 +1,14 @@
+model: {{ task.get_net_param('network').value }}
+dataset: {{ task.get_net_param('dataset').value }}
+batch_size: {{ task.get_hyper_param(tpe, 'bs') }}
+max_epoch: {{ task.get_learn_param('total_epochs') }}
+learning_rate: {{ task.get_optimizer_param(tpe, 'lr') }}
+learning_decay: {{ task.get_hyper_param(tpe, 'lr_decay') }}
+loss: {{ task.get_net_param('lossFunction').value }}
+optimizer: {{ task.get_optimizer_param(tpe, 'type').value }}
+optimizer_args: {{ task.get_optimizer_args(tpe) }}
+scheduler_step_size: {{ task.get_scheduler_param(tpe, 'scheduler_step_size') }}
+scheduler_gamma: {{ task.get_scheduler_param(tpe, 'scheduler_gamma') }}
+min_lr: {{ task.get_scheduler_param(tpe, 'min_lr') }}
+cuda: {{ task.get_learn_param('cuda') }}
+seed: {{ task.get_net_param('seed') }}
