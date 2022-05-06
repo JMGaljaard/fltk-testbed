@@ -1,4 +1,5 @@
 import abc
+import collections
 import uuid
 from dataclasses import field, dataclass
 from typing import OrderedDict, List, Optional
@@ -27,10 +28,10 @@ class ArrivalTask(abc.ABC):
     type_map: Optional[OrderedDict[str, int]]
     system_parameters: SystemParameters = field(compare=False)
     hyper_parameters: HyperParameters = field(compare=False)
-    priority: Optional[int]
+    learning_parameters: LearningParameters = field(compare=False)
+    priority: Optional[int] = None
 
-    @abc.abstractmethod
-    def named_system_params(self, *args, **kwargs) -> OrderedDict[str, SystemResources]:
+    def named_system_params(self) -> OrderedDict[str, SystemResources]:
         """
         Helper function to get system parameters by name.
         @param kwargs: kwargs for arguments.
@@ -38,6 +39,10 @@ class ArrivalTask(abc.ABC):
         @return: Dictionary corresponding to System resources per learner type.
         @rtype: OrderedDict[str, SystemResources]
         """
+        sys_conf = self.system_parameters
+        ret_dict = collections.OrderedDict(
+                [(tpe, sys_conf.get(tpe)) for tpe in self.type_map.keys()])
+        return ret_dict
 
     @abc.abstractmethod
     def typed_replica_count(self, replica_type: str) -> int:
@@ -76,22 +81,7 @@ class DistributedArrivalTask(ArrivalTask):
                 },
                 system_parameters=arrival.get_system_config(),
                 hyper_parameters=arrival.get_parameter_config(),
-                priority=arrival.get_priority())
-
-    def named_system_params(self, types: Optional[List[str]] = None) -> OrderedDict[str, SystemParameters]:
-        """
-        Helper function to get named system parameters for types. Default follows the naming convention of KubeFlow,
-        where the first operator gets assigned the name 'Master' and subsequent compute units are assigned 'Worker'.
-        @param types: List of types that need to be added to the dpeloyment, e.g. 'Worker' and 'Master'. Note
-        that ordering matters, and first element in the list is assumed to be assigned IDX=0.
-        @type types: Optional[List[str]]
-        @return:
-        @rtype:
-        """
-        if types is None:
-            types = ['Master', 'Worker']
-        ret_dict = OrderedDict[str, SystemParameters]([(tpe, self.system_parameters) for tpe in types])
-        return ret_dict
+                learning_parameters=arrival.get_learning_config())
 
     def typed_replica_count(self, replica_type):
         parallelism_dict = {'Master': MASTER_REPLICATION,
@@ -104,9 +94,6 @@ class FederatedArrivalTask(ArrivalTask):
     """
     Task describing configuration objects for running FederatedLearning experiments on K8s.
     """
-
-    learning_parameters: LearningParameters
-
     def __init__(self, arrival: Arrival, u_id: uuid.UUID, repl: int):
         super(FederatedArrivalTask, self).__init__(
                 id=u_id,
@@ -117,19 +104,9 @@ class FederatedArrivalTask(ArrivalTask):
                 type_map=arrival.get_experiment_config().worker_replication,
                 system_parameters=arrival.get_system_config(),
                 hyper_parameters=arrival.get_parameter_config(),
-                priority=arrival.get_priority())
-        self.learning_parameters = arrival.task.learning_parameters
+                priority=arrival.get_priority(),
+                learning_parameters=arrival.get_learning_config())
 
-    def named_system_params(self) -> OrderedDict[str, SystemResources]:
-        """
-        Helper function to get named system parameters for types. Default follows the naming convention of KubeFlow,
-        where the first operator gets assigned the name 'Master' and subsequent compute units are assigned 'Worker'.
-        @return:
-        @rtype:
-        """
-        ret_dict = OrderedDict[str, SystemResources](
-                [(tpe, self.system_parameters.configurations[tpe]) for tpe in self.type_map.keys()])
-        return ret_dict
 
     def typed_replica_count(self, replica_type):
         return self.type_map[replica_type]

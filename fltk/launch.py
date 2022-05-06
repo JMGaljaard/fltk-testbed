@@ -8,6 +8,7 @@ from multiprocessing.pool import ThreadPool
 from pathlib import Path
 
 import torch.distributed as dist
+import yaml
 from kubernetes import config
 from torch.distributed import rpc
 
@@ -16,7 +17,7 @@ from fltk.core.distributed import DistClient
 from fltk.core.distributed import Orchestrator
 from fltk.core.distributed.extractor import download_datasets
 from fltk.core.federator import Federator
-from fltk.nets.util.reproducability import init_reproducibility
+from fltk.nets.util.reproducability import init_reproducibility, init_learning_reproducibility
 from fltk.util.cluster.client import ClusterManager
 from fltk.util.cluster.worker import should_distribute
 from fltk.util.config import DistributedConfig, Config, retrieve_config_network_params
@@ -165,10 +166,13 @@ def launch_client(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
     """
     logging.info("Starting in client mode")
 
-    learning_params = extract_learning_parameters(args)
+    with open(args.experiment_config) as f:
+        learning_params_dict = yaml.safe_load(f)
+        learning_params = LearningParameters.from_dict(learning_params_dict)
+
     # Set the seed for PyTorch, numpy seed is mostly ignored. Set the `torch_seed` to a different value
     # for each repetition that you want to run an experiment with.
-    conf.set_seed()
+    init_learning_reproducibility(learning_params)
     task_id = args.task_id
     exec_distributed_client(task_id, conf=conf, learning_params=learning_params, namespace=args)
     logging.info("Stopping client...")

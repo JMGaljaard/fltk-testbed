@@ -71,15 +71,16 @@ def __main__():
     except Exception as _:  # pylint: disable=broad-except
         print('No configuration path is provided.')
 
+    launch_fn: launch_signature = __run_op_dict[args.action]
+    launch_fn(arg_path, conf_path,
+              _save_get(args, 'rank'),
+              _save_get(args, 'nic'),
+              _save_get(args, 'host'),
+              _save_get(args, 'prefix'),
+              args,
+              distributed_config)
     try:
-        launch_fn: launch_signature = __run_op_dict[args.action]
-        launch_fn(arg_path, conf_path,
-                  _save_get(args, 'rank'),
-                  _save_get(args, 'nic'),
-                  _save_get(args, 'host'),
-                  _save_get(args, 'prefix'),
-                  args,
-                  distributed_config)
+        pass
     except Exception as e:
         print(f"Failed with reason: {e}")
         parser.print_help()

@@ -22,9 +22,9 @@
           "testBatchSize": 1000,
           "learningRateDecay": 0.0002,
           "optimizerConfig": {
-            "type": "SGD",
-            "learningRate": 0.01,
-            "momentum": 0.1
+            "type": "Adam",
+            "learningRate": 0.001,
+            "momentum": [0.9, 0.999]
           },
           "schedulerConfig": {
             "schedulerStepSize": 50,
@@ -36,6 +36,10 @@
           "Master": null,
           "Worker": null
         }
+      },
+      "learningParameters": {
+        "totalEpochs": 0,
+        "cuda": false
       },
       "experimentConfiguration": {
         "randomSeed": [

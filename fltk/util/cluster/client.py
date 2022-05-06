@@ -202,7 +202,7 @@ class ClusterManager(metaclass=Singleton):
         self._stop()
 
 
-def _generate_command(config: DistributedConfig, task: ArrivalTask) -> List[str]:
+def _generate_command(config: DistributedConfig, task: ArrivalTask, tpe: Optional[str] = None) -> List[str]:
     """
     Function to generate commands for containers to start working with. Either a federated learnign command
     will be realized, or a distributed learning command. Note that distributed learning commands will be revised
@@ -222,12 +222,8 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask) -> List[str]
         # Perform Federated Learning experiment.
         command = ('python3 -m fltk remote experiments/node.config.yaml')
     else:
-        # Perform Distributed Learning experiment.
         command = (f'python3 -m fltk client {config.config_path} {task.id} '
-                   f'--model {task.network} --dataset {task.dataset} '
-                   f'--optimizer Adam --max_epoch {task.hyper_parameters.max_epoch} '
-                   f'--batch_size {task.hyper_parameters.bs} --learning_rate {task.hyper_parameters.lr} '
-                   f'--decay {task.hyper_parameters.lr_decay} --loss CrossEntropy '
+                   f'experiments/node.config.yaml'
                    f'--backend gloo')
     return command.split(' ')
 
@@ -329,8 +325,8 @@ class DeploymentBuilder:
         @rtype:
         """
         # TODO: Implement cmd / config reference.
-        cmd = _generate_command(conf, task)
         for indx, (tpe, curr_resource) in enumerate(self._build_description.resources.items()):
+            cmd = _generate_command(conf, task, tpe)
             container = _build_typed_container(conf, cmd, curr_resource,
                                                requires_mount=not indx,
                                                experiment_name=config_name_dict[tpe])
