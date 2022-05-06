@@ -1,7 +1,7 @@
 import datetime
 import logging
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Type
 
 import numpy as np
 import torch
@@ -17,9 +17,6 @@ from fltk.util.results import EpochData
 
 
 class DistClient(DistNode):
-    """
-    TODO: Combine with Client and differentiate between Federated and Distributed Learnign through better inheritance.
-    """
 
     def __init__(self, rank: int, task_id: str, world_size: int, config: DistributedConfig = None,
                  learning_params: LearningParameters = None):
@@ -68,16 +65,17 @@ class DistClient(DistNode):
         self._logger.info(f"Preparing learner model with distributed={distributed}")
         self.model.to(self.device)
         if distributed:
+            # Wrap the model to use pytorch DistributedDataParallel wrapper for all reduce.
             self.model = torch.nn.parallel.DistributedDataParallel(self.model)
 
         # Currently it is assumed to use an SGD optimizer. **kwargs need to be used to launch this properly
-        self.optimizer = self.learning_params.get_optimizer()(self.model.parameters(),
-                                                              lr=self.learning_params.learning_rate,
-                                                              momentum=0.9)
+        optim_type: Type[torch.optim.Optimizer] = self.learning_params.get_optimizer()
+        self.optimizer = optim_type(self.model.parameters(), self.learning_params.learning_rate,
+                                    momentum=self.learning_params.optimizer_args)
         self.scheduler = MinCapableStepLR(self.optimizer,
-                                          self.config.get_scheduler_step_size(),
-                                          self.config.get_scheduler_gamma(),
-                                          self.config.get_min_lr())
+                                          self.learning_params.scheduler_step_size,
+                                          self.learning_params.scheduler_gamma,
+                                          self.learning_params.min_lr)
 
         self.tb_writer = SummaryWriter(
             str(self.config.get_log_path(self._task_id, self._id, self.learning_params.model)))
@@ -171,7 +169,7 @@ class DistClient(DistNode):
         @warning Currently the testing process assumes that the model performs classification, for different types of
         tasks this function would need to be updated.
         @return: (accuracy, loss, class_precision, class_recall, confusion_mat): class_precision, class_recal and
-        confusion_mat will be in a np.array, which corresponds to the nubmer of classes in a classification task.
+        confusion_mat will be in a np.array, which corresponds to the number of classes in a classification task.
         @rtype: Tuple[float, float, np.array, np.array, np.array]:
         """
         correct = 0

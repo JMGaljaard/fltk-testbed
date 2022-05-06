@@ -148,6 +148,8 @@ class HyperParameters:
 
                 self.configurations[learner_type] = updated_conf
 
+    def get(self, tpe: str):
+        return self.configurations[tpe]
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
@@ -182,6 +184,11 @@ class SystemParameters:
     data_parallelism: Optional[int]
     configurations: OrderedDict[str, SystemResources]
 
+    def get(self, tpe: str):
+        if tpe in self.configurations:
+            return self.configurations[tpe]
+        # Fallback to default for alternative declaration.
+        return self.configurations['default']
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
@@ -214,13 +221,12 @@ class LearningParameters:
     parameters as well as some system parameters like cuda.
     """
     total_epochs: int
-    rounds: int
-    epochs_per_round: int
     cuda: bool
-    clients_per_round: int
-    aggregation: Optional[Aggregations]
-    data_sampler: Optional[SamplerConfiguration]
-
+    rounds: Optional[int] = None
+    epochs_per_round: Optional[int] = None
+    clients_per_round: Optional[int] = None
+    aggregation: Optional[Aggregations] = None
+    data_sampler: Optional[SamplerConfiguration] = None
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
