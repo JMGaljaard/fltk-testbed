@@ -1,0 +1,4 @@
+You successfully launched an experiment configuration on your cluster in {{ .Release.Namespace }}.
+
+N.B. Make sure to collect all data after completing your experiment!
+N.B. Re-installing the orchestrator WILL RESULT IN DELETION OF ALL TRAINJOBS and PODS!

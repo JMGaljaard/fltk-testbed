@@ -1,6 +1,6 @@
 name: ../docker-compose-gcloud
 description: Helm Chart for running the Federator/Orchestrator for the FLTK framework
-version: 0.1.0
+version: 0.2.0
 apiVersion: v1
 appVersion: 1.17.0
 keywords:
