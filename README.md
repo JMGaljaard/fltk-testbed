@@ -445,11 +445,24 @@ We have now completed the setup of the project and can continue by running actua
 should. You may also skip this step and work on your code, but it might be good to test your deployment
 before running into trouble later.
 
+#### Federated Experiment
 ```bash
 helm install flearner charts/orchestrator --namespace test -f charts/fltk-values.yaml\
   --set-file orchestrator.experiment=./configs/federated_tasks/example_arrival_config.json,\
   orchestrator.configuration=./configs/example_cloud_experiment.json
 ```
+
+#### Distributed Experiment
+```bash
+helm install flearner charts/orchestrator --namespace test -f charts/fltk-values.yaml\
+  --set-file orchestrator.experiment=./configs/distributed_tasks/example_arrival_config.json,\
+  orchestrator.configuration=./configs/example_cloud_experiment.json
+```
+
+**N.B.** The `./configs/distributed_tasks` and `./configs/distributed_tasks` dictories contain experiment configurations,
+i.e. which networks should be run, etc. The `./configs/example_cloud_experiment.json` file contains shared configuration 
+information, e.g. on how to log experiments. Make sure to ensure that all data can be saved to a persistent volume. 
+E.g. by creating a shared volume for `models` and saving to the corresponding directory.
 
 To debug the deployment append with the `--debug` flag, note that you may need to uninstall a prior deployment.
 Alternatively, you can use the `upgrade` argument, however, currently the orchestrator does not support updated
