@@ -207,7 +207,7 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask, tpe: Optiona
     Function to generate commands for containers to start working with. Either a federated learnign command
     will be realized, or a distributed learning command. Note that distributed learning commands will be revised
     in an upcomming version of KFLTK.
-    @param config:
+    @param config: DistributedConfiguration map with share
     @type config:
     @param task:
     @type task:
@@ -216,7 +216,6 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask, tpe: Optiona
     @return:
     @rtype:
     """
-    # TODO: Refactor fltk client command with configuration maps.
     federated = isinstance(task, FederatedArrivalTask)
     if federated:
         # Perform Federated Learning experiment.
@@ -250,6 +249,12 @@ def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V
     volume_mounts.append(V1VolumeMount(
             mount_path='/opt/federation-lab/experiments',
             name=experiment_name,
+            read_only=True
+    ))
+    # Mount the runtime configuration configmap as a volume to use shared configuration.
+    volume_mounts.append(V1VolumeMount(
+            mount_path='/opt/federation-lab/config',
+            name='fltk-orchestrator-config-volume',
             read_only=True
     ))
     # Create mount for configuration
@@ -379,6 +384,8 @@ class DeploymentBuilder:
                 conf_map = V1ConfigMapVolumeSource(name=tpe_config_map_name)
                 volumes.append(V1Volume(name=tpe_config_map_name,
                                         config_map=conf_map))
+        volumes.append(V1Volume(name='fltk-orchestrator-config-volume',
+                                config_map=V1ConfigMapVolumeSource(name='fltk-orchestrator-config')))
         for tpe, container in self._build_description.typed_containers.items():
             # TODO: Make this less hardcody
             self._build_description.typed_templates[tpe] = \
