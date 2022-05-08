@@ -1,5 +1,5 @@
 fltk:
-    configDir: configs
+    configDir: config
     workDir: /opt/federation-lab
 provider:
     domain: gcr.io
