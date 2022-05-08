@@ -70,8 +70,7 @@ class DistClient(DistNode):
 
         # Currently it is assumed to use an SGD optimizer. **kwargs need to be used to launch this properly
         optim_type: Type[torch.optim.Optimizer] = self.learning_params.get_optimizer()
-        self.optimizer = optim_type(self.model.parameters(), self.learning_params.learning_rate,
-                                    momentum=self.learning_params.optimizer_args)
+        self.optimizer = optim_type(self.model.parameters(), **self.learning_params.optimizer_args)
         self.scheduler = MinCapableStepLR(self.optimizer,
                                           self.learning_params.scheduler_step_size,
                                           self.learning_params.scheduler_gamma,
@@ -242,7 +241,8 @@ class DistClient(DistNode):
                              loss=test_loss,
                              class_precision=class_precision,
                              class_recall=class_recall,
-                             confusion_mat=confusion_mat)
+                             confusion_mat=confusion_mat,
+                             num_epochs=max_epoch)
 
             epoch_results.append(data)
             if self._id == 0:

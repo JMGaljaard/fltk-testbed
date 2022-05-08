@@ -24,7 +24,7 @@
           "optimizerConfig": {
             "type": "Adam",
             "learningRate": 0.001,
-            "momentum": [0.9, 0.999]
+            "betas": [0.9, 0.999]
           },
           "schedulerConfig": {
             "schedulerStepSize": 50,
@@ -38,7 +38,7 @@
         }
       },
       "learningParameters": {
-        "totalEpochs": 0,
+        "totalEpochs": 100,
         "cuda": false
       },
       "experimentConfiguration": {

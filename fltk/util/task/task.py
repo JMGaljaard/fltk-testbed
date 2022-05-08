@@ -23,6 +23,7 @@ class ArrivalTask(abc.ABC):
     id: UUID = field(compare=False)  # pylint: disable=invalid-name
     network: Nets = field(compare=False)
     dataset: Dataset = field(compare=False)
+    loss_function: str = field(compare=False)
     seed: int = field(compare=False)
     replication: int = field(compare=False)
     type_map: Optional[OrderedDict[str, int]]
@@ -53,60 +54,6 @@ class ArrivalTask(abc.ABC):
         @return: Number of workers to spawn of a specific type.
         @rtype: int
         """
-
-
-@dataclass(order=True)
-class DistributedArrivalTask(ArrivalTask):
-    """
-    Object to contain configuration of training task. It describes the following properties;
-        * Number of machines
-        * System-configuration
-        * Network
-        * Dataset
-        * Hyper-parameters
-
-    The tasks are by default sorted according to priority.
-    """
-
-    def __init__(self, arrival: Arrival, u_id: uuid.UUID, repl: int):
-        super(DistributedArrivalTask, self).__init__(
-                id=u_id,
-                network=arrival.get_network(),
-                dataset=arrival.get_dataset(),
-                seed=arrival.get_experiment_config().random_seed[repl],
-                replication=repl,
-                type_map={
-                    'Master': MASTER_REPLICATION,
-                    'Worker': arrival.task.system_parameters.data_parallelism - MASTER_REPLICATION
-                },
-                system_parameters=arrival.get_system_config(),
-                hyper_parameters=arrival.get_parameter_config(),
-                learning_parameters=arrival.get_learning_config())
-
-    def typed_replica_count(self, replica_type):
-        parallelism_dict = {'Master': MASTER_REPLICATION,
-                            'Worker': self.system_parameters.data_parallelism - MASTER_REPLICATION}
-        return parallelism_dict[replica_type]
-
-
-@dataclass(order=True)
-class FederatedArrivalTask(ArrivalTask):
-    """
-    Task describing configuration objects for running FederatedLearning experiments on K8s.
-    """
-    def __init__(self, arrival: Arrival, u_id: uuid.UUID, repl: int):
-        super(FederatedArrivalTask, self).__init__(
-                id=u_id,
-                network=arrival.get_network(),
-                dataset=arrival.get_dataset(),
-                seed=arrival.get_experiment_config().random_seed[repl],
-                replication=repl,
-                type_map=arrival.get_experiment_config().worker_replication,
-                system_parameters=arrival.get_system_config(),
-                hyper_parameters=arrival.get_parameter_config(),
-                priority=arrival.get_priority(),
-                learning_parameters=arrival.get_learning_config())
-
 
     def typed_replica_count(self, replica_type):
         return self.type_map[replica_type]
@@ -190,8 +137,11 @@ class FederatedArrivalTask(ArrivalTask):
         optimizer_conf: OptimizerConfig = self.hyper_parameters.configurations[tpe].optimizer_config
         kwargs = {
             'lr': optimizer_conf.lr,
-            'momentum': optimizer_conf.momentum
         }
+        if  optimizer_conf.momentum:
+            kwargs['momentum'] = optimizer_conf.momentum
+        if optimizer_conf.betas:
+            kwargs['betas'] = optimizer_conf.betas
         return kwargs
 
     def get_scheduler_param(self, tpe, parameter):
@@ -218,3 +168,58 @@ class FederatedArrivalTask(ArrivalTask):
         @rtype:
         """
         return getattr(self, parameter)
+
+
+@dataclass(order=True)
+class DistributedArrivalTask(ArrivalTask):
+    """
+    Object to contain configuration of training task. It describes the following properties;
+        * Number of machines
+        * System-configuration
+        * Network
+        * Dataset
+        * Hyper-parameters
+
+    The tasks are by default sorted according to priority.
+    """
+
+    def __init__(self, arrival: Arrival, u_id: uuid.UUID, repl: int):
+        super(DistributedArrivalTask, self).__init__(
+                id=u_id,
+                network=arrival.get_network(),
+                dataset=arrival.get_dataset(),
+                loss_function=arrival.task.network_configuration.loss_function,
+                seed=arrival.get_experiment_config().random_seed[repl],
+                replication=repl,
+                type_map={
+                    'Master': MASTER_REPLICATION,
+                    'Worker': arrival.task.system_parameters.data_parallelism - MASTER_REPLICATION
+                },
+                system_parameters=arrival.get_system_config(),
+                hyper_parameters=arrival.get_parameter_config(),
+                learning_parameters=arrival.get_learning_config())
+
+    def typed_replica_count(self, replica_type):
+        parallelism_dict = {'Master': MASTER_REPLICATION,
+                            'Worker': self.system_parameters.data_parallelism - MASTER_REPLICATION}
+        return parallelism_dict[replica_type]
+
+
+@dataclass(order=True)
+class FederatedArrivalTask(ArrivalTask):
+    """
+    Task describing configuration objects for running FederatedLearning experiments on K8s.
+    """
+    def __init__(self, arrival: Arrival, u_id: uuid.UUID, repl: int):
+        super(FederatedArrivalTask, self).__init__(
+                id=u_id,
+                network=arrival.get_network(),
+                dataset=arrival.get_dataset(),
+                loss_function=arrival.task.network_configuration.loss_function,
+                seed=arrival.get_experiment_config().random_seed[repl],
+                replication=repl,
+                type_map=arrival.get_experiment_config().worker_replication,
+                system_parameters=arrival.get_system_config(),
+                hyper_parameters=arrival.get_parameter_config(),
+                priority=arrival.get_priority(),
+                learning_parameters=arrival.get_learning_config())
