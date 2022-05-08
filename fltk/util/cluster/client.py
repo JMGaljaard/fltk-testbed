@@ -223,7 +223,7 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask, tpe: Optiona
         command = ('python3 -m fltk remote experiments/node.config.yaml')
     else:
         command = (f'python3 -m fltk client {config.config_path} {task.id} '
-                   f'experiments/node.config.yaml'
+                   f'experiments/node.config.yaml '
                    f'--backend gloo')
     return command.split(' ')
 

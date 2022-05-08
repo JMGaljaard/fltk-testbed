@@ -27,6 +27,7 @@ class OptimizerConfig:
     """
     type: Optional[Optimizations] = None
     momentum: Optional[Union[float, Tuple[float]]] = None
+    betas: Optional[Union[float, Tuple[float]]] = None
     lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory)
 
 

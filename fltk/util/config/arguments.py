@@ -1,3 +1,4 @@
+import logging
 from argparse import Namespace, ArgumentParser
 from dataclasses import dataclass
 from typing import List, Tuple, Type, Dict, T, Union
@@ -41,10 +42,11 @@ _available_data = {
 }
 
 _available_loss = {
-    "CROSSENTROPY": torch.nn.CrossEntropyLoss
+    "CROSSENTROPYLOSS": torch.nn.CrossEntropyLoss,
+    "HUBERLOSS" : torch.nn.HuberLoss
 }
 
-_available_optimizer = {
+_available_optimizer: Dict[str, Type[torch.optim.Optimizer]] = {
     "SGD": torch.optim.SGD,
     "ADAM": torch.optim.Adam,
     "ADAMW": torch.optim.AdamW
@@ -85,6 +87,8 @@ class LearningParameters:  # pylint: disable=too-many-instance-attributes
         @rtype: T
         """
         safe_keyword = str.upper(keyword)
+        if safe_keyword not in lookup:
+            logging.fatal(f"Cannot find configuration parameter {keyword} in dictionary.")
         return lookup.get(safe_keyword)
 
     def get_model_class(self) -> Type[torch.nn.Module]:
