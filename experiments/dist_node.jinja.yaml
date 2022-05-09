@@ -1,6 +1,7 @@
 model: {{ task.get_net_param('network').value }}
 dataset: {{ task.get_net_param('dataset').value }}
 batch_size: {{ task.get_hyper_param(tpe, 'bs') }}
+test_batch_size: {{ task.get_hyper_param(tpe, 'test_bs') }}
 max_epoch: {{ task.get_learn_param('total_epochs') }}
 learning_rate: {{ task.get_optimizer_param(tpe, 'lr') }}
 learning_decay: {{ task.get_hyper_param(tpe, 'lr_decay') }}
