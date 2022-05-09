@@ -4,6 +4,7 @@ from torchvision import transforms
 
 from fltk.datasets.distributed.dataset import DistDataset
 from fltk.samplers import get_sampler
+from fltk.util.config import Config
 
 
 class DistCIFAR10Dataset(DistDataset):
@@ -11,7 +12,7 @@ class DistCIFAR10Dataset(DistDataset):
     CIFAR10 Dataset implementation for Distributed learning experiments.
     """
 
-    def __init__(self, args):
+    def __init__(self, args: Config):
         super(DistCIFAR10Dataset, self).__init__(args)
         self.init_train_dataset()
         self.init_test_dataset()
@@ -30,7 +31,7 @@ class DistCIFAR10Dataset(DistDataset):
         self.train_dataset = datasets.CIFAR10(root=self.get_args().get_data_path(), train=True, download=True,
                                               transform=transform)
         self.train_sampler = get_sampler(self.train_dataset, self.args)
-        self.train_loader = DataLoader(self.train_dataset, batch_size=16, sampler=self.train_sampler)
+        self.train_loader = DataLoader(self.train_dataset, batch_size=self.args.batch_size, sampler=self.train_sampler)
         self.logger.info(f"this client gets {len(self.train_sampler)} samples")
         # logging.info("this client gets {} samples".format(len(self.train_sampler)))
 
@@ -46,4 +47,4 @@ class DistCIFAR10Dataset(DistDataset):
         self.test_dataset = datasets.CIFAR10(root=self.get_args().get_data_path(), train=False, download=True,
                                              transform=transform)
         self.test_sampler = get_sampler(self.test_dataset, self.args)
-        self.test_loader = DataLoader(self.test_dataset, batch_size=16, sampler=self.test_sampler)
+        self.test_loader = DataLoader(self.test_dataset, batch_size=self.args.test_batch_size, sampler=self.test_sampler)
