@@ -59,6 +59,22 @@ def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig, u_id:
     return type_dict, name_dict
 
 
+def _generate_task(arrival) -> ArrivalTask:
+    """
+    Function to generate a task from an Arrival.
+    @param arrival: Arrival to create a (runnable) Task from.
+    @type arrival: Arrival
+    @return: Mapped ArrivalTask for the given task.
+    @rtype: ArrivalTask
+    """
+    unique_identifier: uuid.UUID = uuid.uuid4()
+    task_type: Type[ArrivalTask] = get_job_arrival_class(arrival.task.experiment_type)
+    task = task_type.build(arrival=arrival,
+                     u_id=unique_identifier,
+                     replication=arrival.task.replication)
+    return task
+
+
 class Orchestrator(DistNode):
     """
     Central component of the Federated Learning System: The Orchestrator
@@ -119,15 +135,8 @@ class Orchestrator(DistNode):
             # 1. Check arrivals
             # If new arrivals, store them in arrival list
             while not self.__arrival_generator.arrivals.empty():
-                arrival: Arrival = self.__arrival_generator.arrivals.get()
-                unique_identifier: uuid.UUID = uuid.uuid4()
-                task = DistributedArrivalTask(priority=arrival.get_priority(),
-                                              id=unique_identifier,
-                                              network=arrival.get_network(),
-                                              dataset=arrival.get_dataset(),
-                                              sys_conf=arrival.get_system_config(),
-                                              param_conf=arrival.get_parameter_config())
-
+                arrival = self.__arrival_generator.arrivals.get()
+                task = _generate_task(arrival)
                 self.__logger.debug(f"Arrival of: {task}")
                 self.pending_tasks.put(task)
 
@@ -172,12 +181,7 @@ class Orchestrator(DistNode):
             # If new arrivals, store them in arrival list
             while not self.__arrival_generator.arrivals.empty():
                 arrival = self.__arrival_generator.arrivals.get()
-                unique_identifier: uuid.UUID = uuid.uuid4()
-                task_type: Type[ArrivalTask] = get_job_arrival_class(arrival.task.experiment_type)
-                task = task_type(arrival=arrival,
-                                 u_id=unique_identifier,
-                                 repl=arrival.task.replication)
-
+                task = _generate_task(arrival)
                 self.__logger.debug(f"Arrival of: {task}")
                 self.pending_tasks.put(task)
 
@@ -200,7 +204,6 @@ class Orchestrator(DistNode):
 
                 # TODO: Extend this logic in your real project, this is only meant for demo purposes
                 # For now we exit the thread after scheduling a single task.
-
                 self.stop()
 
             self.__logger.debug("Still alive...")

@@ -68,7 +68,7 @@ class DistClient(DistNode):
             # Wrap the model to use pytorch DistributedDataParallel wrapper for all reduce.
             self.model = torch.nn.parallel.DistributedDataParallel(self.model)
 
-        # Currently it is assumed to use an SGD optimizer. **kwargs need to be used to launch this properly
+        # Currently, it is assumed to use an SGD optimizer. **kwargs need to be used to launch this properly
         optim_type: Type[torch.optim.Optimizer] = self.learning_params.get_optimizer()
         self.optimizer = optim_type(self.model.parameters(), **self.learning_params.optimizer_args)
         self.scheduler = MinCapableStepLR(self.optimizer,
@@ -122,7 +122,7 @@ class DistClient(DistNode):
         (for example for customized training or Federated Learning), additional torch.distributed.barrier calls might
         be required to launch.
 
-        :param epoch: Current epoch number
+        :param epoch: Current epoch number.
         :type epoch: int
         @param log_interval: Iteration interval at which to log.
         @type log_interval: int
@@ -156,7 +156,7 @@ class DistClient(DistNode):
             # Note that currently this is not supported in the Framework. However, the creation of a ReadWriteMany
             # PVC in the deployment charts, and mounting this in the appropriate directory, would resolve this issue.
             # This can be done by copying the setup of the PVC used to record the TensorBoard information (used by
-            # logger created by the rank==0 node during the training process (i.e. to keep track of process).
+            # logger created by the rank==0 node during the training process (i.e. to keep track of process)).
             self.save_model(epoch)
 
         return final_running_loss
@@ -168,7 +168,7 @@ class DistClient(DistNode):
         @warning Currently the testing process assumes that the model performs classification, for different types of
         tasks this function would need to be updated.
         @return: (accuracy, loss, class_precision, class_recall, confusion_mat): class_precision, class_recal and
-        confusion_mat will be in a np.array, which corresponds to the number of classes in a classification task.
+        confusion_mat will be in a `np.array`, which corresponds to the number of classes in a classification task.
         @rtype: Tuple[float, float, np.array, np.array, np.array]:
         """
         correct = 0
@@ -183,7 +183,7 @@ class DistClient(DistNode):
                 images, labels = images.to(self.device), labels.to(self.device)
 
                 outputs = self.model(images)
-                # Currently the FLTK framework assumes that a classification task is performed (hence max).
+                # Currently, the FLTK framework assumes that a classification task is performed (hence max).
                 # Future work may add support for non-classification training.
                 _, predicted = torch.max(outputs.data, 1) # pylint: disable=no-member
                 total += labels.size(0)
@@ -223,7 +223,7 @@ class DistClient(DistNode):
 
             # Let only the 'master node' work on training. Possibly DDP can be used
             # to have a distributed test loader as well to speed up (would require
-            # aggregation of data.
+            # aggregation of data).
             elapsed_time_train = datetime.datetime.now() - start_time_train
             train_time_ms = int(elapsed_time_train.total_seconds() * 1000)
 
