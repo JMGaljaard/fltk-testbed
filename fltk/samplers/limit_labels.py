@@ -41,7 +41,7 @@ class LimitLabelsSampler(DistributedSamplerWrapper):
                 # conditions for swapping:
                 #   sets of labels A, B, with B incomplete, remaining label l that is not possible to give to B, s.t.:
                 #       (1) l not in A
-                #       (2) exists label l' in A but not in B
+                #       (2) exists label l' in A, but not in B
                 #   l, l' can be swapped
 
                 client = random.choice(clients)  # label can not be given to this client
@@ -63,8 +63,7 @@ class LimitLabelsSampler(DistributedSamplerWrapper):
             if len(client_labels[client]) == limit:
                 clients.remove(client)
 
-        # now we have a set of labels for each client
-        # client with rank=rank now needs to be given data
+        # now we have a set of labels for each client with rank=rank now needs to be given data
         # all clients get the same amount of data, the first portion is given to client with rank 1, the second to rank 2, etc
 
         labels = client_labels[self.client_id]

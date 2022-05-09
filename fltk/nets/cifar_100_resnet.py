@@ -90,11 +90,11 @@ class Cifar100ResNet(torch.nn.Module):
         self.fc = torch.nn.Linear(512 * block.expansion, num_classes)
 
     def _make_layer(self, block, out_channels, num_blocks, stride):
-        """make resnet layers(by layer i didnt mean this 'layer' was the
-        same as a neuron netowork layer, ex. conv layer), one layer may
-        contain more than one residual block
+        """
+        Make resnet layers (I.e. not a singular (hidden) neuron layer), one layer may
+        contain more than one residual blocks.
         Args:
-            block: block type, basic block or bottle neck block
+            block: block type, basic block or bottle-neck block
             out_channels: output depth channel number of this layer
             num_blocks: how many blocks per layer
             stride: the stride of the first block of this layer

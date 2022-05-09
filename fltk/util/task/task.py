@@ -2,7 +2,7 @@ import abc
 import collections
 import uuid
 from dataclasses import field, dataclass
-from typing import OrderedDict, List, Optional
+from typing import OrderedDict, List, Optional, T
 from uuid import UUID
 
 from fltk.datasets.dataset import Dataset
@@ -32,6 +32,21 @@ class ArrivalTask(abc.ABC):
     learning_parameters: LearningParameters = field(compare=False)
     priority: Optional[int] = None
 
+    @staticmethod
+    @abc.abstractmethod
+    def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> T:
+        """
+        Function to build a specific type of ArrivalTask.
+        @param arrival: Arrival object with configuration for an experiment (or Arrival).
+        @type arrival: Arrival
+        @param u_id: Unique identifier for an experiment to prevent collision in experiment names.
+        @type u_id: UUID
+        @param replication: Replication id (integer).
+        @type replication: int
+        @return: Type of (child) ArrivalTask with corresponding experiment configuration.
+        @rtype: T
+        """
+
     def named_system_params(self) -> OrderedDict[str, SystemResources]:
         """
         Helper function to get system parameters by name.
@@ -48,7 +63,7 @@ class ArrivalTask(abc.ABC):
     @abc.abstractmethod
     def typed_replica_count(self, replica_type: str) -> int:
         """
-        Helper function to get replica cout per type of learner.
+        Helper function to get replica count per type of learner.
         @param replica_type: String representation of learner type.
         @type replica_type: str
         @return: Number of workers to spawn of a specific type.
@@ -60,7 +75,7 @@ class ArrivalTask(abc.ABC):
 
     def get_hyper_param(self, tpe, parameter):
         """
-        Helper function to acquire hyperparameters as-though the configuration is a flat configuration file.
+        Helper function to acquire hyper-parameters as-though the configuration is a flat configuration file.
         @param tpe:
         @type tpe:
         @param parameter:
@@ -85,7 +100,7 @@ class ArrivalTask(abc.ABC):
 
     def get_sampler_param(self, tpe, parameter):
         """
-        Helper function to acquire federated datasampler parameters as-though the configuration is a flat configuration
+        Helper function to acquire federated data sampler parameters as-though the configuration is a flat configuration
         file.
         @param tpe:
         @type tpe:
@@ -98,7 +113,7 @@ class ArrivalTask(abc.ABC):
 
     def get_sampler_args(self, tpe: str):
         """
-        Helper function to acquire federated datasampler arguments as-though the configuration is a flat configuration
+        Helper function to acquire federated data sampler arguments as-though the configuration is a flat configuration
         file.
         @param tpe:
         @type tpe:
@@ -138,7 +153,7 @@ class ArrivalTask(abc.ABC):
         kwargs = {
             'lr': optimizer_conf.lr,
         }
-        if  optimizer_conf.momentum:
+        if optimizer_conf.momentum:
             kwargs['momentum'] = optimizer_conf.momentum
         if optimizer_conf.betas:
             kwargs['betas'] = optimizer_conf.betas
@@ -146,7 +161,7 @@ class ArrivalTask(abc.ABC):
 
     def get_scheduler_param(self, tpe, parameter):
         """
-        Helper function to acquire learnign scheduler parameters as-though the configuration is a flat configuration
+        Helper function to acquire learning scheduler parameters as-though the configuration is a flat configuration
         file.
         @param tpe:
         @type tpe:
@@ -183,21 +198,23 @@ class DistributedArrivalTask(ArrivalTask):
     The tasks are by default sorted according to priority.
     """
 
-    def __init__(self, arrival: Arrival, u_id: uuid.UUID, repl: int):
-        super(DistributedArrivalTask, self).__init__(
+    @staticmethod
+    def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> T:
+        task = DistributedArrivalTask(
                 id=u_id,
                 network=arrival.get_network(),
                 dataset=arrival.get_dataset(),
                 loss_function=arrival.task.network_configuration.loss_function,
-                seed=arrival.get_experiment_config().random_seed[repl],
-                replication=repl,
-                type_map={
+                seed=arrival.get_experiment_config().random_seed[replication],
+                replication=replication,
+                type_map=collections.OrderedDict({
                     'Master': MASTER_REPLICATION,
                     'Worker': arrival.task.system_parameters.data_parallelism - MASTER_REPLICATION
-                },
+                }),
                 system_parameters=arrival.get_system_config(),
                 hyper_parameters=arrival.get_parameter_config(),
                 learning_parameters=arrival.get_learning_config())
+        return task
 
     def typed_replica_count(self, replica_type):
         parallelism_dict = {'Master': MASTER_REPLICATION,
@@ -210,16 +227,19 @@ class FederatedArrivalTask(ArrivalTask):
     """
     Task describing configuration objects for running FederatedLearning experiments on K8s.
     """
-    def __init__(self, arrival: Arrival, u_id: uuid.UUID, repl: int):
-        super(FederatedArrivalTask, self).__init__(
+
+    @staticmethod
+    def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> T:
+        task = FederatedArrivalTask(
                 id=u_id,
                 network=arrival.get_network(),
                 dataset=arrival.get_dataset(),
                 loss_function=arrival.task.network_configuration.loss_function,
-                seed=arrival.get_experiment_config().random_seed[repl],
-                replication=repl,
+                seed=arrival.get_experiment_config().random_seed[replication],
+                replication=replication,
                 type_map=arrival.get_experiment_config().worker_replication,
                 system_parameters=arrival.get_system_config(),
                 hyper_parameters=arrival.get_parameter_config(),
                 priority=arrival.get_priority(),
                 learning_parameters=arrival.get_learning_config())
+        return task
