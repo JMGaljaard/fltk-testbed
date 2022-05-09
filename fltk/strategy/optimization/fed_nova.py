@@ -31,7 +31,7 @@ class FedNova(Optimizer):
 
     .. note::
         The implementation of SGD with Momentum/Nesterov subtly differs from
-        Sutskever et. al. and implementations in some other frameworks.
+        Sutskever et al. and implementations in some other frameworks.
 
         Considering the specific case of Momentum, the update can be written as
 
@@ -42,7 +42,7 @@ class FedNova(Optimizer):
         where p, g, v and :math:`\rho` denote the parameters, gradient,
         velocity, and momentum respectively.
 
-        This is in contrast to Sutskever et. al. and
+        This is in contrast to Sutskever et al. and
         other frameworks which employ an update of the form
 
         .. math::
@@ -142,7 +142,7 @@ class FedNova(Optimizer):
                 p.data.add_(d_p, alpha=-local_lr)
 
         # compute local normalizing vector a_i ... but it's a scalar?
-        # should't a_i be applied to cum_grad?
+        # shouldn't a_i be applied to cum_grad?
         # so this must be the l1 norm? -> this seems correct. a_i is not computed directly, only it's l1 norm
         if self.momentum != 0:
             self.local_counter = self.local_counter * self.momentum + 1

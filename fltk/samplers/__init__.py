@@ -17,7 +17,7 @@ def get_sampler(dataset, args):
     @type dataset: Dataset
     @param args: Configuration object containing arguments to DataSampler instantiation.
     @type args: Any
-    @return: Datasampler setup with arguments provided by args and dataset.
+    @return: Data sampler setup with arguments provided by args and dataset.
     @rtype: Optional[DataSampler]
     """
     logger = getLogger(__name__)

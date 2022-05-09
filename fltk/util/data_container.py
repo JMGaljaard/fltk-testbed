@@ -43,8 +43,8 @@ class ClientRecord(DataRecord):
 
 class DataContainer:
     """
-    Datacontainer class for collecting experiment data. By default an 'Excel' compatible format is used by numpy and
-    the csv library. As such, it is adviced to use a library such as `pandas` to load data for analysis purposes.
+    Datacontainer class for collecting experiment data. By default, an 'Excel' compatible format is used by numpy and
+    the csv library. As such, it is advised to use a library such as `pandas` to load data for analysis purposes.
     """
     records: List[DataRecord]
     file_name: str
@@ -84,7 +84,7 @@ class DataContainer:
 
     def save(self):
         """
-        Function to save the encapsulated data to the experiment file. The format is by default 'excel' compatible,
+        Function to save the encapsulated data to the experiment file. The format is 'excel' compatible,
         resulting in the capability of loading complex objects such as ndarrays as a field.
         @return: None
         @rtype: None

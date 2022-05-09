@@ -30,7 +30,7 @@ class FedProx(Optimizer):
 
     .. note::
         The implementation of SGD with Momentum/Nesterov subtly differs from
-        Sutskever et. al. and implementations in some other frameworks.
+        Sutskever et al. and implementations in some other frameworks.
 
         Considering the specific case of Momentum, the update can be written as
 
@@ -41,7 +41,7 @@ class FedProx(Optimizer):
         where p, g, v and :math:`\rho` denote the parameters, gradient,
         velocity, and momentum respectively.
 
-        This is in contrast to Sutskever et. al. and
+        This is in contrast to Sutskever et al. and
         other frameworks which employ an update of the form
 
         .. math::

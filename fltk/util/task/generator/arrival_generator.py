@@ -58,7 +58,7 @@ class ArrivalGenerator(metaclass=Singleton): # pylint: disable=too-many-instance
 
     def stop(self) -> None:
         """
-        Function to call when the generator needs to stop. By default the generator will run for 1 hour.
+        Function to call when the generator needs to stop. By default, the generator will run for 1 hour.
         @return: None
         @rtype: None
         """
