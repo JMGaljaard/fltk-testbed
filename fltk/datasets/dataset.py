@@ -55,9 +55,9 @@ class Dataset:
         """
         Return the data loader for the train dataset.
 
-        :param batch_size: batch size of data loader
+        :param batch_size: batch size of data loader.
         :type batch_size: int
-        :return: torch.utils.data.DataLoader
+        :return: torch.utils.data.DataLoader.
         """
         return self.train_loader
 
@@ -65,7 +65,7 @@ class Dataset:
         """
         Return the data loader for the test dataset.
 
-        :param batch_size: batch size of data loader
+        :param batch_size: batch size of data loader.
         :type batch_size: int
         :return: torch.utils.data.DataLoader
         """
@@ -76,11 +76,11 @@ class Dataset:
         """
         Get a data loader created from a given set of data.
 
-        :param batch_size: batch size of data loader
+        :param batch_size: batch size of data loader.
         :type batch_size: int
-        :param X: data features
+        :param X: data features,
         :type X: numpy.Array()
-        :param Y: data labels
+        :param Y: data labels.
         :type Y: numpy.Array()
         :return: torch.utils.data.DataLoader
         """
