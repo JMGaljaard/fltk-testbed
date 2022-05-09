@@ -34,4 +34,4 @@ class DistMNISTDataset(DistDataset):
         self.test_dataset = datasets.MNIST(root=self.get_args().get_data_path(), train=False, download=True,
                                              transform=transforms.Compose([transforms.ToTensor()]))
         self.test_sampler = get_sampler(self.test_dataset, self.args)
-        self.test_loader = DataLoader(self.test_dataset, batch_size=16, sampler=self.test_sampler)
+        self.test_loader = DataLoader(self.test_dataset, batch_size=self.args.test_batch_size, sampler=self.test_sampler)

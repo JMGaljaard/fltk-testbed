@@ -2,6 +2,7 @@ from abc import abstractmethod
 from typing import Any
 
 # from fltk.util.arguments import Arguments
+from fltk.util.config import Config
 from fltk.util.log import getLogger
 
 
@@ -14,7 +15,7 @@ class DistDataset:
     test_loader = None
     logger = getLogger(__name__)
 
-    def __init__(self, args: Any):
+    def __init__(self, args: Config):
         self.args = args
 
     def get_args(self):
