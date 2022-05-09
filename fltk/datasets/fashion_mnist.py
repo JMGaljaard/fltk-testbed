@@ -25,5 +25,5 @@ class FashionMNISTDataset(Dataset):
                                              transform=transforms.Compose([transforms.ToTensor()]))
         sampler = DistributedSampler(test_dataset, rank=self.rank,
                                      num_replicas=self.world_size) if self.world_size else None
-        test_loader = DataLoader(test_dataset, batch_size=self.learning_params.batch_size, sampler=sampler)
+        test_loader = DataLoader(test_dataset, batch_size=self.learning_params.test_batch_size, sampler=sampler)
         return test_loader

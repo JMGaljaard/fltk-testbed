@@ -48,6 +48,7 @@ class LearningParameters:  # pylint: disable=too-many-instance-attributes
     model: str
     dataset: str
     batch_size: int
+    test_batch_size: int
     max_epoch: int
     learning_rate: float
     learning_decay: float
