@@ -39,8 +39,8 @@ def _get_distributed_config(args) -> Optional[DistributedConfig]:
             logging.info("Loading file {args.config}")
             config = DistributedConfig.from_dict(json.load(config_file))  # pylint: disable=no-member
             config.config_path = Path(args.config)
-    except Exception as excep:  # pylint: disable=broad-except
-        msg = f"Failed to get distributed config: {excep}"
+    except Exception as e:  # pylint: disable=broad-except
+        msg = f"Failed to get distributed config: {e}"
         logging.info(msg)
     return config
 
