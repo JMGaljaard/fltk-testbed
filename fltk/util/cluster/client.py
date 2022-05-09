@@ -1,5 +1,4 @@
 import logging
-import time
 from collections import defaultdict
 from dataclasses import dataclass
 from multiprocessing.pool import ThreadPool
@@ -7,6 +6,7 @@ from typing import Dict, List, Tuple, Optional, OrderedDict, Union
 from uuid import UUID
 
 import schedule
+import time
 from kubeflow.pytorchjob import V1PyTorchJob, V1ReplicaSpec, V1PyTorchJobSpec
 from kubernetes import client
 from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container, V1PodTemplateSpec, \
@@ -41,7 +41,7 @@ class BuildDescription:
     resources = OrderedDict[str, V1ResourceRequirements]()
     typed_containers = OrderedDict[str, V1Container]()
     typed_templates = OrderedDict[str, V1PodTemplateSpec]()
-    id: Optional[UUID] = None # pylint: disable=invalid-name
+    id: Optional[UUID] = None  # pylint: disable=invalid-name
     spec: Optional[V1PyTorchJobSpec] = None
     tolerations: Optional[List[V1Toleration]] = None
 
@@ -66,7 +66,7 @@ class ResourceWatchDog:
         """
         self._v1: client.CoreV1Api
         self._logger = logging.getLogger('ResourceWatchDog')
-        self._Q = Convert() # pylint: disable=invalid-name
+        self._Q = Convert()  # pylint: disable=invalid-name
 
     def stop(self) -> None:
         """
@@ -202,7 +202,7 @@ class ClusterManager(metaclass=Singleton):
         self._stop()
 
 
-def _generate_command(config: DistributedConfig, task: ArrivalTask, tpe: Optional[str] = None) -> List[str]:
+def _generate_command(config: DistributedConfig, task: ArrivalTask) -> List[str]:
     """
     Function to generate commands for containers to start working with. Either a federated learnign command
     will be realized, or a distributed learning command. Note that distributed learning commands will be revised
@@ -211,8 +211,6 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask, tpe: Optiona
     @type config:
     @param task:
     @type task:
-    @param federated:
-    @type federated:
     @return:
     @rtype:
     """
@@ -233,10 +231,12 @@ def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V
     """
     Function to build the Master worker container. This requires the LOG PV to be mounted on the expected
     logging directory. Make sure that any changes in the Helm charts are also reflected here.
-    @param name:
-    @type name:
-    @return:
-    @rtype:
+    @param conf: configuration object that contains specifics to properly start a client.
+    @type conf: DistributedConfig
+    @param name: Required name for deployment. Don't change unless you really need to.
+    @type name: str
+    @return: Unique experiment name, this will not be checked during deployment for uniqueness.
+    @rtype: str
     """
     volume_mounts: Optional[List[V1VolumeMount]] = []
     if requires_mount:
@@ -270,15 +270,15 @@ def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V
 
 def _resource_dict(mem: Union[str, int], cpu: Union[str, int]) -> Dict[str, str]:
     """
-    Private helper function to create a resource dictionary for deployments. Currently only supports the creation
-    of the requests/limits directory that is needed for a V1ResoruceRequirements object.
-    @param mem: Memory Request/Limit for a Container's ResoruceRequirement
+    Private helper function to create a resource dictionary for deployments. Currently, only supports the creation
+    of the requests/limits directory that is needed for a `V1ResourceRequirements` object.
+    @param mem: Memory Request/Limit for a Container's ResourceRequirement.
     @type mem: str
     @param cpu: CPU Request/Limit for a Container's ResourceRequirement.
     @type cpu: int
 
-    @return:
-    @rtype:
+    @return: Dictionary with resource requirements for a container (i.e. memory and cpu requests).
+    @rtype: Dict[str, str]
     """
     return {'memory': f'{mem}', 'cpu': f'{cpu}'}
 
@@ -286,7 +286,7 @@ def _resource_dict(mem: Union[str, int], cpu: Union[str, int]) -> Dict[str, str]
 class DeploymentBuilder:
     """
     Builder class to build a V1PytorchJob. This is to make construction of the complex required object easier.
-    Currently it requires the object to be built in order. As such, re-calling a specific function will require all
+    Currently, it requires the object to be built in order. As such, re-calling a specific function will require all
     following functions to be called. This is due to the bottom-to-top construction of the configuration objects.
 
     A later version might refactor to a jinja templating approach to be more flexible for re-construction.
@@ -315,29 +315,33 @@ class DeploymentBuilder:
         for tpe, sys_reqs in system_reqs.items():
             typed_req_dict = _resource_dict(mem=sys_reqs.memory,
                                             cpu=sys_reqs.cores)
-            # Currently the request is set to the limits. You may want to change this.
+            # Note: currently, the request is set to the limits. You may want to change this.
             self._build_description.resources[tpe] = client.V1ResourceRequirements(requests=typed_req_dict,
                                                                                    limits=typed_req_dict)
 
-    def build_container(self, task: ArrivalTask, conf: DistributedConfig, config_name_dict: Optional[Dict[str, str]]):
+    def build_container(self, task: ArrivalTask, conf: DistributedConfig,
+                        configmap_name_dict: Optional[Dict[str, str]]):
         """
         Function to build container descriptions for deploying from within an Orchestrator pod.
-        @param task:
-        @type task:
-        @param conf:
-        @type conf:
+        @param conf: configuration object that contains specifics to properly start a client.
+        @type conf: DistributedConfig
+        @param task: Learning task for which a job description must be made.
+        @type task: DistributedArrivalTask
+        @param configmap_name_dict: Mapping of pod names to their respective K8s configMap names.
+        @type configmap_name_dict: Optional[Dict[str, str]]
         @return:
         @rtype:
         """
         # TODO: Implement cmd / config reference.
         for indx, (tpe, curr_resource) in enumerate(self._build_description.resources.items()):
-            cmd = _generate_command(conf, task, tpe)
+            cmd = _generate_command(conf, task)
             container = _build_typed_container(conf, cmd, curr_resource,
                                                requires_mount=not indx,
-                                               experiment_name=config_name_dict[tpe])
+                                               experiment_name=configmap_name_dict[tpe])
             self._build_description.typed_containers[tpe] = container
 
-    def build_tolerations(self, tols: List[Tuple[str, Optional[str], str, str]] = None, specific_nodes=True) -> None:
+    def build_tolerations(self, tols: Optional[List[Tuple[str, Optional[str], str, str]]] = None,
+                          specific_nodes: bool = True) -> None:
         """
         Function to set the V1Tolerations in the job. This allows for scheduling pods on specific Kubernetes Nodes that
         have specific Taints. Setting tols to an empyt list of `specific_nodes` to False, a Pod becomes schedulable on
@@ -362,13 +366,15 @@ class DeploymentBuilder:
             self._build_description.tolerations = \
                 [V1Toleration(key=key, value=vl, operator=op, effect=effect) for key, vl, op, effect in tols]
 
-    def build_template(self, config_name_dict: Optional[Dict[str, str]]) -> None:
+    def build_template(self, configmap_name_dict: Optional[Dict[str, str]]) -> None:
         """
         Build Pod Template specs needed for PytorchJob object. This function will create the V1TemplateSpec
         with the required V1PodSpec  (including mounts fo volumes and containers, etc.). Requires other parameters to be
         set appropriately.
-        @return:
-        @rtype:
+        @param configmap_name_dict: Mapping of pod names to their respective K8s configMap names.
+        @type configmap_name_dict: Optional[Dict[str, str]]
+        @return: None
+        @rtype: None
         """
         # TODO: Add support for tolerations to use only affinity nodes to deploy to...
         # Ensure with taints that
@@ -378,8 +384,8 @@ class DeploymentBuilder:
             [V1Volume(name="fl-log-claim",
                       persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(claim_name='fl-log-claim'))
              ]
-        if config_name_dict:
-            for tpe, tpe_config_map_name in config_name_dict.items():
+        if configmap_name_dict:
+            for tpe, tpe_config_map_name in configmap_name_dict.items():
                 # Use default file permission 0644
                 conf_map = V1ConfigMapVolumeSource(name=tpe_config_map_name)
                 volumes.append(V1Volume(name=tpe_config_map_name,
@@ -402,8 +408,8 @@ class DeploymentBuilder:
         that is being constructed.
         @param task: Arrival task containing the specifications of the replica counts.
         @type task: ArrivalTask
-        @param restart_policy: Optional parameter to set the restart policy. By default it will not restart any pods
-        using the option "Never".
+        @param restart_policy: Optional parameter to set the restart policy. Default behavior is to not restart pods by
+        setting their restartPolicy to the option "Never".
         @type restart_policy: str
         @return: None
         @rtype: None
@@ -436,12 +442,19 @@ class DeploymentBuilder:
                 spec=self._build_description.spec)
         return job
 
-    def create_identifier(self, task: ArrivalTask):  # pylint: disable=missing-function-docstring
+    def create_identifier(self, task: ArrivalTask):
+        """
+        Function to set the task identifier.
+        @param task: Learning task for which a job description must be made.
+        @type task: DistributedArrivalTask
+        @return: None
+        @rtype: None
+        """
         self._build_description.id = task.id
 
 
 def construct_job(conf: DistributedConfig, task: ArrivalTask,
-                  config_name_dict: Optional[Dict[str, str]] = None) -> V1PyTorchJob:
+                  configmap_name_dict: Optional[Dict[str, str]] = None) -> V1PyTorchJob:
     """
     Function to build a Job, based on the specifications of an ArrivalTask, and the general configuration of the
     DistributedConfig.
@@ -449,18 +462,21 @@ def construct_job(conf: DistributedConfig, task: ArrivalTask,
     @type conf: DistributedConfig
     @param task: Learning task for which a job description must be made.
     @type task: DistributedArrivalTask
-    @return: KubeFlow compatible PyTorchJob description to create a Job with the requested system and hyper parameters.
+    @param configmap_name_dict: Mapping of pod names to their respective K8s configMap names.
+    @type configmap_name_dict: Optional[Dict[str, str]]
+    @return: KubeFlow compatible PyTorchJob description to create a Job with the requested system and hyper-parameters.
     @rtype: V1PyTorchJob
     """
 
     dp_builder = DeploymentBuilder()
     dp_builder.create_identifier(task)
     dp_builder.build_resources(task)
-    dp_builder.build_container(task, conf, config_name_dict)
+    dp_builder.build_container(task, conf, configmap_name_dict)
     dp_builder.build_tolerations()
-    dp_builder.build_template(config_name_dict)
+    dp_builder.build_template(configmap_name_dict)
     dp_builder.build_spec(task)
     job = dp_builder.construct()
     # Fix to deploy on more up-to-date Kubernetes clusters. See if needed for KubeFlow operator release.
+    # This can be removed under Kubeflow v1.5
     job.openapi_types = job.swagger_types
     return job
