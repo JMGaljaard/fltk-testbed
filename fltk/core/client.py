@@ -153,7 +153,7 @@ class Client(Node):
 
     def exec_round(self, num_epochs: int) -> Tuple[Any, Any, Any, Any, float, float, float, np.array]:
         """
-        Function as access point for the Federator Node to kick-off a remote learning round on a client.
+        Function as access point for the Federator Node to kick off a remote learning round on a client.
         @param num_epochs: Number of epochs to run
         @type num_epochs: int
         @return: Tuple containing the statistics of the training round; loss, weights, accuracy, test_loss, make-span,
