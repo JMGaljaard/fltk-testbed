@@ -23,7 +23,7 @@
       "hyperParameters": {
         "default": {
           "batchSize": 128,
-          "testBatchSize": 1000,
+          "testBatchSize": 128,
           "learningRateDecay": 0.0002,
           "optimizerConfig": {
             "type": "SGD",

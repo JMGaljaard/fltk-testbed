@@ -19,12 +19,15 @@
       "hyperParameters": {
         "default": {
           "batchSize": 128,
-          "testBatchSize": 1000,
+          "testBatchSize": 128,
           "learningRateDecay": 0.0002,
           "optimizerConfig": {
             "type": "Adam",
             "learningRate": 0.001,
-            "betas": [0.9, 0.999]
+            "betas": [
+              0.9,
+              0.999
+            ]
           },
           "schedulerConfig": {
             "schedulerStepSize": 50,
@@ -44,8 +47,10 @@
       "experimentConfiguration": {
         "randomSeed": [
           1,
-          2,
-          5
+          41,
+          42,
+          43,
+          430
         ]
       }
     }
