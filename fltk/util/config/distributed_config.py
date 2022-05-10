@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 from dataclasses_json import config, dataclass_json
 
@@ -121,7 +122,7 @@ class DistributedConfig():
     """
     execution_config: ExecutionConfig
     cluster_config: ClusterConfig = field(metadata=config(field_name="cluster"))
-    config_path: Path = None
+    config_path: Optional[Path] = None
 
     def get_duration(self) -> int:
         """
