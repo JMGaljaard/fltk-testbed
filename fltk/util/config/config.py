@@ -21,11 +21,14 @@ from fltk.util.config.definitions.net import Nets
 from fltk.util.config.definitions.optim import Optimizations
 
 
-def get_safe_loader():
+def get_safe_loader() -> yaml.SafeLoader:
     """
-    Function to get safe-loader.
-    @return:
-    @rtype:
+    Function to get a yaml SafeLoader that is capable of properly parsing yaml compatible floats.
+
+    By default otherwise loading a value such as `1e-10` will result in in being parsed as a string.
+
+    @return: SafeLoader capable of parsing scientificly notated yaml values.
+    @rtype: yaml.SafeLoader
     """
     # Current version of yaml does not parse numbers like 1e-10 correctly, resulting in a str type.
     # Credits to https://stackoverflow.com/a/30462009/14661801
@@ -99,22 +102,6 @@ class Config:
     save_data_append: bool = False
     output_path: Path = field(metadata=config(encoder=str, decoder=Path), default=Path('logging'))
 
-    def __init__(self, **kwargs) -> None:
-        enum_fields = [x for x in self.__dataclass_fields__.items() if
-                       isinstance(x[1].type, Enum) or isinstance(x[1].type, EnumMeta)]
-        if 'dataset' in kwargs and 'dataset_name' not in kwargs:
-            kwargs['dataset_name'] = kwargs['dataset']
-        if 'net' in kwargs and 'net_name' not in kwargs:
-            kwargs['net_name'] = kwargs['net']
-        for name, field in enum_fields:
-            if name in kwargs and isinstance(kwargs[name], str):
-                kwargs[name] = field.type(kwargs[name])
-        for name, value in kwargs.items():
-            self.__setattr__(name, value)
-            if name == 'output_location':
-                self.output_path = Path(value)
-        self.update_rng_seed()
-
     def update_rng_seed(self):
         torch.manual_seed(self.rng_seed)
 
@@ -143,7 +130,21 @@ class Config:
         return self.loss_function
 
     @staticmethod
-    def FromYamlFile(path: Path):
+    def from_yaml(path: Path):
+        """
+        Parse yaml file to dataclass. Re-implemented to rely on dataclasses_json to load data with tested library.
+
+        Alternatively, running the followign code would result in loading a JSON formatted configuration file, in case
+        you prefer to create json based configuration files.
+
+        >>> with open("configs/example.json") as f:
+        >>>     Config.from_json(f.read())
+
+        @param path: Path pointing to configuration yaml file.
+        @type path: Path
+        @return: Configuration dataclass representation of the configuration file.
+        @rtype: Config
+        """
         getLogger(__name__).debug(f'Loading yaml from {path.absolute()}')
         safe_loader = get_safe_loader()
         with open(path) as file:
