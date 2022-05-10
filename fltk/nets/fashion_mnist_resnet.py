@@ -16,6 +16,7 @@ class Residual(torch.nn.Module):
             self.conv3 = None
 
     def forward(self, x): # pylint: disable=missing-function-docstring
+        # TODO: Resolve sizing issue with bn2. Have to find reference implementation.
         y = self.conv1(self.relu(self.bn1(x)))
         y = self.conv2(self.relu(self.bn2(y)))
         # print (y.shape)

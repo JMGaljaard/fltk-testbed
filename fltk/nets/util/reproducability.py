@@ -1,10 +1,11 @@
 import os
+from typing import Optional
 
 import numpy as np
 import torch
 
 from fltk.util.config.distributed_config import ExecutionConfig
-from fltk.util.config.arguments import LearningParameters
+from fltk.util.config.arguments import DistLearningConfig
 
 
 def cuda_reproducible_backend(cuda: bool) -> None:
@@ -24,7 +25,7 @@ def cuda_reproducible_backend(cuda: bool) -> None:
         torch.backends.cudnn.deterministic = False
 
 
-def init_reproducibility(config: ExecutionConfig) -> None:
+def init_reproducibility(config: Optional[ExecutionConfig] = None, test_seed: int = 42) -> None:
     """
     Function to pre-set all seeds for libraries used during training. Allows for re-producible network initialization,
     and non-deterministic number generation. Allows to prevent 'lucky' draws in network initialization.
@@ -33,17 +34,25 @@ def init_reproducibility(config: ExecutionConfig) -> None:
     @return: None
     @rtype: None
     """
-    random_seed = config.reproducibility.arrival_seed
-    torch_seed = config.reproducibility.torch_seed
+    if config:
+        random_seed = config.reproducibility.arrival_seed
+        torch_seed = config.reproducibility.torch_seed
+        cuda = config.cuda
+    else:
+        random_seed = test_seed
+        torch_seed = test_seed
+        cuda = torch.cuda.is_available()
+
     torch.manual_seed(torch_seed)
-    if config.cuda:
+    if cuda:
         torch.cuda.manual_seed_all(torch_seed)
         cuda_reproducible_backend(True)
     np.random.seed(random_seed)
     os.environ['PYTHONHASHSEED'] = str(random_seed)
 
 
-def init_learning_reproducibility(params: LearningParameters) -> None:
+
+def init_learning_reproducibility(params: DistLearningConfig) -> None:
     """
     Function to pre-set all seeds for libraries used during training. Allows for re-producible network initialization,
     and non-deterministic number generation. Allows to prevent 'lucky' draws in network initialization.
