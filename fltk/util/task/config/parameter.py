@@ -2,9 +2,11 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+# noinspection PyUnresolvedReferences
 from typing import List, Optional, OrderedDict, Any, Union, Tuple, Type, Dict, MutableMapping, T
 
 from dataclasses_json import dataclass_json, LetterCase, config
+# noinspection PyProtectedMember
 from torch.nn.modules.loss import _Loss
 
 from fltk.util.config.definitions import DataSampler, Nets, Aggregations, Optimizations, Dataset, ExperimentType
@@ -306,8 +308,6 @@ class TrainTask:
         Overridden init method for dataclass, to allow for 'exploding' a JobDescription object to a flattened object.
         @param job_parameters:
         @type job_parameters:
-        @param job_description:
-        @type job_description:
         @param priority:
         @type priority:
         """
