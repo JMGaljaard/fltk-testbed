@@ -1,4 +1,5 @@
 from fltk.datasets.distributed import DistMNISTDataset, DistFashionMNISTDataset, DistCIFAR100Dataset, DistCIFAR10Dataset
+from fltk.datasets import MNIST, FashionMNISTDataset, CIFAR10Dataset, CIFAR100Dataset
 from fltk.util.config.definitions.dataset import Dataset
 
 
@@ -10,6 +11,13 @@ def available_datasets():
         Dataset.mnist: DistMNISTDataset
     }
 
+def available_dataparallel_datasets():
+    return {
+        Dataset.cifar10: CIFAR10Dataset,
+        Dataset.cifar100: CIFAR100Dataset,
+        Dataset.fashion_mnist: FashionMNISTDataset,
+        Dataset.mnist: MNIST
+    }
 
 def get_dataset(name: Dataset):
     return available_datasets()[name]
@@ -33,3 +41,7 @@ def get_test_loader_path(name: Dataset) -> str:
         Dataset.mnist: 'data_loaders/mnist/test_data_loader.pickle',
     }
     return paths[name]
+
+
+def get_dist_dataset(name: Dataset):
+    return available_dataparallel_datasets()[name]

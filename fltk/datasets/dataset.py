@@ -4,12 +4,12 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.data import TensorDataset
 
-from fltk.util.config.arguments import LearningParameters
+from fltk.util.config.arguments import DistLearningConfig
 
 
 class Dataset:
 
-    def __init__(self, config, learning_params: LearningParameters, rank: int, world_size: int):
+    def __init__(self, config, learning_params: DistLearningConfig, rank: int, world_size: int):
         self.config = config
         self.learning_params = learning_params
 
