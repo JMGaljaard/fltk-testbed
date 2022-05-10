@@ -1,5 +1,6 @@
 # pylint: disable=invalid-name
 import torch
+# noinspection PyUnresolvedReferences
 from torch.optim.optimizer import Optimizer, required
 
 
@@ -165,7 +166,7 @@ class FedNova(Optimizer):
 
     def pre_communicate(self):
         """
-        Function to perform pre-communication communications during Federated Learning for FedNova aggregration.
+        Function to perform pre-communication communications during Federated Learning for FedNova aggregation.
         @return: None
         @rtype: None
         """
