@@ -86,6 +86,11 @@ class ClusterConfig:
     image: str = 'fltk:latest'
 
     def load_incluster_namespace(self):
+        """
+        Function to retreive information from teh cluster itself provided by K8s.
+        @return: None
+        @rtype: None
+        """
         with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace") as f:
             current_namespace = f.read()
             self.namespace = current_namespace
