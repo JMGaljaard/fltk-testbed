@@ -204,7 +204,7 @@ def launch_single(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
     # We can iterate over all the experiments in the directory and execute it, as long as the system remains the same!
     # System = machines and its configuration
     print(conf_path)
-    s_conf = Config.FromYamlFile(conf_path)
+    s_conf = Config.from_yaml(conf_path)
     s_conf.world_size = conf.num_clients + 1
     s_conf.replication_id = prefix
     federator_node = Federator('federator', 0, conf.world_size, s_conf)
@@ -238,7 +238,7 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
     @return: None
     @rtype: None
     """
-    r_conf = Config.FromYamlFile(conf_path)
+    r_conf = Config.from_yaml(conf_path)
     r_conf.world_size = r_conf.num_clients + 1
     r_conf.replication_id = prefix
     if rank and not (nic and host):
