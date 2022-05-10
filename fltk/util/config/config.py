@@ -45,8 +45,8 @@ def get_safe_loader() -> yaml.SafeLoader:
             list(u'-+0123456789.'))
     return safe_loader
 
-@dataclass
 @dataclass_json
+@dataclass
 class Config:
     batch_size: int = 1
     test_batch_size: int = 1000
