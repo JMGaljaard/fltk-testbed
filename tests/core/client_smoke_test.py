@@ -59,7 +59,7 @@ class TestFederatedLearnerSmoke(unittest.TestCase):
     learning_config: Config = None
 
     def setUp(self):
-        self.learning_config = Config.FromYamlFile(Path(TEST_PARAM_CONF_FEDERATED))
+        self.learning_config = Config.from_yaml(Path(TEST_PARAM_CONF_FEDERATED))
 
     @parameterized.expand(
         [[f"{x.value}-{y.value}", x, y] for x, y in MODEL_SET_PAIRING]
