@@ -1,8 +1,9 @@
+import logging
 from typing import Type, Dict
 
 import torch
 
-from ..util.config.definitions.net import Nets
+from fltk.util.config.definitions.net import Nets
 from .cifar_100_resnet import Cifar100ResNet
 from .cifar_100_vgg import Cifar100VGG, vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn
 from .cifar_10_cnn import Cifar10CNN
@@ -28,7 +29,6 @@ def _available_nets() -> Dict[Nets, Type[torch.nn.Module]]:
         Nets.fashion_mnist_cnn: FashionMNISTCNN,
         Nets.fashion_mnist_resnet: FashionMNISTResNet,
         Nets.mnist_cnn: MNIST_CNN,
-
     }
 
 
@@ -40,6 +40,7 @@ def get_net(name: Nets) -> Type[torch.nn.Module]:
     @return: Class reference to required Network.
     @rtype: Type[torch.nn.Module]
     """
+    logging.info(f"Getting net: {name}")
     return _available_nets()[name]
 
 
