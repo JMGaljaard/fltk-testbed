@@ -9,17 +9,19 @@ from sklearn.metrics import confusion_matrix
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.core.distributed.dist_node import DistNode
+from fltk.datasets.loader_util import get_dist_dataset
+from fltk.nets import get_net
 from fltk.nets.util import calculate_class_precision, calculate_class_recall, save_model, load_model_from_file
 from fltk.schedulers import MinCapableStepLR, LearningScheduler
 from fltk.util.config import DistributedConfig
-from fltk.util.config.arguments import LearningParameters
+from fltk.util.config.arguments import DistLearningConfig
 from fltk.util.results import EpochData
 
 
 class DistClient(DistNode):
 
     def __init__(self, rank: int, task_id: str, world_size: int, config: DistributedConfig = None,
-                 learning_params: LearningParameters = None):
+                 learning_params: DistLearningConfig = None):
         """
         @param rank: PyTorch rank provided by KubeFlow setup.
         @type rank: int
@@ -28,7 +30,7 @@ class DistClient(DistNode):
         @param config: Parsed configuration file representation to extract runtime information from.
         @type config: DistributedConfig
         @param learning_params: Hyper-parameter configuration to be used during the training process by the learner.
-        @type learning_params: LearningParameters
+        @type learning_params: DistLearningConfig
         """
         self._logger = logging.getLogger(f'Client-{rank}-{task_id}')
 
@@ -42,9 +44,8 @@ class DistClient(DistNode):
 
         # Create model and dataset
         self.loss_function = self.learning_params.get_loss()()
-        self.dataset = self.learning_params.get_dataset_class()(self.config, self.learning_params, self._id,
-                                                                self._world_size)
-        self.model = self.learning_params.get_model_class()()
+        self.dataset = get_dist_dataset(self.learning_params.dataset)(self.config, self.learning_params, self._id, self._world_size)
+        self.model = get_net(self.learning_params.model)()
         self.device = self._init_device()
 
         self.optimizer: torch.optim.Optimizer
@@ -76,8 +77,9 @@ class DistClient(DistNode):
                                           self.learning_params.scheduler_gamma,
                                           self.learning_params.min_lr)
 
-        self.tb_writer = SummaryWriter(
-            str(self.config.get_log_path(self._task_id, self._id, self.learning_params.model)))
+        if self.config.execution_config.tensorboard.active:
+            self.tb_writer = SummaryWriter(
+                str(self.config.get_log_path(self._task_id, self._id, self.learning_params.model)))
 
     def stop_learner(self):
         """
@@ -267,11 +269,11 @@ class DistClient(DistNode):
         @return: None
         @rtype: None
         """
+        if self.config.execution_config.tensorboard.active:
+            self.tb_writer.add_scalar('training loss per epoch',
+                                      epoch_data.loss_train,
+                                      epoch)
 
-        self.tb_writer.add_scalar('training loss per epoch',
-                                  epoch_data.loss_train,
-                                  epoch)
-
-        self.tb_writer.add_scalar('accuracy per epoch',
-                                  epoch_data.accuracy,
-                                  epoch)
+            self.tb_writer.add_scalar('accuracy per epoch',
+                                      epoch_data.accuracy,
+                                      epoch)
