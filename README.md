@@ -479,8 +479,16 @@ default configuration. As described in the [values](./charts/orchestrator/values
 
 ## Running tests
 In addition to the FLTK framework implementation, some tests are available to prevent regression of bugs. Currently, only a limited subset of features 
-is tested of FLTK. All current tests are deterministic, flaky tests indicate that something is likely broken
+is tested of FLTK. All current tests are deterministic, flaky tests indicate that something is likely broken.
 
+To run the test included, run the following command to run the tests in a terminal:
+
+
+```bash
+python3 -m pytest tests
+```
+
+These tests should all pass (currently, mainly providing smoke tests). Warnings can be safely ignored.
 ### Prerequisites
 Setup a `development` virtual environment, using the [`requirements-dev.txt`](requirements-dev.txt) requirements file.
 This will install the same requirements as the [`requirements.txt`](requirements.txt), with some additional packages needed to run the tests.
