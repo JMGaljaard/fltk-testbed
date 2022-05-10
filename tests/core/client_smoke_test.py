@@ -71,7 +71,6 @@ class TestFederatedLearnerSmoke(unittest.TestCase):
         fed_client = Client('test-id', 1, 60000, self.learning_config)
 
         fed_client.init_dataloader()
-        # _limit_dataset(fed_client)
         self.assertTrue(fed_client.is_ready())
 
         with patch.object(DS, 'get_train_dataset', fed_client.dataset):
