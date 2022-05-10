@@ -1,5 +1,4 @@
 import argparse
-import json
 import logging
 from pathlib import Path
 from typing import Optional, Any, Dict
@@ -8,7 +7,7 @@ import sys
 
 from fltk.launch import launch_extractor, launch_client, launch_single, \
     launch_remote, launch_cluster, launch_signature
-from fltk.util.config import DistributedConfig
+from fltk.util.config import get_distributed_config
 from fltk.util.config.arguments import create_all_subparsers
 from fltk.util.generate_experiments import generate, run
 
@@ -32,19 +31,6 @@ def _save_get(args, param) -> Optional[Any]:
     return save_argument
 
 
-def _get_distributed_config(args) -> Optional[DistributedConfig]:
-    config = None
-    try:
-        with open(args.config, 'r') as config_file:
-            logging.info("Loading file {args.config}")
-            config = DistributedConfig.from_dict(json.load(config_file))  # pylint: disable=no-member
-            config.config_path = Path(args.config)
-    except Exception as e:  # pylint: disable=broad-except
-        msg = f"Failed to get distributed config: {e}"
-        logging.info(msg)
-    return config
-
-
 def __main__():
     """
     Main loop to perform learning (either Federated or Distributed). Note that Orchestrator is part of this setup for
@@ -59,7 +45,7 @@ def __main__():
     # To create your own parser mirror the construction in the 'client_parser' object.
     # Or refer to the ArgumentParser library documentation.
     args = parser.parse_args()
-    distributed_config = _get_distributed_config(args)
+    distributed_config = get_distributed_config(args)
 
     arg_path, conf_path = None, None
     try:

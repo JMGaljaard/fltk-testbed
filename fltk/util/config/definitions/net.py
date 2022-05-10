@@ -1,5 +1,4 @@
-from enum import unique, Enum
-
+from aenum import unique, Enum
 
 @unique
 class Nets(Enum):
@@ -10,3 +9,9 @@ class Nets(Enum):
     fashion_mnist_cnn = "FashionMNISTCNN"
     fashion_mnist_resnet = "FashionMNISTResNet"
     mnist_cnn = 'MNISTCNN'
+
+    @classmethod
+    def _missing_name_(cls, name: str):
+        for member in cls:
+            if member.name.lower() == name.lower():
+                return member

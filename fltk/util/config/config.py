@@ -1,23 +1,49 @@
 # pylint: disable=missing-function-docstring,invalid-name
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, EnumMeta
 from logging import getLogger
 from pathlib import Path
-from typing import Type
+from typing import Type, List
+
+import re
 
 import torch
 import yaml
+from dataclasses_json import config, dataclass_json
+# noinspection PyProtectedMember
 from torch.nn.modules.loss import _Loss
 
 from fltk.util.config.definitions import DataSampler
-from fltk.util.config.definitions.net import Nets
 from fltk.util.config.definitions.aggregate import Aggregations
-from fltk.util.config.definitions.logging import LogLevel
 from fltk.util.config.definitions.dataset import Dataset
+from fltk.util.config.definitions.logging import LogLevel
+from fltk.util.config.definitions.net import Nets
 from fltk.util.config.definitions.optim import Optimizations
 
 
+def get_safe_loader():
+    """
+    Function to get safe-loader.
+    @return:
+    @rtype:
+    """
+    # Current version of yaml does not parse numbers like 1e-10 correctly, resulting in a str type.
+    # Credits to https://stackoverflow.com/a/30462009/14661801
+    safe_loader = yaml.SafeLoader
+    safe_loader.add_implicit_resolver(
+            u'tag:yaml.org,2002:float',
+            re.compile(u'''^(?:
+             [-+]?(?:[0-9][0-9_]*)\\.[0-9_]*(?:[eE][-+]?[0-9]+)?
+            |[-+]?(?:[0-9][0-9_]*)(?:[eE][-+]?[0-9]+)
+            |\\.[0-9_]+(?:[eE][-+][0-9]+)?
+            |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*
+            |[-+]?\\.(?:inf|Inf|INF)
+            |\\.(?:nan|NaN|NAN))$''', re.X),
+            list(u'-+0123456789.'))
+    return safe_loader
+
 @dataclass
+@dataclass_json
 class Config:
     batch_size: int = 1
     test_batch_size: int = 1000
@@ -31,8 +57,6 @@ class Config:
     scheduler_step_size: int = 50
     scheduler_gamma: float = 0.5
     min_lr: float = 1e-10
-
-    # @TODO: Set seed from configuration
     rng_seed = 0
 
     # Enum
@@ -59,7 +83,7 @@ class Config:
     data_path: str = "data"
     # Enum
     data_sampler: DataSampler = DataSampler.uniform
-    data_sampler_args = []
+    data_sampler_args: List[float] = field(default_factory=list)
 
     # Set by Node upon argument
     rank: int = 0
@@ -68,15 +92,16 @@ class Config:
     replication_id: int = None
     experiment_prefix: str = ''
 
-    real_time : bool = False
+    real_time: bool = False
 
     # Save data in append mode. Thereby flushing on every append to file.
     # This could be useful when a system is likely to crash midway an experiment
     save_data_append: bool = False
-    output_path: Path = Path('logging')
+    output_path: Path = field(metadata=config(encoder=str, decoder=Path), default=Path('logging'))
 
     def __init__(self, **kwargs) -> None:
-        enum_fields = [x for x in self.__dataclass_fields__.items() if isinstance(x[1].type, Enum) or isinstance(x[1].type, EnumMeta)]
+        enum_fields = [x for x in self.__dataclass_fields__.items() if
+                       isinstance(x[1].type, Enum) or isinstance(x[1].type, EnumMeta)]
         if 'dataset' in kwargs and 'dataset_name' not in kwargs:
             kwargs['dataset_name'] = kwargs['dataset']
         if 'net' in kwargs and 'net_name' not in kwargs:
@@ -117,11 +142,11 @@ class Config:
     def get_loss_function(self) -> Type[_Loss]:
         return self.loss_function
 
-    @classmethod
-    def FromYamlFile(cls, path: Path):
+    @staticmethod
+    def FromYamlFile(path: Path):
         getLogger(__name__).debug(f'Loading yaml from {path.absolute()}')
+        safe_loader = get_safe_loader()
         with open(path) as file:
-            content = yaml.safe_load(file)
-            for k, v in content.items():
-                getLogger(__name__).debug(f'Inserting key "{k}" into config')
-            return cls(**content)
+            content = yaml.load(file, Loader=safe_loader)
+            conf = Config.from_dict(content)
+        return conf
