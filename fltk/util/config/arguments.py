@@ -1,31 +1,13 @@
 import logging
 from argparse import ArgumentParser
 from dataclasses import dataclass
-from typing import List, Type, Dict, T, Union
+from typing import List, Type, Dict, T, Union, Any
 
 import torch.distributed as dist
 import torch.nn
 from dataclasses_json import dataclass_json
 
-import fltk.nets as nets
-from fltk.datasets import CIFAR10Dataset, FashionMNISTDataset, CIFAR100Dataset, MNIST
-from fltk.datasets.dataset import Dataset
-
-_available_nets = {
-    "CIFAR100RESNET": nets.Cifar100ResNet,
-    "CIFAR100VGG": nets.Cifar100VGG,
-    "CIFAR10CNN": nets.Cifar10CNN,
-    "CIFAR10RESNET": nets.Cifar10ResNet,
-    "FASHIONMNISTCNN": nets.FashionMNISTCNN,
-    "FASHIONMNISTRESNET": nets.FashionMNISTResNet
-}
-
-_available_data = {
-    "CIFAR10": CIFAR10Dataset,
-    "CIFAR100": CIFAR100Dataset,
-    "FASHIONMNIST": FashionMNISTDataset,
-    "MNIST": MNIST
-}
+from fltk.util.config.definitions import Nets, Dataset
 
 _available_loss = {
     "CROSSENTROPYLOSS": torch.nn.CrossEntropyLoss,
@@ -41,12 +23,12 @@ _available_optimizer: Dict[str, Type[torch.optim.Optimizer]] = {
 
 @dataclass_json
 @dataclass(frozen=True)
-class LearningParameters:  # pylint: disable=too-many-instance-attributes
+class DistLearningConfig:  # pylint: disable=too-many-instance-attributes
     """
     Class encapsulating LearningParameters, for now used under DistributedLearning.
     """
-    model: str
-    dataset: str
+    model: Nets
+    dataset: Dataset
     batch_size: int
     test_batch_size: int
     max_epoch: int
@@ -54,7 +36,7 @@ class LearningParameters:  # pylint: disable=too-many-instance-attributes
     learning_decay: float
     loss: str
     optimizer: str
-    optimizer_args: Union[float, List[float]]
+    optimizer_args: Dict[str, Any]
     scheduler_step_size: int
     scheduler_gamma: float
     min_lr: float
@@ -78,21 +60,21 @@ class LearningParameters:  # pylint: disable=too-many-instance-attributes
             logging.fatal(f"Cannot find configuration parameter {keyword} in dictionary.")
         return lookup.get(safe_keyword)
 
-    def get_model_class(self) -> Type[torch.nn.Module]:
-        """
-        Function to obtain the model class that was given via commandline.
-        @return: Type corresponding to the model that was passed as argument.
-        @rtype: Type[torch.nn.Module]
-        """
-        return self.__safe_get(_available_nets, self.model)
+    # def get_model_class(self) -> Type[torch.nn.Module]:
+    #     """
+    #     Function to obtain the model class that was given via commandline.
+    #     @return: Type corresponding to the model that was passed as argument.
+    #     @rtype: Type[torch.nn.Module]
+    #     """
+    #     return get_net(self.model)
 
-    def get_dataset_class(self) -> Type[Dataset]:
-        """
-        Function to obtain the dataset class that was given via commandline.
-        @return: Type corresponding to the dataset that was passed as argument.
-        @rtype: Type[Dataset]
-        """
-        return self.__safe_get(_available_data, self.dataset)
+    # def get_dataset_class(self) -> Type[Dataset]:
+    #     """
+    #     Function to obtain the dataset class that was given via commandline.
+    #     @return: Type corresponding to the dataset that was passed as argument.
+    #     @rtype: Type[Dataset]
+    #     """
+    #     return get_dataset(self.dataset)
 
     def get_loss(self) -> Type:
         """
