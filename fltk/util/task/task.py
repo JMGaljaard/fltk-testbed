@@ -2,7 +2,8 @@ import abc
 import collections
 import uuid
 from dataclasses import field, dataclass
-from typing import OrderedDict, List, Optional, T
+# noinspection PyUnresolvedReferences
+from typing import OrderedDict, Optional, T, List
 from uuid import UUID
 
 from fltk.datasets.dataset import Dataset
@@ -50,8 +51,6 @@ class ArrivalTask(abc.ABC):
     def named_system_params(self) -> OrderedDict[str, SystemResources]:
         """
         Helper function to get system parameters by name.
-        @param kwargs: kwargs for arguments.
-        @type kwargs: dict
         @return: Dictionary corresponding to System resources per learner type.
         @rtype: OrderedDict[str, SystemResources]
         """
@@ -89,8 +88,6 @@ class ArrivalTask(abc.ABC):
         """
         Helper function to acquire federated learning parameters as-though the configuration is a flat configuration
         file.
-        @param tpe:
-        @type tpe:
         @param parameter:
         @type parameter:
         @return:
@@ -98,12 +95,12 @@ class ArrivalTask(abc.ABC):
         """
         return getattr(self.learning_parameters, parameter)
 
-    def get_sampler_param(self, tpe, parameter):
+    def get_sampler_param(self, tpe: str, parameter: LearningParameters):
         """
         Helper function to acquire federated data sampler parameters as-though the configuration is a flat configuration
         file.
-        @param tpe:
-        @type tpe:
+        @param tpe: Type indication for a learner, future version with heterogenous deployment would require this.
+        @type tpe: str
         @param parameter:
         @type parameter:
         @return:
@@ -111,16 +108,14 @@ class ArrivalTask(abc.ABC):
         """
         return getattr(self.learning_parameters.data_sampler, parameter)
 
-    def get_sampler_args(self, tpe: str):
+    def get_sampler_args(self, tpe: str) -> List[str]:
         """
         Helper function to acquire federated data sampler arguments as-though the configuration is a flat configuration
         file.
-        @param tpe:
-        @type tpe:
-        @param parameter:
-        @type parameter:
-        @return:
-        @rtype:
+        @param tpe: Type indication for a learner, future version with heterogenous deployment would require this.
+        @type tpe: str
+        @return: Arguments for the sampler function.
+        @rtype: List[str]
         """
         sampler_conf: SamplerConfiguration = self.learning_parameters.data_sampler
         args = [sampler_conf.q_value, sampler_conf.seed]
