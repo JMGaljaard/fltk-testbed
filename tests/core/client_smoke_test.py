@@ -9,7 +9,7 @@ from parameterized import parameterized
 
 from fltk.core.client import Client
 from fltk.core.distributed import DistClient
-from fltk.util.config import DistributedConfig, get_distributed_config, get_learning_param_config, Config, \
+from fltk.util.config import DistributedConfig, get_distributed_config, get_learning_param_config, FedLearningConfig, \
     DistLearningConfig
 
 from fltk.datasets.dataset import Dataset as DS
@@ -56,10 +56,10 @@ class TestLocalDistLearnerSmoke(unittest.TestCase):
 
 
 class TestFederatedLearnerSmoke(unittest.TestCase):
-    learning_config: Config = None
+    learning_config: FedLearningConfig = None
 
     def setUp(self):
-        self.learning_config = Config.from_yaml(Path(TEST_PARAM_CONF_FEDERATED))
+        self.learning_config = FedLearningConfig.from_yaml(Path(TEST_PARAM_CONF_FEDERATED))
 
     @parameterized.expand(
         [[f"{x.value}-{y.value}", x, y] for x, y in MODEL_SET_PAIRING]

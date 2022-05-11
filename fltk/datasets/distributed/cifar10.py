@@ -4,7 +4,7 @@ from torchvision import transforms
 
 from fltk.datasets.distributed.dataset import DistDataset
 from fltk.samplers import get_sampler
-from fltk.util.config import Config
+from fltk.util.config import FedLearningConfig
 
 
 class DistCIFAR10Dataset(DistDataset):
@@ -12,7 +12,7 @@ class DistCIFAR10Dataset(DistDataset):
     CIFAR10 Dataset implementation for Distributed learning experiments.
     """
 
-    def __init__(self, args: Config):
+    def __init__(self, args: FedLearningConfig):
         super(DistCIFAR10Dataset, self).__init__(args)
         self.init_train_dataset()
         self.init_test_dataset()

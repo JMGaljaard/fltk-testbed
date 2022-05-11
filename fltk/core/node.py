@@ -6,7 +6,7 @@ import torch
 from torch.distributed import rpc
 from fltk.datasets.loader_util import get_dataset
 from fltk.nets import get_net
-from fltk.util.config import Config
+from fltk.util.config import FedLearningConfig
 from fltk.util.log import getLogger
 
 # Global dictionary to enable peer to peer communication between clients
@@ -30,7 +30,7 @@ class Node(abc.ABC):
     dataset: Any
     logger = getLogger(__name__)
 
-    def __init__(self, identifier: str, rank: int, world_size: int, config: Config):
+    def __init__(self, identifier: str, rank: int, world_size: int, config: FedLearningConfig):
         self.config = config
         self.id = identifier # pylint: disable=invalid-name
         self.rank = rank
@@ -40,7 +40,7 @@ class Node(abc.ABC):
         global_vars['self'] = self
         self._config(config)
 
-    def _config(self, config: Config):
+    def _config(self, config: FedLearningConfig):
         self.logger.setLevel(config.log_level.value)
         self.config.rank = self.rank
         self.config.world_size = self.world_size
