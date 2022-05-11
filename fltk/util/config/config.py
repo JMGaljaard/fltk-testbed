@@ -48,9 +48,10 @@ def get_safe_loader() -> yaml.SafeLoader:
             list(u'-+0123456789.'))
     return safe_loader
 
+
 @dataclass_json
 @dataclass
-class Config:
+class FedLearningConfig:
     batch_size: int = 1
     test_batch_size: int = 1000
     rounds: int = 2
@@ -141,18 +142,18 @@ class Config:
         you prefer to create json based configuration files.
 
         >>> with open("configs/example.json") as f:
-        >>>     Config.from_json(f.read())
+        >>>     FedLearningConfig.from_json(f.read())
 
         @param path: Path pointing to configuration yaml file.
         @type path: Path
         @return: Configuration dataclass representation of the configuration file.
-        @rtype: Config
+        @rtype: FedLearningConfig
         """
         getLogger(__name__).debug(f'Loading yaml from {path.absolute()}')
         safe_loader = get_safe_loader()
         with open(path) as file:
             content = yaml.load(file, Loader=safe_loader)
-            conf = Config.from_dict(content)
+            conf = FedLearningConfig.from_dict(content)
         return conf
 
 

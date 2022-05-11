@@ -8,7 +8,7 @@ import torch
 from fltk.core.node import Node
 from fltk.schedulers import MinCapableStepLR
 from fltk.strategy import get_optimizer
-from fltk.util.config import Config
+from fltk.util.config import FedLearningConfig
 
 
 class Client(Node):
@@ -17,7 +17,7 @@ class Client(Node):
     """
     running = False
 
-    def __init__(self, identifier: str, rank: int, world_size: int, config: Config):
+    def __init__(self, identifier: str, rank: int, world_size: int, config: FedLearningConfig):
         super().__init__(identifier, rank, world_size, config)
 
         self.loss_function = self.config.get_loss_function()()

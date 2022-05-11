@@ -167,7 +167,7 @@ class DistributedConfig():
 
     def get_default_model_folder_path(self) -> Path:
         """
-        @deprecated Function to get the default model folder path from Config, needed for non-default training in the
+        @deprecated Function to get the default model folder path from FedLearningConfig, needed for non-default training in the
         FLTK framework.
         @return: Path representation of model path.
         @rtype: Path

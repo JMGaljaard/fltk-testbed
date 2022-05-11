@@ -6,10 +6,10 @@ import yaml
 import logging
 
 from fltk.util.config.distributed_config import DistributedConfig
-from fltk.util.config.config import Config, get_safe_loader, DistLearningConfig
+from fltk.util.config.config import FedLearningConfig, get_safe_loader, DistLearningConfig
 
 
-def retrieve_config_network_params(conf: Config, nic=None, host=None):
+def retrieve_config_network_params(conf: FedLearningConfig, nic=None, host=None):
     if hasattr(conf, 'system'):
         system_attr = getattr(conf, 'system')
         if 'federator' in system_attr:
