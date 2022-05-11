@@ -20,8 +20,8 @@ from fltk.core.federator import Federator
 from fltk.nets.util.reproducability import init_reproducibility, init_learning_reproducibility
 from fltk.util.cluster.client import ClusterManager
 from fltk.util.cluster.worker import should_distribute
-from fltk.util.config import DistributedConfig, Config, retrieve_config_network_params, get_learning_param_config
-from fltk.util.config.arguments import DistLearningConfig
+from fltk.util.config import DistributedConfig, Config, retrieve_config_network_params, get_learning_param_config, \
+    DistLearningConfig
 from fltk.util.environment import retrieve_or_init_env, retrieve_env_config
 from fltk.util.task.generator.arrival_generator import SimulatedArrivalGenerator, SequentialArrivalGenerator
 

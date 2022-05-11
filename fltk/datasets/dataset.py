@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.data import TensorDataset
 
-from fltk.util.config.arguments import DistLearningConfig
+from fltk.util.config import DistLearningConfig
 
 
 class Dataset:
