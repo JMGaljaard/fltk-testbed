@@ -13,7 +13,7 @@ from fltk.core.client import Client
 from fltk.core.node import Node
 from fltk.strategy import get_aggregation
 from fltk.strategy import random_selection
-from fltk.util.config import Config
+from fltk.util.config import FedLearningConfig
 from fltk.util.data_container import DataContainer, FederatorRecord, ClientRecord
 
 NodeReference = Union[Node, str]
@@ -57,7 +57,7 @@ class Federator(Node):
     num_rounds: int
     exp_data: DataContainer
 
-    def __init__(self, identifier: str, rank: int, world_size: int, config: Config):
+    def __init__(self, identifier: str, rank: int, world_size: int, config: FedLearningConfig):
         super().__init__(identifier, rank, world_size, config)
         self.loss_function = self.config.get_loss_function()()
         self.num_rounds = config.rounds
