@@ -13,6 +13,7 @@ from fltk.datasets.loader_util import get_dist_dataset
 from fltk.nets import get_net
 from fltk.nets.util import calculate_class_precision, calculate_class_recall, save_model, load_model_from_file
 from fltk.schedulers import MinCapableStepLR, LearningScheduler
+from fltk.strategy import get_optimizer
 from fltk.util.config import DistributedConfig, DistLearningConfig
 from fltk.util.results import EpochData
 
@@ -68,8 +69,8 @@ class DistClient(DistNode):
             # Wrap the model to use pytorch DistributedDataParallel wrapper for all reduce.
             self.model = torch.nn.parallel.DistributedDataParallel(self.model)
 
-        # Currently, it is assumed to use an SGD optimizer. **kwargs need to be used to launch this properly
-        optim_type: Type[torch.optim.Optimizer] = self.learning_params.get_optimizer()
+        # Currently, it is assumed to use an SGD optimizer, using non-federated optimizer types.
+        optim_type = get_optimizer(self.learning_params.optimizer, federated=False)
         self.optimizer = optim_type(self.model.parameters(), **self.learning_params.optimizer_args)
         self.scheduler = MinCapableStepLR(self.optimizer,
                                           self.learning_params.scheduler_step_size,

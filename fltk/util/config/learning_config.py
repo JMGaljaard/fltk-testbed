@@ -49,20 +49,26 @@ def get_safe_loader() -> yaml.SafeLoader:
     return safe_loader
 
 
+# fixme: With python 3.10, this can be done with the dataclass kw_only kwarg.
 @dataclass_json
 @dataclass
-class FedLearningConfig:
-    batch_size: int = 1
-    test_batch_size: int = 1000
+class LearningConfig:
+    batch_size: int = field(metadata=dict(required=False, missing=128))
+    test_batch_size: int = field(metadata=dict(required=False, missing=128))
+    cuda: bool = field(metadata=dict(required=False, missing=False))
+    scheduler_step_size: int = field(metadata=dict(required=False, missing=50))
+    scheduler_gamma: float = field(metadata=dict(required=False, missing=0.5))
+
+
+@dataclass_json
+@dataclass
+class FedLearningConfig(LearningConfig):
     rounds: int = 2
     epochs: int = 1
     lr: float = 0.01
     momentum: float = 0.1
-    cuda: bool = False
     shuffle: bool = False
     log_interval: int = 10
-    scheduler_step_size: int = 50
-    scheduler_gamma: float = 0.5
     min_lr: float = 1e-10
     rng_seed = 0
 
@@ -169,8 +175,8 @@ _available_optimizer: Dict[str, Type[torch.optim.Optimizer]] = {
 
 
 @dataclass_json
-@dataclass(frozen=True)
-class DistLearningConfig:  # pylint: disable=too-many-instance-attributes
+@dataclass
+class DistLearningConfig(LearningConfig):  # pylint: disable=too-many-instance-attributes
     """
     Class encapsulating LearningParameters, for now used under DistributedLearning.
     """
@@ -182,13 +188,10 @@ class DistLearningConfig:  # pylint: disable=too-many-instance-attributes
     learning_rate: float
     learning_decay: float
     loss: str
-    optimizer: str
+    optimizer: Optimizations
     optimizer_args: Dict[str, Any]
-    scheduler_step_size: int
-    scheduler_gamma: float
-    min_lr: float
 
-    cuda: bool
+    min_lr: float
     seed: int
 
     @staticmethod
@@ -216,11 +219,3 @@ class DistLearningConfig:  # pylint: disable=too-many-instance-attributes
         """
         return self.__safe_get(_available_loss, self.loss)
 
-    def get_optimizer(self) -> Type[torch.optim.Optimizer]:
-        """
-        Function to obtain the loss function Type that was given via commandline to be used during the training
-        execution.
-        @return: Type corresponding to the Optimizer to be used during training.
-        @rtype: Type[torch.optim.Optimizer]
-        """
-        return self.__safe_get(_available_optimizer, self.optimizer)
