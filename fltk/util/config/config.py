@@ -1,19 +1,22 @@
 # pylint: disable=missing-function-docstring,invalid-name
+import logging
 from dataclasses import dataclass, field
 from enum import Enum, EnumMeta
 from logging import getLogger
 from pathlib import Path
-from typing import Type, List
+from typing import Type, List, Dict, Any, T
 
 import re
 
 import torch
+import torch.nn
+import torch.optim
 import yaml
 from dataclasses_json import config, dataclass_json
 # noinspection PyProtectedMember
 from torch.nn.modules.loss import _Loss
 
-from fltk.util.config.definitions import DataSampler
+from fltk.util.config.definitions import DataSampler, Nets, Dataset
 from fltk.util.config.definitions.aggregate import Aggregations
 from fltk.util.config.definitions.dataset import Dataset
 from fltk.util.config.definitions.logging import LogLevel
@@ -151,3 +154,72 @@ class Config:
             content = yaml.load(file, Loader=safe_loader)
             conf = Config.from_dict(content)
         return conf
+
+
+_available_loss = {
+    "CROSSENTROPYLOSS": torch.nn.CrossEntropyLoss,
+    "HUBERLOSS" : torch.nn.HuberLoss
+}
+_available_optimizer: Dict[str, Type[torch.optim.Optimizer]] = {
+    "SGD": torch.optim.SGD,
+    "ADAM": torch.optim.Adam,
+    "ADAMW": torch.optim.AdamW
+}
+
+
+@dataclass_json
+@dataclass(frozen=True)
+class DistLearningConfig:  # pylint: disable=too-many-instance-attributes
+    """
+    Class encapsulating LearningParameters, for now used under DistributedLearning.
+    """
+    model: Nets
+    dataset: Dataset
+    batch_size: int
+    test_batch_size: int
+    max_epoch: int
+    learning_rate: float
+    learning_decay: float
+    loss: str
+    optimizer: str
+    optimizer_args: Dict[str, Any]
+    scheduler_step_size: int
+    scheduler_gamma: float
+    min_lr: float
+
+    cuda: bool
+    seed: int
+
+    @staticmethod
+    def __safe_get(lookup: Dict[str, T], keyword: str) -> T:
+        """
+        Static function to 'safe' get elements from a dictionary, to prevent issues with Capitalization in the code.
+        @param lookup: Lookup dictionary to 'safe get' from.
+        @type lookup: dict
+        @param keyword: Keyword to 'get' from the Lookup dictionary.
+        @type keyword: str
+        @return: Lookup value from 'safe get' request.
+        @rtype: T
+        """
+        safe_keyword = str.upper(keyword)
+        if safe_keyword not in lookup:
+            logging.fatal(f"Cannot find configuration parameter {keyword} in dictionary.")
+        return lookup.get(safe_keyword)
+
+    def get_loss(self) -> Type:
+        """
+        Function to obtain the loss function Type that was given via commandline to be used during the training
+        execution.
+        @return: Type corresponding to the loss function that was passed as argument.
+        @rtype: Type
+        """
+        return self.__safe_get(_available_loss, self.loss)
+
+    def get_optimizer(self) -> Type[torch.optim.Optimizer]:
+        """
+        Function to obtain the loss function Type that was given via commandline to be used during the training
+        execution.
+        @return: Type corresponding to the Optimizer to be used during training.
+        @rtype: Type[torch.optim.Optimizer]
+        """
+        return self.__safe_get(_available_optimizer, self.optimizer)

@@ -13,8 +13,7 @@ from fltk.datasets.loader_util import get_dist_dataset
 from fltk.nets import get_net
 from fltk.nets.util import calculate_class_precision, calculate_class_recall, save_model, load_model_from_file
 from fltk.schedulers import MinCapableStepLR, LearningScheduler
-from fltk.util.config import DistributedConfig
-from fltk.util.config.arguments import DistLearningConfig
+from fltk.util.config import DistributedConfig, DistLearningConfig
 from fltk.util.results import EpochData
 
 

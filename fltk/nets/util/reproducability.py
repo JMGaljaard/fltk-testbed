@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 from fltk.util.config.distributed_config import ExecutionConfig
-from fltk.util.config.arguments import DistLearningConfig
+from fltk.util.config import DistLearningConfig
 
 
 def cuda_reproducible_backend(cuda: bool) -> None:

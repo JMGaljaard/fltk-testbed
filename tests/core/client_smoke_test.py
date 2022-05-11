@@ -9,8 +9,8 @@ from parameterized import parameterized
 
 from fltk.core.client import Client
 from fltk.core.distributed import DistClient
-from fltk.util.config import DistributedConfig, get_distributed_config, get_learning_param_config, Config
-from fltk.util.config.arguments import DistLearningConfig
+from fltk.util.config import DistributedConfig, get_distributed_config, get_learning_param_config, Config, \
+    DistLearningConfig
 
 from fltk.datasets.dataset import Dataset as DS
 from fltk.util.config.definitions import Nets, Dataset
