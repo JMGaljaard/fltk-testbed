@@ -117,7 +117,7 @@ class Orchestrator(DistNode):
         self.__logger.info("Received stop signal for the Orchestrator.")
         self._alive = False
 
-    def run(self, clear: bool = True) -> None:
+    def run(self, clear: bool = False) -> None:
         """
         Main loop of the Orchestrator.
         @param clear: Boolean indicating whether a previous deployment needs to be cleaned up (i.e. lingering jobs that
@@ -162,7 +162,7 @@ class Orchestrator(DistNode):
 
         logging.info('Experiment completed, currently does not support waiting.')
 
-    def run_batch(self, clear: bool = True) -> None:
+    def run_batch(self, clear: bool = False) -> None:
         """
         Main loop of the Orchestrator.
         @param clear: Boolean indicating whether a previous deployment needs to be cleaned up (i.e. lingering jobs that
