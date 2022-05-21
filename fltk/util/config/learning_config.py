@@ -3,7 +3,7 @@ import logging
 from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
-from typing import Type, List, Dict, Any, T
+from typing import Type, List, Dict, Any, T, Union
 
 import re
 
@@ -22,8 +22,16 @@ from fltk.util.config.definitions.logging import LogLevel
 from fltk.util.config.definitions.net import Nets
 from fltk.util.config.definitions.optim import Optimizations
 
-def _eval_decoder(arg: str) -> Any:
-    return eval(arg)
+
+def _eval_decoder(obj: Union[str, T]) -> Union[Any, T]:
+    """
+    Decoder function to help decoding string objects to objects using the Python interpeter.
+    If a non-string object is passed it will return the argument
+
+    """
+    if isinstance(obj, str):
+        return eval(obj)
+    return obj
 
 def get_safe_loader() -> yaml.SafeLoader:
     """
@@ -66,6 +74,7 @@ class LearningConfig:
 @dataclass_json
 @dataclass
 class FedLearningConfig(LearningConfig):
+    loss_function: Type[_Loss] = field(metadata=config(encoder=str, decoder=_eval_decoder), default=torch.nn.CrossEntropyLoss)
     rounds: int = 2
     epochs: int = 1
     lr: float = 0.01
@@ -79,7 +88,6 @@ class FedLearningConfig(LearningConfig):
         'lr': lr,
         'momentum': momentum
     }
-    loss_function: Type[_Loss] = field(metadata=config(encoder=str, decoder=_eval_decoder), default=torch.nn.CrossEntropyLoss)
     # Enum
     log_level: LogLevel = LogLevel.DEBUG
 
@@ -177,4 +185,4 @@ class DistLearningConfig(LearningConfig):  # pylint: disable=too-many-instance-a
     learning_rate: float
     learning_decay: float
     seed: int
-    loss: Type[_Loss] = field(metadata=config(encoder=str, decoder=_eval_decoder), default=torch.nn.CrossEntropyLoss)
+    loss: Type[_Loss] = field(metadata=config(encoder=str, decoder=_eval_decoder), default=torch.nn.CrossEntropyLoss})
