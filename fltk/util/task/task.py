@@ -238,3 +238,4 @@ class FederatedArrivalTask(ArrivalTask):
                 priority=arrival.get_priority(),
                 learning_parameters=arrival.get_learning_config())
         return task
+
