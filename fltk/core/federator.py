@@ -294,7 +294,7 @@ class Federator(Node):
 
         while not all_futures_done(training_futures):
             time.sleep(0.1)
-            self.logger.info('')
+            # self.logger.info('')
             # self.logger.info(f'Waiting for other clients')
 
         self.logger.info('Continue with rest [1]')
