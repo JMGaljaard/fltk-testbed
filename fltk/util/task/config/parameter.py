@@ -9,7 +9,7 @@ from dataclasses_json import dataclass_json, LetterCase, config
 # noinspection PyProtectedMember
 from torch.nn.modules.loss import _Loss
 
-from fltk.util.config.definitions import DataSampler, Nets, Aggregations, Optimizations, Dataset, ExperimentType
+from fltk.util.config.definitions import DataSampler, Nets, Aggregations, Optimizations, Dataset, ExperimentType, Loss
 
 
 def _none_factory() -> None:
@@ -193,6 +193,7 @@ class SystemParameters:
         # Fallback to default for alternative declaration.
         return self.configurations['default']
 
+
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class NetworkConfiguration:
@@ -201,7 +202,7 @@ class NetworkConfiguration:
     """
     network: Nets
     dataset: Dataset
-    loss_function: Optional[Type[_Loss]]
+    loss_function: Optional[Loss]
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
