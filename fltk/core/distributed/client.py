@@ -43,7 +43,7 @@ class DistClient(DistNode):
         self.learning_params = learning_params
 
         # Create model and dataset
-        self.loss_function = self.learning_params.loss()
+        self.loss_function = self.learning_params.get_loss_function()()
         self.dataset = get_dist_dataset(self.learning_params.dataset)(self.config, self.learning_params, self._id, self._world_size)
         self.model = get_net(self.learning_params.model)()
         self.device = self._init_device()
