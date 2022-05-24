@@ -65,11 +65,15 @@ tensorboard-plugin-wit==1.8.0
 threadpoolctl==2.1.0
 tomli==2.0.1
 -f https://download.pytorch.org/whl/torch_stable.html
-torch==1.9.0+cpu
+torch==1.9.0+cpu; sys_platform != "darwin"
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==1.9.0; sys_platform == "darwin"
 torchmetrics==0.5.0
 torchsummary==1.5.1
 -f https://download.pytorch.org/whl/torch_stable.html
-torchvision==0.10.0+cpu
+torchvision==0.10.0+cpu; sys_platform != "darwin"
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==1.9.0; sys_platform == "darwin"
 tqdm==4.49.0
 typing-inspect==0.7.1
 typing_extensions==4.1.1
