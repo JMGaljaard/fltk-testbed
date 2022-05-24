@@ -15,7 +15,7 @@ from fltk.util.config import DistributedConfig, get_distributed_config, get_lear
 from fltk.datasets.dataset import Dataset as DS
 from fltk.util.config.definitions import Nets, Dataset
 
-TEST_DIST_CONF = './configs/test_experiment.json'
+TEST_DIST_CONF = './configs/test/test_experiment.json'
 TEST_PARAM_CONF_PARALLEL = './experiments/test/data_parallel.yaml'
 TEST_PARAM_CONF_FEDERATED = './experiments/test/federated.yaml'
 MODEL_SET_PAIRING = [
@@ -65,7 +65,6 @@ class TestFederatedLearnerSmoke(unittest.TestCase):
         [[f"{x.value}-{y.value}", x, y] for x, y in MODEL_SET_PAIRING]
     )
     def test_fed_client(self, name, net: Nets, dataset: Dataset):
-        # self.learning_params = dataclasses.replace(self.learning_params, model=net, dataset=dataset)
         self.learning_config.net_name = net
         self.learning_config.dataset_name = dataset
         fed_client = Client('test-id', 1, 60000, self.learning_config)
