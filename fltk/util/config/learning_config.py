@@ -1,5 +1,4 @@
 # pylint: disable=missing-function-docstring,invalid-name
-import logging
 from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
@@ -15,7 +14,7 @@ from dataclasses_json import config, dataclass_json
 # noinspection PyProtectedMember
 from torch.nn.modules.loss import _Loss
 
-from fltk.util.config.definitions import DataSampler
+from fltk.util.config.definitions import DataSampler, Loss, get_loss_function
 from fltk.util.config.definitions.aggregate import Aggregations
 from fltk.util.config.definitions.dataset import Dataset
 from fltk.util.config.definitions.logging import LogLevel
@@ -74,8 +73,10 @@ class LearningConfig:
 @dataclass_json
 @dataclass
 class FedLearningConfig(LearningConfig):
-    loss_function: Type[_Loss] = field(metadata=config(encoder=str, decoder=_eval_decoder), default=torch.nn.CrossEntropyLoss)
+    loss_function: Loss = Loss.cross_entropy_loss
+    # Number of communication epochs.
     rounds: int = 2
+    # Number of epochs to perform per ROUND
     epochs: int = 1
     lr: float = 0.01
     momentum: float = 0.1
@@ -146,7 +147,7 @@ class FedLearningConfig(LearningConfig):
         return self.data_path
 
     def get_loss_function(self) -> Type[_Loss]:
-        return self.loss_function
+        return get_loss_function(self.loss_function)
 
     @staticmethod
     def from_yaml(path: Path):
@@ -183,6 +184,36 @@ class DistLearningConfig(LearningConfig):  # pylint: disable=too-many-instance-a
     dataset: Dataset
     max_epoch: int
     learning_rate: float
-    learning_decay: float
+    learning_rate_decay: float
     seed: int
-    loss: Type[_Loss] = field(metadata=config(encoder=str, decoder=_eval_decoder), default=torch.nn.CrossEntropyLoss})
+    loss: Loss = Loss.cross_entropy_loss
+
+    @staticmethod
+    def from_yaml(path: Path):
+        """
+        Parse yaml file to dataclass. Re-implemented to rely on dataclasses_json to load data with tested library.
+
+        Alternatively, running the followign code would result in loading a JSON formatted configuration file, in case
+        you prefer to create json based configuration files.
+
+        >>> with open("configs/example.json") as f:
+        >>>     DistLearningConfig.from_json(f.read())
+
+        @param path: Path pointing to configuration yaml file.
+        @type path: Path
+        @return: Configuration dataclass representation of the configuration file.
+        @rtype: FedLearningConfig
+        """
+        getLogger(__name__).debug(f'Loading yaml from {path.absolute()}')
+        safe_loader = get_safe_loader()
+        with open(path) as file:
+            content = yaml.load(file, Loader=safe_loader)
+            conf = DistLearningConfig.from_dict(content)
+        return conf
+
+
+    def get_loss_function(self) -> Type[_Loss]:
+        """
+        Helper function to get loss_function based on definition _or_ string.
+        """
+        return get_loss_function(self.loss)
