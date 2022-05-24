@@ -1,23 +1,27 @@
 batch_size: 1
 test_batch_size: 1
+cuda: false
+scheduler_step_size: 500
+scheduler_gamma: 0.2
 rounds: 1
-lr: 0.01
-momentum: 0.1
-cuda: False
+epochs: 2500
+lr: 0.05
+momentum: 0.011
 shuffle: True
-scheduler_step_size: 50
-scheduler_gamma: 0.5
-min_lr: 1e-10
+log_interval: 20
+min_lr: 2e-10
 rng_seed: 430
 optimizer: SGD
-optimizer_args: {'lr': 0.01, 'momentum': 0.1}
+optimizer_args: {'lr': 0.01, 'momentum': 0.0001}
+loss_function: CrossEntropyLoss
+clients_per_round: 1
 distributed: true
 single_machine: false
-aggregration: FedAvg
+aggregation: Sum
 dataset_name: mnist
 net_name: FashionMNISTCNN
 data_sampler: uniform
 data_sampler_args: [0.07, 42]
-replication_id: 4
 real_time: true
 save_data_append: true
+replication_id: 4

@@ -1,0 +1,77 @@
+[
+  {
+    "type": "distributed",
+    "jobClassParameters": {
+      "networkConfiguration": {
+        "network": "FashionMNISTResNet",
+        "lossFunction": "MSELoss",
+        "dataset": "fashion-mnist"
+      },
+      "systemParameters": {
+        "dataParallelism": 2,
+        "configurations": {
+          "Master": {
+            "cores": "1000m",
+            "memory": "1Gi"
+          },
+          "Worker": {
+            "cores": "750m",
+            "memory": "1Gi"
+          }
+        }
+      },
+      "hyperParameters": {
+        "default": {
+          "batchSize": 500,
+          "testBatchSize": 1000,
+          "learningRateDecay": 0.0002,
+          "optimizerConfig": {
+            "type": "SGD",
+            "learningRate": 1e3,
+            "momentum": 0.74
+          },
+          "schedulerConfig": {
+            "schedulerStepSize": 520,
+            "schedulerGamma": 0.5,
+            "minimumLearningRate": 3e-10
+          }
+        },
+        "configurations": {
+          "Master": null,
+          "Worker": {
+            "batchSize": 500,
+            "optimizerConfig": {
+              "learningRate": 0.05
+            },
+            "schedulerConfig": {
+              "schedulerStepSize": 2000
+            }
+          }
+        }
+      },
+      "learningParameters": {
+        "totalEpochs": 44,
+        "rounds": 45,
+        "epochsPerRound": 2,
+        "cuda": false,
+        "clientsPerRound": 1,
+        "dataSampler": {
+          "type": "uniform",
+          "qValue": 0.07,
+          "seed": 42,
+          "shuffle": true
+        },
+        "aggregation": "Sum"
+      },
+      "experimentConfiguration": {
+        "randomSeed": [
+          142
+        ],
+        "workerReplication": {
+          "Master": 1,
+          "Worker": 1
+        }
+      }
+    }
+  }
+]
