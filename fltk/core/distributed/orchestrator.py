@@ -40,12 +40,21 @@ def _generate_experiment_path_name(task: ArrivalTask, u_id: str, config: Distrib
     return full_path
 
 
-def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig, u_id: uuid.UUID, replication: int = 1) -> \
-        (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
+def render_template(task: ArrivalTask, tpe: str, replication: int, experiment_path: str) -> str:
+    """
+    Helper function to render jinja templates with necessary arguments for experiments.
+    """
     if isinstance(task, FederatedArrivalTask):
         template = __ENV.get_template('node.jinja.yaml')
     else:
         template = __ENV.get_template('dist_node.jinja.yaml')
+    filled_template = template.render(task=task, tpe=tpe, replication=replication, experiment_path=experiment_path)
+    return filled_template
+
+
+def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig, u_id: uuid.UUID, replication: int = 1) -> \
+        (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
+
     type_dict = collections.OrderedDict()
     name_dict = collections.OrderedDict()
     for tpe in task.type_map.keys():
@@ -53,7 +62,7 @@ def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig, u_id:
         meta = V1ObjectMeta(name=name,
                             labels={'app.kubernetes.io/name': f"fltk.node.config.{tpe}"})
         exp_path = _generate_experiment_path_name(task, u_id, config)
-        filled_template = template.render(task=task, tpe=tpe, replication=replication, experiment_path=exp_path)
+        filled_template = render_template(task=task, tpe=tpe, replication=replication, experiment_path=exp_path)
         type_dict[tpe] = V1ConfigMap(data={'node.config.yaml': filled_template}, metadata=meta)
         name_dict[tpe] = name
     return type_dict, name_dict
