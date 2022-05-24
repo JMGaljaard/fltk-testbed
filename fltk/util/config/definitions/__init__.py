@@ -6,3 +6,4 @@ from .logging import LogLevel
 from .net import Nets
 from .optim import Optimizations
 from .experiment_type import ExperimentType
+from .loss import Loss, get_loss_function
