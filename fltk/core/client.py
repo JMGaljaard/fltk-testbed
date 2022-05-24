@@ -93,8 +93,6 @@ class Client(Node):
                         f'[{self.id}] [{num_epochs:d}, {i:5d}] loss: {running_loss / self.config.log_interval:.3f}')
                 final_running_loss = running_loss / self.config.log_interval
                 running_loss = 0.0
-                # break
-
         end_time = time.time()
         duration = end_time - start_time
         self.logger.info(f'Train duration is {duration} seconds')
@@ -136,7 +134,6 @@ class Client(Node):
                 pred_.extend(predicted.cpu().numpy())
 
                 loss += self.loss_function(outputs, labels).item()
-
         # Calculate learning statistics
         loss /= len(self.dataset.get_test_loader().dataset)
         accuracy = 100.0 * correct / total
