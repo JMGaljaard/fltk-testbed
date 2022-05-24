@@ -13,7 +13,7 @@ min_lr: {{ task.get_scheduler_param(tpe, 'min_lr') }}
 rng_seed: {{ task.get_net_param('seed') }}
 optimizer: {{ task.get_optimizer_param(tpe, 'type').value }}
 optimizer_args: {{ task.get_optimizer_args(tpe) }}
-loss_function: {{ task.get_net_param('loss_function') }}
+loss_function: {{ task.get_net_param('loss_function').value }}
 clients_per_round: {{ task.get_learn_param('clients_per_round')}}
 distributed: true
 single_machine: false

@@ -10,6 +10,7 @@ model: {{ task.get_net_param('network').value }}
 dataset: {{ task.get_net_param('dataset').value }}
 max_epoch: {{ task.get_learn_param('total_epochs') }}
 learning_rate: {{ task.get_optimizer_param(tpe, 'lr') }}
-learning_decay: {{ task.get_hyper_param(tpe, 'lr_decay') }}
+learning_rate_decay: {{ task.get_hyper_param(tpe, 'lr_decay') }}
 seed: {{ task.get_net_param('seed') }}
-loss: {{ task.get_net_param('loss_function') }}
+loss: {{ task.get_net_param('loss_function').value }}
+

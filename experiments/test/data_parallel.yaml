@@ -1,15 +1,16 @@
-model: FashionMNISTCNN
-dataset: mnist
 batch_size: 1
 test_batch_size: 1
-max_epoch: 1
-learning_rate: 0.001
-learning_decay: 0.0002
-loss: CrossEntropyLoss
-optimizer: Adam
-optimizer_args: {'lr': 0.001, 'betas': [0.9, 0.999]}
+cuda: True
 scheduler_step_size: 50
 scheduler_gamma: 0.5
 min_lr: 1e-10
-cuda: True
+optimizer: Adam
+optimizer_args: {'lr': 0.001, 'betas': [0.9, 0.999]}
+model: FashionMNISTCNN
+dataset: mnist
+max_epoch: 1
+learning_rate: 0.001
+learning_rate_decay: 0.001
+loss: CrossEntropyLoss
 seed: 5
+
