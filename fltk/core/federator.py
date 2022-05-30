@@ -284,7 +284,7 @@ class Federator(Node):
             client_ref.exp_data.append(c_record)
 
         for client in selected_clients:
-            future = self.message_async(client.ref, Client.exec_round, num_epochs)
+            future = self.message_async(client.ref, Client.exec_round, num_epochs, com_round_id)
             cb_factory(future, training_cb, client, client_weights, client_sizes, num_epochs)
             self.logger.info(f'Request sent to client {client.name}')
             training_futures.append(future)

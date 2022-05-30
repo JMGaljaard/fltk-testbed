@@ -57,45 +57,53 @@ class Client(Node):
             time.sleep(0.1)
         self.logger.info('Exiting node')
 
-    def train(self, num_epochs: int):
+    def train(self, num_epochs: int, round_id: int):
         """
-        Function implementing federated learning training loop.
-        @param num_epochs: Number of epochs to run.
+        Function implementing federated learning training loop, allowing to run for a configurable number of epochs
+        on a local dataset. Note that only the last statistics of a run are sent to the caller (i.e. Federator).
+        @param num_epochs: Number of epochs to run during a communication round's training loop.
         @type num_epochs: int
-        @return: Final running loss statistic and acquired parameters of the locally trained network.
+        @param round_id: Global communication round ID to be used during training.
+        @type round_id: int
+        @return: Final running loss statistic and acquired parameters of the locally trained network. NOTE that
+        intermediate information is only logged to the STD-out.
         @rtype: Tuple[float, Dict[str, torch.Tensor]]
         """
         start_time = time.time()
-
         running_loss = 0.0
         final_running_loss = 0.0
-        if self.distributed:
-            self.dataset.train_sampler.set_epoch(num_epochs)
+        for local_epoch in range(num_epochs):
+            effective_epoch = round_id * num_epochs + local_epoch
+            progress = f'[RD-{round_id}][LE-{local_epoch}][EE-{effective_epoch}]'
+            if self.distributed:
+                # In case a client occurs within (num_epochs) communication rounds as this would cause
+                # an order or data to re-occur during training.
+                self.dataset.train_sampler.set_epoch(effective_epoch)
 
-        number_of_training_samples = len(self.dataset.get_train_loader())
-        self.logger.info(f'{self.id}: Number of training samples: {number_of_training_samples}')
+            training_cardinality = len(self.dataset.get_train_loader())
+            self.logger.info(f'{progress}{self.id}: Number of training samples: {training_cardinality}')
 
-        for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
 
-            # zero the parameter gradients
-            self.optimizer.zero_grad()
+                # zero the parameter gradients
+                self.optimizer.zero_grad()
 
-            outputs = self.net(inputs)
-            loss = self.loss_function(outputs, labels)
+                outputs = self.net(inputs)
+                loss = self.loss_function(outputs, labels)
 
-            loss.backward()
-            self.optimizer.step()
-            running_loss += loss.item()
-            # Mark logging update step
-            if i % self.config.log_interval == 0:
-                self.logger.info(
-                        f'[{self.id}] [{num_epochs:d}, {i:5d}] loss: {running_loss / self.config.log_interval:.3f}')
-                final_running_loss = running_loss / self.config.log_interval
-                running_loss = 0.0
-        end_time = time.time()
-        duration = end_time - start_time
-        self.logger.info(f'Train duration is {duration} seconds')
+                loss.backward()
+                self.optimizer.step()
+                running_loss += loss.item()
+                # Mark logging update step
+                if i % self.config.log_interval == 0:
+                    self.logger.info(
+                            f'[{self.id}] [{local_epoch}/{num_epochs:d}, {i:5d}] loss: {running_loss / self.config.log_interval:.3f}')
+                    final_running_loss = running_loss / self.config.log_interval
+                    running_loss = 0.0
+            end_time = time.time()
+            duration = end_time - start_time
+            self.logger.info(f'{progress} Train duration is {duration} seconds')
 
         return final_running_loss, self.get_nn_parameters(),
 
@@ -148,7 +156,7 @@ class Client(Node):
     def get_client_datasize(self):  # pylint: disable=missing-function-docstring
         return len(self.dataset.get_train_sampler())
 
-    def exec_round(self, num_epochs: int) -> Tuple[Any, Any, Any, Any, float, float, float, np.array]:
+    def exec_round(self, num_epochs: int, round_id: int) -> Tuple[Any, Any, Any, Any, float, float, float, np.array]:
         """
         Function as access point for the Federator Node to kick off a remote learning round on a client.
         @param num_epochs: Number of epochs to run
@@ -157,9 +165,9 @@ class Client(Node):
         training make-span, testing make-span, and confusion matrix.
         @rtype: Tuple[Any, Any, Any, Any, float, float, float, np.array]
         """
+        self.logger.info(f"[EXEC] running {num_epochs} locally...")
         start = time.time()
-
-        loss, weights = self.train(num_epochs)
+        loss, weights = self.train(num_epochs, round_id)
         time_mark_between = time.time()
         accuracy, test_loss, test_conf_matrix = self.test()
 
