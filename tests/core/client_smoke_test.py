@@ -73,5 +73,5 @@ class TestFederatedLearnerSmoke(unittest.TestCase):
         self.assertTrue(fed_client.is_ready())
 
         with patch.object(DS, 'get_train_dataset', fed_client.dataset):
-            self.assertTrue(fed_client.exec_round(1))
+            self.assertTrue(fed_client.exec_round(1, 0))
 

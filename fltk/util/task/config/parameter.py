@@ -225,7 +225,7 @@ class LearningParameters:
     Dataclass containing configuration parameters for the learning process itself. This includes the Federated learning
     parameters as well as some system parameters like cuda.
     """
-    _total_epochs: int = field(metadata=config(field_name='total_epochs'))
+    _total_epochs: int = field(metadata=config(field_name='totalEpochs'))
     cuda: bool
     rounds: Optional[int] = None
     epochs_per_round: Optional[int] = None
@@ -236,8 +236,10 @@ class LearningParameters:
     @property
     def total_epochs(self):
         logging.warning('By default `total_epochs` is not used duruing Federated Learning. This attribute will be'
-                        'changed in a comming release.')
-        return self.total_epochs
+                        'changed in a coming release.')
+        return self._total_epochs
+
+
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class ExperimentConfiguration:
