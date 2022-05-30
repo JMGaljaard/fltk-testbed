@@ -5,6 +5,7 @@ from pathlib import Path
 # noinspection PyUnresolvedReferences
 from typing import List, Optional, OrderedDict, Any, Union, Tuple, Type, Dict, MutableMapping, T
 
+import deprecate
 from dataclasses_json import dataclass_json, LetterCase, config
 # noinspection PyProtectedMember
 from torch.nn.modules.loss import _Loss
@@ -224,7 +225,7 @@ class LearningParameters:
     Dataclass containing configuration parameters for the learning process itself. This includes the Federated learning
     parameters as well as some system parameters like cuda.
     """
-    total_epochs: int
+    _total_epochs: int = field(metadata=config(field_name='total_epochs'))
     cuda: bool
     rounds: Optional[int] = None
     epochs_per_round: Optional[int] = None
@@ -232,6 +233,11 @@ class LearningParameters:
     aggregation: Optional[Aggregations] = None
     data_sampler: Optional[SamplerConfiguration] = None
 
+    @property
+    def total_epochs(self):
+        logging.warning('By default `total_epochs` is not used duruing Federated Learning. This attribute will be'
+                        'changed in a comming release.')
+        return self.total_epochs
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class ExperimentConfiguration:
