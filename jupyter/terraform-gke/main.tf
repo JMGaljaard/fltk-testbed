@@ -25,8 +25,8 @@ module "gke" {
       machine_type              = "e2-medium"
       node_locations            = "us-central1-c"
       auto_scaling              = false
-      min_count                 = 1
-      max_count                 = 2
+      min_count                 = 0
+      max_count                 = 1
       local_ssd_count           = 0
       spot                      = false
       disk_size_gb              = 64
@@ -46,7 +46,7 @@ module "gke" {
       node_locations            = "us-central1-c"
       auto_scaling              = false
       min_count                 = 0
-      max_count                 = 4
+      max_count                 = 1
       local_ssd_count           = 0
       spot                      = false
       disk_size_gb              = 64

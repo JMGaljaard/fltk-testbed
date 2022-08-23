@@ -27,7 +27,19 @@ variable "description" {
 }
 
 variable "account_id" {
+  type = string
   description = "The service account Identifier to be used to interact with Google cloud."
   default = "terraform-iam-service-account"
 }
 
+variable "complete" {
+  type = bool
+  description = "Whether or not to fully install kubeflow, or only training operators."
+  default = false
+}
+
+variable "kubeflow_version" {
+  type = string
+  description = "Kubeflow (training operator) to install."
+  default = "v1.5.0"
+}
