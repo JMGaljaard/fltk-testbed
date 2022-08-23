@@ -25,7 +25,7 @@ __ENV = Environment(loader=FileSystemLoader(EXPERIMENT_DIR))
 def _generate_experiment_path_name(task: ArrivalTask, u_id: str, config: DistributedConfig):
     """
     Helper function to generate experiment name for logging without conflicts
-    @param task: Arrival task for Task realted information.
+    @param task: Arrival task for Task related information.
     @type task: ArrivalTask
     @param u_id: Unique identifier string corresponding to the experiment.
     @type u_id: str
@@ -221,7 +221,8 @@ class Orchestrator(DistNode):
 
     def __clear_jobs(self):
         """
-        Function to clear existing jobs in the environment (i.e. old experiments/tests)
+        Function to clear existing jobs in the environment (i.e. old experiments/tests). This will will, currently,
+        not remove configuration map objects. A later version will allow for removing these autmatically as well.
         @return: None
         @rtype: None
         """
@@ -242,6 +243,10 @@ class Orchestrator(DistNode):
                 self.__logger.warning(f'Could not delete: {job_name}. Reason: {excp}')
 
     def __create_config_maps(self, config_maps: Dict[str, V1ConfigMap]):
+        """
+        Private helper function to generate V1ConfigMap resources that are to be attached to the different trainers.
+        This allows for dynamic (at least more dynamic) deployment with regenerated configuration files.
+        """
         for _, config_map in config_maps.items():
             self._v1.create_namespaced_config_map(self._config.cluster_config.namespace,
                                                   config_map)
