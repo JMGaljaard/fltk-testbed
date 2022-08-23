@@ -32,8 +32,6 @@ provider "kubectl" {
   config_path = var.kubernetes_config_path
 }
 
-
-# Use GCP to get kubernetes configuration. However, we should aim to use the service account a bit more cleanly...
 provider "kubernetes" {
   host  = "https://${data.google_container_cluster.testbed_cluster.endpoint}"
   token = data.google_client_config.provider.access_token # Provided by Google data object
