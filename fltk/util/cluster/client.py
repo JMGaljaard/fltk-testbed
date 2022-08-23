@@ -1,4 +1,5 @@
 import logging
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 from multiprocessing.pool import ThreadPool
@@ -6,8 +7,7 @@ from typing import Dict, List, Tuple, Optional, OrderedDict, Union
 from uuid import UUID
 
 import schedule
-import time
-from kubeflow.pytorchjob import V1PyTorchJob, V1ReplicaSpec, V1PyTorchJobSpec
+from kubeflow.training import V1ReplicaSpec, KubeflowOrgV1PyTorchJob, KubeflowOrgV1PyTorchJobSpec
 from kubernetes import client
 from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container, V1PodTemplateSpec, \
     V1VolumeMount, V1Toleration, V1Volume, V1PersistentVolumeClaimVolumeSource, V1ConfigMapVolumeSource
@@ -42,7 +42,7 @@ class BuildDescription:
     typed_containers = OrderedDict[str, V1Container]()
     typed_templates = OrderedDict[str, V1PodTemplateSpec]()
     id: Optional[UUID] = None  # pylint: disable=invalid-name
-    spec: Optional[V1PyTorchJobSpec] = None
+    spec: Optional[KubeflowOrgV1PyTorchJobSpec] = None
     tolerations: Optional[List[V1Toleration]] = None
 
 
@@ -420,14 +420,12 @@ class DeploymentBuilder:
                     replicas=task.typed_replica_count(tpe),
                     restart_policy=restart_policy,
                     template=tpe_template)
-            typed_replica_spec.openapi_types = typed_replica_spec.swagger_types
             pt_rep_spec[tpe] = typed_replica_spec
 
-        job_spec = V1PyTorchJobSpec(pytorch_replica_specs=pt_rep_spec)
-        job_spec.openapi_types = job_spec.swagger_types
+        job_spec = KubeflowOrgV1PyTorchJobSpec(pytorch_replica_specs=pt_rep_spec)
         self._build_description.spec = job_spec
 
-    def construct(self) -> V1PyTorchJob:
+    def construct(self) -> KubeflowOrgV1PyTorchJob:
         """
         Contruct V1PyTorch object following the description of the building process. Note that V1PyTorchJob differs
         slightly from a V1Job object in Kubernetes. Refer to the kubeflow documentation for more information on the
@@ -435,7 +433,7 @@ class DeploymentBuilder:
         @return: V1PyTorchJob object that was dynamically constructed.
         @rtype: V1PyTorchJob
         """
-        job = V1PyTorchJob(
+        job = KubeflowOrgV1PyTorchJob(
                 api_version="kubeflow.org/v1",
                 kind="PyTorchJob",
                 metadata=V1ObjectMeta(name=f'trainjob-{self._build_description.id}', namespace='test'),
@@ -454,7 +452,7 @@ class DeploymentBuilder:
 
 
 def construct_job(conf: DistributedConfig, task: ArrivalTask,
-                  configmap_name_dict: Optional[Dict[str, str]] = None) -> V1PyTorchJob:
+                  configmap_name_dict: Optional[Dict[str, str]] = None) -> KubeflowOrgV1PyTorchJob:
     """
     Function to build a Job, based on the specifications of an ArrivalTask, and the general configuration of the
     DistributedConfig.
@@ -464,10 +462,9 @@ def construct_job(conf: DistributedConfig, task: ArrivalTask,
     @type task: DistributedArrivalTask
     @param configmap_name_dict: Mapping of pod names to their respective K8s configMap names.
     @type configmap_name_dict: Optional[Dict[str, str]]
-    @return: KubeFlow compatible PyTorchJob description to create a Job with the requested system and hyper-parameters.
-    @rtype: V1PyTorchJob
+    @return: KubeFlow compatible KubeflowOrgV1PyTorchJob description to create a Job with the requested system and hyper-parameters.
+    @rtype: KubeflowOrgV1PyTorchJob
     """
-
     dp_builder = DeploymentBuilder()
     dp_builder.create_identifier(task)
     dp_builder.build_resources(task)
@@ -476,7 +473,4 @@ def construct_job(conf: DistributedConfig, task: ArrivalTask,
     dp_builder.build_template(configmap_name_dict)
     dp_builder.build_spec(task)
     job = dp_builder.construct()
-    # Fix to deploy on more up-to-date Kubernetes clusters. See if needed for KubeFlow operator release.
-    # This can be removed under Kubeflow v1.5
-    job.openapi_types = job.swagger_types
     return job
