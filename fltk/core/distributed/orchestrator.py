@@ -3,11 +3,11 @@ import logging
 import time
 import uuid
 from queue import PriorityQueue
-from typing import List, OrderedDict, Dict, Type, Union
+from typing import List, OrderedDict, Dict, Type
 
 from jinja2 import Environment, FileSystemLoader
-from kubeflow.pytorchjob import PyTorchJobClient
-from kubeflow.pytorchjob.constants.constants import PYTORCHJOB_GROUP, PYTORCHJOB_VERSION, PYTORCHJOB_PLURAL
+from kubeflow.training import PyTorchJobClient
+from kubeflow.training.constants.constants import PYTORCHJOB_GROUP, PYTORCHJOB_VERSION, PYTORCHJOB_PLURAL
 from kubernetes import client
 from kubernetes.client import V1ConfigMap, V1ObjectMeta
 
@@ -54,7 +54,6 @@ def render_template(task: ArrivalTask, tpe: str, replication: int, experiment_pa
 
 def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig, u_id: uuid.UUID, replication: int = 1) -> \
         (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
-
     type_dict = collections.OrderedDict()
     name_dict = collections.OrderedDict()
     for tpe in task.type_map.keys():
@@ -79,8 +78,8 @@ def _generate_task(arrival) -> ArrivalTask:
     unique_identifier: uuid.UUID = uuid.uuid4()
     task_type: Type[ArrivalTask] = get_job_arrival_class(arrival.task.experiment_type)
     task = task_type.build(arrival=arrival,
-                     u_id=unique_identifier,
-                     replication=arrival.task.replication)
+                           u_id=unique_identifier,
+                           replication=arrival.task.replication)
     return task
 
 
@@ -173,10 +172,10 @@ class Orchestrator(DistNode):
 
     def run_batch(self, clear: bool = False) -> None:
         """
-        Main loop of the Orchestrator.
+        Main loop of the Orchestrator for processing a configuration as a batch, i.e. deploy one-after-another without
+        any scheduling or simulation applied.
         @param clear: Boolean indicating whether a previous deployment needs to be cleaned up (i.e. lingering jobs that
         were deployed by the previous run).
-
         @type clear: bool
         @return: None
         @rtype: None
