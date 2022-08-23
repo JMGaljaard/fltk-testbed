@@ -1,3 +1,4 @@
+
 variable "kubernetes_version" {
   description = "Kubernetes version to use, note that kubeflow depends on version pre-1.22 for deployment as of now."
   default = "1.21"
@@ -23,6 +24,7 @@ variable "project_region" {
 
 variable "description" {
   type = string
+  description = "Service account description"
   default = "Managed by terraform FLTK testbed deployment"
 }
 
