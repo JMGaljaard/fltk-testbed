@@ -1,4 +1,3 @@
-# resources.tf
 
 terraform {
   required_providers {
