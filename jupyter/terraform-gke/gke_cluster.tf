@@ -1,15 +1,14 @@
-locals {
- terraform_service_account = "${var.account_id}@${var.project_id}.iam.gserviceaccount.com"
-}
-
 data "google_client_config" "default" {}
 
+# In case of using a gke deployment, use the GKE provider. Otherwise we create a container cluster.
 module "gke" {
   source            = "terraform-google-modules/kubernetes-engine/google"
   project_id        = var.project_id
   name              = var.cluster_name
-  region            = "us-central1"
-  zones             = ["us-central1-c"]
+  # Create a ZONAL cluster, dissallowing the cluster to span multiple regions in a zone.
+  # Alternatively, for scheduling cross-regions, utilize `zone` and `regions` instead of `regional` and `region`
+  regional          = false
+  region            = var.project_region
   network           = module.gcp-network.network_name
   subnetwork        = module.gcp-network.subnets_names[0]
   ip_range_pods     = var.ip_range_pods_name
@@ -17,11 +16,13 @@ module "gke" {
 
   http_load_balancing        = false
   network_policy             = false
-  horizontal_pod_autoscaling = true
+  horizontal_pod_autoscaling = false
   filestore_csi_driver       = false
   service_account            = local.terraform_service_account
   create_service_account     = false
   kubernetes_version         = var.kubernetes_version
+
+
   node_pools                 = [
     {
       name               = "default-node-pool"
