@@ -4,6 +4,7 @@ import multiprocessing
 import time
 from abc import abstractmethod
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from queue import Queue
 from random import choices
@@ -42,7 +43,7 @@ class ArrivalGenerator(metaclass=Singleton): # pylint: disable=too-many-instance
         parser = ExperimentParser(config_path=self.configuration_path)
         experiment_descriptions = parser.parse()
         self.job_dict = collections.OrderedDict(
-                {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions)})
+                {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions.train_tasks)})
 
     def start(self, duration: Union[float, int]):
         """
@@ -89,8 +90,8 @@ class ArrivalGenerator(metaclass=Singleton): # pylint: disable=too-many-instance
 @dataclass
 class Arrival:
     """
-    Dataclass describing the information needed to keep track of Arrivals and let them `Arrive'. Uses a single timer
-    to allow for easy generation of tasks.
+    Dataclass containing the information needed to keep track of Arrivals to allow their arrival to be scheduled.
+    Uses a single timer to allow for generation of tasks with lower overhead.
     """
     ticks: Optional[int]
     task: TrainTask
@@ -111,9 +112,6 @@ class Arrival:
     def get_parameter_config(self) -> HyperParameters: # pylint: disable=missing-function-docstring
         return self.task.hyper_parameters
 
-    def get_experiment_config(self) -> ExperimentConfiguration: # pylint: disable=missing-function-docstring
-        return self.task.experiment_configuration
-
     def get_learning_config(self) -> LearningParameters: # pylint: disable=missing-function-docstring
         return self.task.learning_parameters
 
@@ -123,6 +121,10 @@ class SimulatedArrivalGenerator(ArrivalGenerator):
     Experiments (on K8s) generator that simulates the arrival of training tasks according to a pre-defined distribution.
     As such, a set of clients can be simulated that submit various types of training jobs. See also
     BatchArrivalGenerator for an implementation that will directly schedule all arrivals on the cluster.
+
+    N.B. it's intended purpose is to easily execute simulate different users/components requesting training jobs.
+    Allowing to schedule different configuration of experiments, to see how a scheduling algorithm behaves. For example
+    simulating users/systems deploying training pipelines with regular intervals.
     """
     job_dict: Dict[str, JobDescription] = None
 
@@ -145,7 +147,7 @@ class SimulatedArrivalGenerator(ArrivalGenerator):
         logging_name = name or self.__class__.__name__
         self.logger = logging.getLogger(logging_name)
 
-    def generate_arrival(self, task_id: str) -> Arrival:
+    def generate_arrival(self, task_id: str, inter_arrival_unit: timedelta = timedelta(minutes=1)) -> Arrival:
         """
         Generate a training task for a JobDescription once the inter-arrival time has been 'deleted'.
         @param task_id: identifier for a training task corresponding to the JobDescription.
@@ -156,12 +158,18 @@ class SimulatedArrivalGenerator(ArrivalGenerator):
         msg = f"Creating task for {task_id}"
         self.logger.info(msg)
         job: JobDescription = self.job_dict[task_id]
-        parameters: JobClassParameter = \
-            choices(job.job_class_parameters, [param.class_probability for param in job.job_class_parameters])[0]
-        priority = choices(parameters.priorities, [prio.probability for prio in parameters.priorities], k=1)[0]
 
-        inter_arrival_ticks = np.random.poisson(lam=job.arrival_statistic)
-        train_task = TrainTask(task_id, parameters, priority)
+        # Select job configuration according to the weight of the `classProbability` (limit 1)
+        parameters, *_ = choices(job.job_class_parameters,
+                                 [job_param.class_probability for job_param in job.job_class_parameters], k=1)
+        # Select job configuration according to the weight of the selected `classParameter`'s priorities (limit 1)
+        priority, *_ = choices(parameters.priorities, [prio.probability for prio in parameters.priorities], k=1)
+
+        inter_arrival_ticks = np.random.poisson(lam=job.arrival_statistic) * inter_arrival_unit.seconds
+        train_task = TrainTask(identity=task_id,
+                               job_parameters=parameters,
+                               priority=priority,
+                               experiment_type=job.experiment_type)
 
         return Arrival(inter_arrival_ticks, train_task, task_id)
 
@@ -182,7 +190,6 @@ class SimulatedArrivalGenerator(ArrivalGenerator):
         event = multiprocessing.Event()
         while self.alive and time.time() - self.start_time < duration:
             save_time = time.time()
-
             new_scheduled = []
             for entry in self._tick_list:
                 entry.ticks -= self._decrement
@@ -190,7 +197,7 @@ class SimulatedArrivalGenerator(ArrivalGenerator):
                     self.arrivals.put(entry)
                     new_arrival = self.generate_arrival(entry.task_id)
                     new_scheduled.append(new_arrival)
-                    msg = f"Arrival {new_arrival} arrives at {new_arrival.ticks} seconds"
+                    msg = f"Arrival {new_arrival.task_id} arrives in {new_arrival.ticks} seconds"
                     self.logger.info(msg)
                 else:
                     new_scheduled.append(entry)
@@ -207,9 +214,14 @@ class SequentialArrivalGenerator(ArrivalGenerator):
     """
     Experiments (on K8s) generator that directly generates all arrivals to be executed. This will rely on the scheduling
     policy of Kubeflows' Pytorch TrainOperator.
+
     This allows for running batches of train jobs, e.g. to run a certain experiment configuration with a number of
     replications in a fire-and-forget fashion. SimulatedArrivalGenerator for an implementation that will simulate
     arrivals following a pre-defined distribution.
+
+    N.B. it's intended purpose is to easily execute a range of experiments, with possibly different configurations,
+    where reproducability is important. For example, running a batch of experiments of a training algorithm to see
+    the effect of hyperparameters on test/validation performance.
     """
 
     def __init__(self, custom_config: Path):
@@ -233,12 +245,13 @@ class SequentialArrivalGenerator(ArrivalGenerator):
 
         description: JobDescription
         for job_name, description in self.job_dict.items():
+            # TODO: Ensure seeds are set properly
             for repl, seed in enumerate(description.job_class_parameters.experiment_configuration.random_seed):
                 replication_name = f"{job_name}_{repl}_{seed}"
                 train_task = TrainTask(identity=replication_name,
                                        job_parameters=description.job_class_parameters,
                                        priority=description.priority,
-                                       experiment_config=description.get_experiment_configuration(),
+                                       # experiment_config=description.get_experiment_configuration(),
                                        replication=repl,
                                        experiment_type=description.experiment_type)
 

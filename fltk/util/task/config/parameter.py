@@ -182,7 +182,7 @@ class SystemParameters:
     executor_memory: Amount of RAM allocated to each executor.
     action: Indicating whether it regards 'inference' or 'train'ing time.
     """
-    data_parallelism: Optional[int]
+    data_parallelism: int
     configurations: OrderedDict[str, SystemResources]
 
     def get(self, tpe: str):
@@ -290,7 +290,7 @@ class TrainTask:
     Training description used by the orchestrator to generate tasks. Contains 'transposed' information of the
     configuration file.
 
-    Dataclass is ordered, to allow for ordering of arrived tasks in a PriorityQueue (for scheduling).
+    Dataclass is ordered, to allow for ordering of arrived tasks in a PriorityQueue (can be used for scheduling).
     """
     network_configuration: NetworkConfiguration = field(compare=False)
     system_parameters: SystemParameters = field(compare=False)
@@ -298,8 +298,8 @@ class TrainTask:
     learning_parameters: Optional[LearningParameters] = field(compare=False)
     seed: int = field(compare=False)
     identifier: str = field(compare=False)
-    replication: Optional[int] = None
-    priority: Optional[int] = None
+    replication: Optional[int] = field(compare=False, default=None)                     # Utilized for batch arrivals.
+    priority: Optional[int] = None                                                      # Allow for sorting/priority.
     experiment_type: ExperimentType = field(compare=False, metadata=config(field_name="type"), default=None)
 
     def __init__(self, identity: str,

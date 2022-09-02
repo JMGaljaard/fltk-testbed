@@ -7,7 +7,6 @@ from typing import Union
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-
 from fltk.util.results import EpochData
 from typing import TYPE_CHECKING
 
@@ -26,8 +25,8 @@ def flatten_params(model_description: Union[torch.nn.Module, OrderedDict]):
         parameters = model_description.parameters()
     else:
         parameters = model_description.values()
-    parameter_list = [torch.flatten(p) for p in parameters] # pylint: disable=no-member
-    flat_params = torch.cat(parameter_list).view(-1, 1) # pylint: disable=no-member
+    parameter_list = [torch.flatten(p) for p in parameters]  # pylint: disable=no-member
+    flat_params = torch.cat(parameter_list).view(-1, 1)  # pylint: disable=no-member
     return flat_params
 
 
@@ -84,7 +83,7 @@ def load_model_from_file(model: torch.nn.Module, model_file_path: Path) -> None:
     if model_file_path.is_file():
         try:
             model.load_state_dict(torch.load(model_file_path))
-        except Exception: # pylint: disable=broad-except
+        except Exception:  # pylint: disable=broad-except
             logging.warning("Couldn't load model. Attempting to map CUDA tensors to CPU to solve error.")
     else:
         logging.warning(f'Could not find model: {model_file_path}')

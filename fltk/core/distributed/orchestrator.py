@@ -231,21 +231,16 @@ class SimulatedOrchestrator(Orchestrator):
                 curr_task: ArrivalTask = self.pending_tasks.get()
                 self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
 
-                # Create persistent logging information. A these will not be deleted by the Orchestrator, as such
-                # allow you to retrieve information of experiments even after removing the PytorchJob after completion.
+                # Create persistent logging information. A these will not be deleted by the Orchestrator, as such, they
+                # allow you to retrieve information of experiments after removing the PytorchJob after completion.
                 config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task, self._config, curr_task.id, 1)
-                # self._create_config_maps(config_dict)
+                self._create_config_maps(config_dict)
 
                 job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
                 self._logger.info(f"Deploying on cluster: {curr_task.id}")
-                # self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
+                self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
                 self.deployed_tasks.append(curr_task)
 
-                # TODO: Extend this logic in your real project, this is only meant for demo purposes
-                # For now we exit the thread after scheduling a single task.
-
-                # self.stop()
-                # return
 
             self._logger.debug("Still alive...")
             # Prevent high cpu utilization by sleeping between checks.

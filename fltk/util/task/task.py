@@ -1,8 +1,10 @@
 import abc
 import collections
+import sys
 import uuid
 from dataclasses import field, dataclass
 # noinspection PyUnresolvedReferences
+import random
 from typing import OrderedDict, Optional, T, List
 from uuid import UUID
 
@@ -59,7 +61,6 @@ class ArrivalTask(abc.ABC):
                 [(tpe, sys_conf.get(tpe)) for tpe in self.type_map.keys()])
         return ret_dict
 
-    @abc.abstractmethod
     def typed_replica_count(self, replica_type: str) -> int:
         """
         Helper function to get replica count per type of learner.
@@ -68,8 +69,6 @@ class ArrivalTask(abc.ABC):
         @return: Number of workers to spawn of a specific type.
         @rtype: int
         """
-
-    def typed_replica_count(self, replica_type):
         return self.type_map[replica_type]
 
     def get_hyper_param(self, tpe, parameter):
@@ -86,7 +85,7 @@ class ArrivalTask(abc.ABC):
 
     def get_learn_param(self, parameter):
         """
-        Helper function to acquire federated learning parameters as-though the configuration is a flat configuration
+        Helper function to acquire federated learning parameters as-if the configuration is a flat configuration
         file.
         @param parameter:
         @type parameter:
@@ -195,12 +194,26 @@ class DistributedArrivalTask(ArrivalTask):
 
     @staticmethod
     def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> T:
+        """
+        Construct a DistributedArrivalTask from an Arrival object. This will create a task with random seed in
+        [0, sys.maxsize] for randomness. It assumes that the random seed/performance of the model itself is not
+        important on it own, but the reproducability is.
+        @param arrival: Arrival object containing the configuration of a task to be scheduled.
+        @type arrival: Arrival
+        @param u_id: Unique identifier to prevent collisions from happening on experiments.
+        @type u_id: uuid.UUID
+        @param replication:
+        @type replication:
+        @return:
+        @rtype:
+        """
         task = DistributedArrivalTask(
                 id=u_id,
                 network=arrival.get_network(),
+                priority=arrival.get_priority(),
                 dataset=arrival.get_dataset(),
                 loss_function=arrival.task.network_configuration.loss_function,
-                seed=arrival.get_experiment_config().random_seed[replication],
+                seed=random.randint(0, sys.maxsize),
                 replication=replication,
                 type_map=collections.OrderedDict({
                     'Master': MASTER_REPLICATION,
@@ -211,11 +224,6 @@ class DistributedArrivalTask(ArrivalTask):
                 learning_parameters=arrival.get_learning_config())
         return task
 
-    def typed_replica_count(self, replica_type):
-        parallelism_dict = {'Master': MASTER_REPLICATION,
-                            'Worker': self.system_parameters.data_parallelism - MASTER_REPLICATION}
-        return parallelism_dict[replica_type]
-
 
 @dataclass(order=True)
 class FederatedArrivalTask(ArrivalTask):
@@ -225,17 +233,18 @@ class FederatedArrivalTask(ArrivalTask):
 
     @staticmethod
     def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> T:
+        # TODO: Check type-maps
         task = FederatedArrivalTask(
                 id=u_id,
                 network=arrival.get_network(),
                 dataset=arrival.get_dataset(),
                 loss_function=arrival.task.network_configuration.loss_function,
-                seed=arrival.get_experiment_config().random_seed[replication],
+                # seed=arrival.get_experiment_config().random_seed[replication],
                 replication=replication,
-                type_map=arrival.get_experiment_config().worker_replication,
+                type_map={'Master': MASTER_REPLICATION,
+                          'Worker': arrival.task.system_parameters.data_parallelism},
                 system_parameters=arrival.get_system_config(),
                 hyper_parameters=arrival.get_parameter_config(),
                 priority=arrival.get_priority(),
                 learning_parameters=arrival.get_learning_config())
         return task
-

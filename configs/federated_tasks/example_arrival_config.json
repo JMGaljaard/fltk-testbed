@@ -1,14 +1,14 @@
 [
   {
     "type": "federated",
-    "jobClassParameters": {
+    "jobClassParameters": [{
       "networkConfiguration": {
         "network": "FashionMNISTCNN",
         "lossFunction": "CrossEntropyLoss",
         "dataset": "mnist"
       },
       "systemParameters": {
-        "dataParallelism": null,
+        "dataParallelism": 4,
         "configurations": {
           "Master": {
             "cores": "1000m",
@@ -62,20 +62,7 @@
           "shuffle": true
         },
         "aggregation": "FedAvg"
-      },
-      "experimentConfiguration": {
-        "randomSeed": [
-          1,
-          41,
-          42,
-          43,
-          430
-        ],
-        "workerReplication": {
-          "Master": 1,
-          "Worker": 2
-        }
       }
-    }
+    }]
   }
 ]
