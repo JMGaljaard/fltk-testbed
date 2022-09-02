@@ -10,8 +10,9 @@ data "kustomization_build" "training-operator" {
   path = "github.com/kubeflow/manifests.git/apps/training-operator/upstream/overlays/standalone?ref=${var.kubeflow_version}"
 }
 
-resource "kustomization_resource" "training-operator" {
 
+
+resource "kustomization_resource" "training-operator" {
   for_each = data.kustomization_build.training-operator.ids
   manifest = data.kustomization_build.training-operator.manifests[each.value]
 }

@@ -1,58 +1,75 @@
-[
-  {
-    "type": "distributed",
-    "jobClassParameters": {
-      "networkConfiguration": {
-        "network": "FashionMNISTCNN",
-        "lossFunction": "CrossEntropyLoss",
-        "dataset": "mnist"
-      },
-      "systemParameters": {
-        "dataParallelism": 2,
-        "configurations": {
-          "default": {
-            "cores": "1000m",
-            "memory": "1Gi"
-          }
-        }
-      },
-      "hyperParameters": {
-        "default": {
-          "batchSize": 128,
-          "testBatchSize": 128,
-          "learningRateDecay": 0.0002,
-          "optimizerConfig": {
-            "type": "Adam",
-            "learningRate": 0.001,
-            "betas": [
-              0.9,
-              0.999
-            ]
+{
+  "experimentConfiguration": {
+    "randomSeed": [
+      1,
+      41,
+      42,
+      43,
+      430
+    ]
+  },
+  "trainTasks": [
+    {
+      "type": "distributed",
+      "lambda": 0.004,
+      "preemptJobs": false,
+      "jobClassParameters": [
+        {
+          "classProbability": 0.1,
+          "priorities": [
+            {
+              "priority": 1,
+              "probability": 0.9
+            },
+            {
+              "priority": 0,
+              "probability": 0.1
+            }
+          ],
+          "networkConfiguration": {
+            "network": "FashionMNISTCNN",
+            "lossFunction": "CrossEntropyLoss",
+            "dataset": "mnist"
           },
-          "schedulerConfig": {
-            "schedulerStepSize": 50,
-            "schedulerGamma": 0.5,
-            "minimumLearningRate": 1e-10
+          "systemParameters": {
+            "dataParallelism": 2,
+            "configurations": {
+              "default": {
+                "cores": "1000m",
+                "memory": "1Gi"
+              }
+            }
+          },
+          "hyperParameters": {
+            "default": {
+              "totalEpochs": 100,
+              "batchSize": 128,
+              "testBatchSize": 128,
+              "learningRateDecay": 0.0002,
+              "optimizerConfig": {
+                "type": "Adam",
+                "learningRate": 0.001,
+                "betas": [
+                  0.9,
+                  0.999
+                ]
+              },
+              "schedulerConfig": {
+                "schedulerStepSize": 50,
+                "schedulerGamma": 0.5,
+                "minimumLearningRate": 1e-10
+              }
+            },
+            "configurations": {
+              "Master": null,
+              "Worker": null
+            }
+          },
+          "learningParameters": {
+            "cuda": false
           }
-        },
-        "configurations": {
-          "Master": null,
-          "Worker": null
         }
-      },
-      "learningParameters": {
-        "totalEpochs": 100,
-        "cuda": false
-      },
-      "experimentConfiguration": {
-        "randomSeed": [
-          1,
-          41,
-          42,
-          43,
-          430
-        ]
-      }
+      ]
     }
-  }
-]
+  ]
+}
