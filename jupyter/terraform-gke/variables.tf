@@ -12,7 +12,7 @@ variable "project_id" {
 
 variable "cluster_name" {
   type = string
-  default = "freddie-testbed-cluster"
+  default = "fltk-testbed-cluster"
   description = "Name of the GKE cluster to be deployed in project <project_id>."
 }
 
