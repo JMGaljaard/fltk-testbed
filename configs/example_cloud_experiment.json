@@ -1,15 +1,14 @@
 {
    "cluster": {
       "orchestrator": {
-         "wait_for_clients": true,
-         "service": "fl-server.test.svc.cluster.local",
-         "nic": "eth0"
+         "orchestrator_type": "simulated"
       },
       "client": {
          "prefix": "client",
          "tensorboard_active": false
       },
-      "image": "gcr.io/test-bed-distml/fltk:latest"
+      "image": "gcr.io/test-bed-distml/fltk:latest",
+      "namespace": "test"
    },
    "execution_config": {
       "duration": 3600,

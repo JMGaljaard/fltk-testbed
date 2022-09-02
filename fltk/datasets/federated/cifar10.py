@@ -2,7 +2,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision import transforms
 
-from fltk.datasets.distributed.dataset import DistDataset
+from fltk.datasets.distributed import DistDataset
 from fltk.samplers import get_sampler
 from fltk.util.config import FedLearningConfig
 
