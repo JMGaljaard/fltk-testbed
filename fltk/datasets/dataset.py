@@ -1,10 +1,14 @@
+from __future__ import annotations
 from abc import abstractmethod
 
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.data import TensorDataset
 
-from fltk.util.config import DistLearningConfig
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fltk.util.config import DistLearningConfig
 
 
 class Dataset:

@@ -3,14 +3,14 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision import transforms
 
-from fltk.datasets.distributed.dataset import DistDataset
+from fltk.datasets.federated.dataset import FedDataset
 from fltk.samplers import get_sampler
 
 
-class DistFashionMNISTDataset(DistDataset):
+class FedFashionMNISTDataset(FedDataset):
 
     def __init__(self, args):
-        super(DistFashionMNISTDataset, self).__init__(args)
+        super(FedFashionMNISTDataset, self).__init__(args)
         self.init_train_dataset()
         self.init_test_dataset()
 

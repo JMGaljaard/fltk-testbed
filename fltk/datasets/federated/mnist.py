@@ -6,16 +6,16 @@ from typing import TYPE_CHECKING
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from fltk.datasets.distributed.dataset import DistDataset
+from fltk.datasets.federated.dataset import FedDataset
 from fltk.samplers import get_sampler
 
 if TYPE_CHECKING:
     pass
 
-class DistMNISTDataset(DistDataset):
+class FedMNISTDataset(FedDataset):
 
     def __init__(self, args):
-        super(DistMNISTDataset, self).__init__(args)
+        super(FedMNISTDataset, self).__init__(args)
         self.init_train_dataset()
         self.init_test_dataset()
 
