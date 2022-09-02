@@ -2,7 +2,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 from torchvision import datasets
 from torchvision import transforms
 
-from .dataset import Dataset
+from fltk.datasets.dataset import Dataset
 
 
 class CIFAR10Dataset(Dataset):

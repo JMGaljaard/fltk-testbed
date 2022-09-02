@@ -4,7 +4,7 @@ from fltk.util.config import FedLearningConfig
 from fltk.util.log import getLogger
 
 
-class DistDataset:
+class FedDataset:
     train_sampler = None
     test_sampler = None
     train_dataset = None

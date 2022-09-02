@@ -2,17 +2,17 @@
 from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data import DataLoader
-from fltk.datasets.distributed.dataset import DistDataset
+from fltk.datasets.federated.dataset import FedDataset
 from fltk.samplers import get_sampler
 
 
-class DistCIFAR100Dataset(DistDataset):
+class FedCIFAR100Dataset(FedDataset):
     """
     CIFAR100 Dataset implementation for Distributed learning experiments.
     """
 
     def __init__(self, args):
-        super(DistCIFAR100Dataset, self).__init__(args)
+        super(FedCIFAR100Dataset, self).__init__(args)
         self.init_train_dataset()
         self.init_test_dataset()
 

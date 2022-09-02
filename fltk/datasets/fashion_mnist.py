@@ -1,5 +1,5 @@
 # pylint: disable=missing-function-docstring,missing-class-docstring,invalid-name
-from .dataset import Dataset
+from fltk.datasets.dataset import Dataset
 from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data import DataLoader, DistributedSampler
