@@ -7,7 +7,7 @@ from fltk.datasets.dataset import Dataset
 
 class CIFAR100Dataset(Dataset):
     """
-    CIFAR100 Dataset implementation for Federated learning experiments.
+    CIFAR100 Dataset implementation for Distributed learning experiments.
     """
 
     DEFAULT_TRANSFORM = transforms.Compose([

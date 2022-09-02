@@ -7,7 +7,7 @@ from fltk.datasets.dataset import Dataset
 
 class CIFAR10Dataset(Dataset):
     """
-    CIFAR10 Dataset implementation for Federated learning experiments.
+    CIFAR10 Dataset implementation for Distributed learning experiments.
     """
 
     def __init__(self, config, learning_param, rank: int = 0, world_size: int = None):
