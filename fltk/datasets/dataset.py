@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import abc
 from abc import abstractmethod
 
 import torch
@@ -11,7 +13,10 @@ if TYPE_CHECKING:
     from fltk.util.config import DistLearningConfig
 
 
-class Dataset:
+class Dataset(abc.ABC):
+    """
+    Dataset implementation for Distributed learning experiments.
+    """
 
     def __init__(self, config, learning_params: DistLearningConfig, rank: int, world_size: int):
         self.config = config
@@ -39,24 +44,6 @@ class Dataset:
         """
         return self.test_loader
 
-    @abstractmethod
-    def load_train_dataset(self):
-        """
-        Loads & returns the training dataset.
-
-        :return: tuple
-        """
-        raise NotImplementedError("load_train_dataset() isn't implemented")
-
-    @abstractmethod
-    def load_test_dataset(self):
-        """
-        Loads & returns the test dataset.
-
-        :return: tuple
-        """
-        raise NotImplementedError("load_test_dataset() isn't implemented")
-
     def get_train_loader(self, **kwargs):
         """
         Return the data loader for the train dataset.
@@ -77,7 +64,24 @@ class Dataset:
         """
         return self.test_loader
 
-    @staticmethod
+    @abstractmethod
+    def load_train_dataset(self):
+        """
+        Loads & returns the training dataset.
+
+        :return: tuple
+        """
+        raise NotImplementedError("load_train_dataset() isn't implemented")
+
+    @abstractmethod
+    def load_test_dataset(self):
+        """
+        Loads & returns the test dataset.
+
+        :return: tuple
+        """
+        raise NotImplementedError("load_test_dataset() isn't implemented")
+
     def get_data_loader_from_data(batch_size, X, Y, **kwargs):
         """
         Get a data loader created from a given set of data.
