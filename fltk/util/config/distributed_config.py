@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from dataclasses_json import config, dataclass_json
+from fltk.util.config.definitions import OrchestratorType
 
 @dataclass_json
 @dataclass
@@ -66,8 +67,7 @@ class ExecutionConfig:
 @dataclass_json
 @dataclass
 class OrchestratorConfig:
-    service: str
-    nic: str
+    orchestrator_type: OrchestratorType
 
 
 @dataclass_json
@@ -82,13 +82,12 @@ class ClientConfig:
 class ClusterConfig:
     orchestrator: OrchestratorConfig
     client: ClientConfig
-    wait_for_clients: bool = True
     namespace: str = 'test'
     image: str = 'fltk:latest'
 
     def load_incluster_namespace(self):
         """
-        Function to retreive information from teh cluster itself provided by K8s.
+        Function to retrieve information from teh cluster itself provided by K8s.
         @return: None
         @rtype: None
         """
@@ -114,7 +113,7 @@ class ClusterConfig:
 
 @dataclass_json
 @dataclass
-class DistributedConfig():
+class DistributedConfig:
     """
     Configuration Dataclass for shared configurations between experiments. This regards your general setup, describing
     elements like the utilization of CUDA accelerators, format of logging file names, whether to save experiment data
