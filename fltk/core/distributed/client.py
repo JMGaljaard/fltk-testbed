@@ -1,7 +1,8 @@
+from __future__ import annotations
 import datetime
 import logging
 from pathlib import Path
-from typing import List, Tuple, Type
+from typing import List, Tuple, Type, TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -9,14 +10,15 @@ from sklearn.metrics import confusion_matrix
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.core.distributed.dist_node import DistNode
-from fltk.datasets.loader_util import get_dist_dataset
+from fltk.datasets import get_dist_dataset
 from fltk.nets import get_net
 from fltk.nets.util import calculate_class_precision, calculate_class_recall, save_model, load_model_from_file
 from fltk.schedulers import MinCapableStepLR, LearningScheduler
 from fltk.strategy import get_optimizer
-from fltk.util.config import DistributedConfig, DistLearningConfig
 from fltk.util.results import EpochData
 
+if TYPE_CHECKING:
+    from fltk.util.config import DistributedConfig, DistLearningConfig
 
 class DistClient(DistNode):
 

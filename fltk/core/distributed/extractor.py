@@ -1,9 +1,13 @@
+from __future__ import annotations
 import os
 from argparse import Namespace
 
 from torchvision.datasets import FashionMNIST, CIFAR10, CIFAR100, MNIST
 
-from fltk.util.config import DistributedConfig
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fltk.util.config import DistributedConfig
 
 
 def download_datasets(args: Namespace, config: DistributedConfig):
