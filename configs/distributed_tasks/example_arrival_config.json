@@ -11,7 +11,7 @@
   "trainTasks": [
     {
       "type": "distributed",
-      "lambda": 0.004,
+      "lambda": 1.5,
       "preemptJobs": false,
       "jobClassParameters": [
         {
@@ -32,7 +32,7 @@
             "dataset": "mnist"
           },
           "systemParameters": {
-            "dataParallelism": 2,
+            "dataParallelism": 4,
             "configurations": {
               "default": {
                 "cores": "1000m",

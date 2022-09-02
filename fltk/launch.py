@@ -8,24 +8,23 @@ from multiprocessing.pool import ThreadPool
 from pathlib import Path
 
 import torch.distributed as dist
-import yaml
 from kubernetes import config
 from torch.distributed import rpc
-
-from fltk.core.client import Client
-from fltk.core.distributed import DistClient
-from fltk.core.distributed import Orchestrator
-from fltk.core.distributed.extractor import download_datasets
-from fltk.core.federator import Federator
+from fltk.core.distributed import DistClient, download_datasets
+from fltk.core import Client, Federator
 from fltk.nets.util.reproducability import init_reproducibility, init_learning_reproducibility
 from fltk.util.cluster.client import ClusterManager
+
 from fltk.util.cluster.worker import should_distribute
 from fltk.util.config import DistributedConfig, FedLearningConfig, retrieve_config_network_params, get_learning_param_config, \
     DistLearningConfig
+from fltk.util.config.definitions import get_orchestrator, OrchestratorType
+
 from fltk.util.environment import retrieve_or_init_env, retrieve_env_config
-from fltk.util.task.generator.arrival_generator import SimulatedArrivalGenerator, SequentialArrivalGenerator
 
 # Define types for clarity in execution
+from fltk.util.task.generator.arrival_generator import SimulatedArrivalGenerator, SequentialArrivalGenerator
+
 Rank = NewType('Rank', int)
 NIC = NewType('NIC', str)
 Host = NewType('Host', int)
@@ -66,7 +65,25 @@ def exec_distributed_client(task_id: str, conf: DistributedConfig = None,
     print(epoch_data)
 
 
-def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, simulate_arrivals: bool = False):
+def get_arrival_generator(config: DistributedConfig, experiment: str):
+    """
+    Retrieval function to create generator functions
+    @param config:
+    @type config:
+    @param experiment:
+    @type experiment:
+    @return:
+    @rtype:
+    """
+    __lookup = {
+        OrchestratorType.BATCH: SequentialArrivalGenerator,
+        OrchestratorType.SIMULATED: SimulatedArrivalGenerator
+    }
+
+    return __lookup.get(config.cluster_config.orchestrator.orchestrator_type, None)(Path(experiment))
+
+
+def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
     """
     Default runner for the Orchestrator that is based on KubeFlow
     @param args: Commandline arguments passed to the execution. Might be removed in a future commit.
@@ -88,11 +105,11 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, si
         logging.info("Pointing configuration to in cluster configuration.")
         conf.cluster_config.load_incluster_namespace()
         conf.cluster_config.load_incluster_image()
-    arrival_generator = (SimulatedArrivalGenerator if simulate_arrivals else SequentialArrivalGenerator)(
-            args.experiment)
-    cluster_manager = ClusterManager()
 
-    orchestrator = Orchestrator(cluster_manager, arrival_generator, conf)
+
+    cluster_manager = ClusterManager()
+    arrival_generator = get_arrival_generator(conf, args.experiment)
+    orchestrator = get_orchestrator(conf, cluster_manager, arrival_generator)
 
     pool = ThreadPool(3)
 
@@ -102,7 +119,7 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, si
     logging.info("Starting arrival generator")
     pool.apply_async(arrival_generator.start, args=[conf.get_duration()])
     logging.info("Starting orchestrator")
-    pool.apply(orchestrator.run if simulate_arrivals else orchestrator.run_batch)
+    pool.apply(orchestrator.run)
 
     pool.close()
     pool.join()
