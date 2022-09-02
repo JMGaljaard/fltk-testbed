@@ -1,3 +1,8 @@
+"""
+Module for declaring types and definitions, including helper functions that allow to retrieve
+object (types) from a definition.
+"""
+
 from .data_sampler import DataSampler
 from .optim import Optimizations
 from .aggregate import Aggregations
@@ -7,3 +12,4 @@ from .net import Nets
 from .optim import Optimizations
 from .experiment_type import ExperimentType
 from .loss import Loss, get_loss_function
+from .orchestrator import OrchestratorType, get_orchestrator
