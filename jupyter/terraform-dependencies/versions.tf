@@ -14,6 +14,11 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = ">= 1.13.1"
     }
+
+    helm = {
+      source = "hashicorp/helm"
+      version = ""
+    }
   }
   required_version = "~> 1.1"
 }
