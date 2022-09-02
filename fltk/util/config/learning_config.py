@@ -14,12 +14,8 @@ from dataclasses_json import config, dataclass_json
 # noinspection PyProtectedMember
 from torch.nn.modules.loss import _Loss
 
-from fltk.util.config.definitions import DataSampler, Loss, get_loss_function
-from fltk.util.config.definitions.aggregate import Aggregations
-from fltk.util.config.definitions.dataset import Dataset
-from fltk.util.config.definitions.logging import LogLevel
-from fltk.util.config.definitions.net import Nets
-from fltk.util.config.definitions.optim import Optimizations
+from fltk.util.config.definitions import (DataSampler, Loss, get_loss_function, Aggregations, Dataset, LogLevel, Nets,
+                                          Optimizations)
 
 
 def _eval_decoder(obj: Union[str, T]) -> Union[Any, T]:
