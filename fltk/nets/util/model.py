@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 from collections import OrderedDict
 from pathlib import Path
@@ -6,8 +7,12 @@ from typing import Union
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from fltk.util.config import DistributedConfig
+
 from fltk.util.results import EpochData
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fltk.util.config import DistributedConfig
 
 
 def flatten_params(model_description: Union[torch.nn.Module, OrderedDict]):
