@@ -1,3 +1,4 @@
+from __future__  import annotations
 from typing import Tuple, Any
 
 import numpy as np
@@ -8,7 +9,11 @@ import torch
 from fltk.core.node import Node
 from fltk.schedulers import MinCapableStepLR
 from fltk.strategy import get_optimizer
-from fltk.util.config import FedLearningConfig
+
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from fltk.util.config import FedLearningConfig
 
 
 class Client(Node):

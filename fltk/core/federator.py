@@ -1,5 +1,6 @@
-import copy
+from __future__ import annotations
 
+import copy
 import numpy as np
 import sklearn
 import time
@@ -13,9 +14,13 @@ from fltk.core.client import Client
 from fltk.core.node import Node
 from fltk.strategy import get_aggregation
 from fltk.strategy import random_selection
-from fltk.util.config import FedLearningConfig
+
 from fltk.util.data_container import DataContainer, FederatorRecord, ClientRecord
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fltk.util.config import FedLearningConfig
 NodeReference = Union[Node, str]
 
 

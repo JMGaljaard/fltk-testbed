@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 import abc
 import copy
 import os
 from typing import Callable, Any
 import torch
 from torch.distributed import rpc
-from fltk.datasets.loader_util import get_dataset
+from fltk.datasets.federated import get_fed_dataset
 from fltk.nets import get_net
-from fltk.util.config import FedLearningConfig
+from typing import TYPE_CHECKING
+
 from fltk.util.log import getLogger
+
+if TYPE_CHECKING:
+    from fltk.util.config import FedLearningConfig
 
 # Global dictionary to enable peer to peer communication between clients
 global_vars = {}
@@ -61,7 +67,7 @@ class Node(abc.ABC):
         if world_size:
             config.world_size = world_size
         self.logger.info(f'world size = {config.world_size} with rank={config.rank}')
-        self.dataset = get_dataset(config.dataset_name)(config)
+        self.dataset = get_fed_dataset(config.dataset_name)(config)
         self.finished_init = True
         self.logger.info('Done with init')
 
