@@ -1,13 +1,4 @@
 {
-  "experimentConfiguration": {
-    "randomSeed": [
-      1,
-      41,
-      42,
-      43,
-      430
-    ]
-  },
   "trainTasks": [
     {
       "type": "distributed",

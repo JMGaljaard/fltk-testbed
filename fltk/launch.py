@@ -98,7 +98,7 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
     logging.info("Starting Orchestrator, initializing resources....")
     if args.local:
         logging.info("Loading local configuration file")
-        config.load_kube_config()
+        # config.load_kube_config()
     else:
         logging.info("Loading in cluster configuration file")
         config.load_incluster_config()
@@ -333,6 +333,10 @@ def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NI
     logging.info(f"Starting in cluster mode{' (locally)' if args.local else ''}.")
     logging.basicConfig(level=logging.DEBUG,
                         datefmt='%m-%d %H:%M')
+
+    # TODO: Set arrival seeds correctly, and launch experiments.
+    # TODO: Make sure to wait for experiments to complete.
+
     # Set the seed for arrivals, torch seed is mostly ignored. Set the `arrival_seed` to a different value
     # for each repetition that you want to run an experiment with.
     init_reproducibility(conf.execution_config)
