@@ -5,7 +5,7 @@ variable "kubernetes_config_path" {
 
 variable "project_id" {
   type = string
-  default = "qpecs-fltk-2022"
+  default = "test-bed-fltk"
   description = "Google Cloud project name to create cluster in."
 }
 

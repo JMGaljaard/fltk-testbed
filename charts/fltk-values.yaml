@@ -4,5 +4,5 @@ fltk:
     workDir: /opt/federation-lab
 provider:
     domain: gcr.io
-    projectName: test-bed-distml
+    projectName: test-bed-fltk
     imageName: fltk:latest
