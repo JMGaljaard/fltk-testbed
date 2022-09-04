@@ -30,7 +30,7 @@ spec:
           memory: {{ (.Values.orchestrator.memory | int) }}
       volumeMounts:
         - name: fl-server-log-volume
-          mountPath: {{ .Values.fltk.workDir }}/output
+          mountPath: {{ .Values.fltk.workDir }}/{{ .Values.fltk.outputDir }}
           readOnly: true
         - name: fltk-orchestrator-config-volume
           mountPath: {{ .Values.fltk.workDir }}/{{ .Values.fltk.configDir }}

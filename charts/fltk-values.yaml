@@ -1,4 +1,5 @@
 fltk:
+    outputDir: output
     configDir: config
     workDir: /opt/federation-lab
 provider:

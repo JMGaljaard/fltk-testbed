@@ -1,8 +1,8 @@
 # Kubernetes - Federation Learning Toolkit ((K)FLTK)
 [![License](https://img.shields.io/badge/license-BSD-blue.svg)](LICENSE)
-[![Python 3.6](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
-[![Python 3.6](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
-[![Python 3.6](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
+[![Python 3.7](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
+[![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
+[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
 
 This toolkit can be used to run Distributed and Federated experiments. This project makes use of
 Pytorch Distributed (Data Parallel) ([docs](https://pytorch.org/tutorials/beginner/dist_overview.html))
@@ -14,7 +14,7 @@ This project builds on the work by Bart Cox, on the Federated Learning toolkit d
 Docker Compose ([repo](https://github.com/bacox/fltk))
 
 
-This project is tested with Ubuntu 20.04 and Arch Linux and Python {3.7, 3.8, 3.9}.
+This project is tested with Ubuntu 20.04, Arch Linux, MacOS, with Python {3.7, 3.8, 3.9}. Python 3.9 is recommended.
 
 ## Global idea
 Pytorch Distributed works based on a `world_size` and `rank`s. The ranks should be between `0` and `world_size-1`.
@@ -32,7 +32,6 @@ extension of the project is planned to implement a `FederatedClient` that allows
 2. Clients prepare needed data and model and synchronize using PyTorch Distributed.
    1. `WORLD_SIZE = 1`: Client performs training locally. 
    2. `WORLD_SIZE > 1`: Clients run epochs with DistributedDataParallel together.
-   3. (FUTURE: ) Your federated learning experiment.
 3. Client logs/reports progress during and after training.
 
 **Important notes:**
@@ -82,6 +81,8 @@ Structure with important folders and files explained:
 
 ```
 project
+├── terraform                    # Contains terraform charts for deployment on GKE
+├── jupyter                      # Contains jupyter notebook files for setup and loading tensorboard files 
 ├── charts                       # Templates for deploying projects with Helm 
 │   ├── extractor                   - Template for 'extractor' for centralized logging (using NFS)
 │   └── orchestrator                - Template for 'orchestrator' for launching distributed experiments 
@@ -102,7 +103,7 @@ project
 ```
 
 ## Execution modes
-Federatd Learning experiments can be set up in various ways (Simulation, Emulation, or fully distributed). Not all have the same requirements and thus some setup are more suited then others depending on the experiment.
+Federated Learning experiments can be set up in various ways (Simulation, Emulation, or fully distributed). Not all have the same requirements and thus some setup are more suited then others depending on the experiment.
 
 ### Simulation
 With the method as single machine is used to execute all the different nodes in the system.
@@ -143,14 +144,15 @@ The following tools need to be set up in your development environment before wor
   * Docker ([docs](https://www.docker.com/get-started)) (with support for BuildKit [docs](https://docs.docker.com/develop/develop-images/build_enhancements/))
   * Kubectl ([docs](https://kubernetes.io/docs/setup/))
   * Helm ([docs](https://helm.sh/docs/chart_template_guide/getting_started/))
-  * Kustomize (3.2.0) ([docs](https://kubectl.docs.kubernetes.io/installation/kustomize/))
+  * (Terraform installation) Terraform
+  * (Manual installation) Kustomize (3.2.0) ([docs](https://kubectl.docs.kubernetes.io/installation/kustomize/))
 * Local execution (single machine):
   * MiniKube ([docs](https://minikube.sigs.k8s.io/docs/start/))
     * It must be noted that certain functionality might require additional steps to work on MiniKube. This is currently untested.
 * Google Cloud Environment (GKE) execution:
   * GCloud SDK ([docs](https://cloud.google.com/sdk/docs/quickstart))
 * Your own cluster provider:
-  * A Kubernetes cluster supporting Kubernetes 1.16+.
+  * A Kubernetes cluster supporting Kubernetes `>1.15,<=1.22`.
 
 ## Getting started
 
@@ -165,7 +167,44 @@ To download the models, execute the following command from the [project root](.)
 python3 -m fltk extractor ./configs/example_cloud_experiment.json  
 ```
 
-## Deployment
+## Deployment (Terraform)
+To setup the the test-bed using Terraform, the following setup needs to be done. This can be achieved through following
+the steps described in [`jupyter/terraform_notebook.ipynb`](jupyter/terraform_notebook.ipynb).
+
+### Prerequisites
+
+Before starting the jupyter notebook server locally, make sure to have the following dependencies installed.
+We will create a virtual environment capable of running a jupyter notebook server with a `bash_kernel`.
+
+For windows users, make sure to run the following commands in a `bash` capable terminal, e.g. using 
+Windows Subsystem for Linux (WSL).
+
+
+```bash
+python3 -m venv venv-jupyter
+source venv-jupyter/bin/activate
+
+# Install python dependencies for running the notebook
+pip3 install jupyter ipython bash_kernel
+# Install bash kernel to use for the notebook
+python3 -m bash_kernel.install
+```
+
+When running the notebook (through an IDE or browser), make sure to set the kernel to the freshly installed
+`bash_kernel`. Otherwise, the cells will be ran as Python code...
+
+### Running the notebook
+
+To start working in the notebook, run the following command in a bash shell, and follow the steps in the notebook.
+
+```bash
+cd jupyter
+jupyter notebook
+```
+
+Click on the link that is displayed in the output, default is `localhost:8888`, and open the terraform notebook.
+
+## Deployment (Manual)
 
 This deployment guide will provide the general process of deploying an example deployment on
 the created cluster. It is assumed that you have already set up a cluster (or emulation tool like MiniKube to execute the 

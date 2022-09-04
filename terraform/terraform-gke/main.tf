@@ -5,7 +5,7 @@ module "gke" {
   source            = "terraform-google-modules/kubernetes-engine/google"
   project_id        = var.project_id
   name              = var.cluster_name
-  # Create a ZONAL cluster, dissallowing the cluster to span multiple regions in a zone.
+  # Create a ZONAL cluster, disallowing the cluster to span multiple regions in a zone.
   # Alternatively, for scheduling cross-regions, utilize `zone` and `regions` instead of `regional` and `region`
   regional          = false
   region            = var.project_region
@@ -23,7 +23,7 @@ module "gke" {
   kubernetes_version         = var.kubernetes_version
 
 
-  node_pools                 = [
+  node_pools = [
     {
       name               = "default-node-pool"
       machine_type       = "e2-medium"
@@ -94,14 +94,13 @@ module "gke" {
 
   node_pools_taints = {
     all = []
-
-    default-node-pool = []
+    default-node-pool = []              # Default nodepool that will contain all the other pods
 
     medium-fltk-pool-1 = [
       {
-        key    = "medium-fltk-pool-1"
-        value  = true
-        effect = "PREFER_NO_SCHEDULE"
+        key    = "fltk.node"            # Taint is used in fltk pods
+        value  = "medium-e2"            # In case more explicit matching is required
+        effect = "PREFER_NO_SCHEDULE"   # Other Pods are preferably not scheduled on this pool
       },
     ]
   }
