@@ -176,7 +176,7 @@ the steps described in [`jupyter/terraform_notebook.ipynb`](jupyter/terraform_no
 Before starting the jupyter notebook server locally, make sure to have the following dependencies installed.
 We will create a virtual environment capable of running a jupyter notebook server with a `bash_kernel`.
 
-For windows users, make sure to run the following commands in a `bash` capable terminal, e.g. using 
+For Windows users, make sure to run the following commands in a `bash` capable terminal, e.g. using 
 Windows Subsystem for Linux (WSL).
 
 
@@ -193,7 +193,7 @@ python3 -m bash_kernel.install
 When running the notebook (through an IDE or browser), make sure to set the kernel to the freshly installed
 `bash_kernel`. Otherwise, the cells will be ran as Python code...
 
-### Running the notebook
+### Deploying cluster and dependencies
 
 To start working in the notebook, run the following command in a bash shell, and follow the steps in the notebook.
 
@@ -204,317 +204,102 @@ jupyter notebook
 
 Click on the link that is displayed in the output, default is `localhost:8888`, and open the terraform notebook.
 
-## Deployment (Manual)
+### Running the Extractor and Experiments
 
-This deployment guide will provide the general process of deploying an example deployment on
-the created cluster. It is assumed that you have already set up a cluster (or emulation tool like MiniKube to execute the 
-commands locally).
-
-**N.B.** This setup expects the NodePool on which you **want** to run training experiments, to have **Taints**, 
-this should be set for the selected nodes. For more information on GKE see [docs](https://cloud.google.com/kubernetes-engine/docs/how-to/node-taints).
-
-In this project we assume the following taint to be set, this can also be done using `kubectl` for each node.
-
-```
-fltk.node=normal:NoSchedule
-```
-
-Programmatically, the following `V1Toleration` allows pods to be scheduled on such 'tainted' nodes, regardless of the value
-for `fltk.node`.
-```python
-from kubernetes.client import V1Toleration
-
-V1Toleration(key="fltk.node",
-             operator="Exists",
-             effect="NoSchedule")
-```
-
-For a more strict Toleration (specific to a value), the following `V1Toleration` should be generated.
-
-```python
-V1Toleration(key="fltk.node",
-             operator="Equals",
-             value="normal",
-             effect='NoSchedule')
-```
-
-For more information on the programmatic creation of `PyTorchJobs` to spawn on a cluster, refer to the 
-`DeploymentBuilder` found in [`./fltk/util/cluster/client.py`](./fltk/util/cluster/client.py) and the function
-`construct_job`.
-
-### GKE / MiniKube
-Currently, this guide was tested to result in a working FLTK setup on GKE and MiniKube.
-
-The guide is structured as follows:
-
-1. (Optional) Setup a Kubernetes Dashboard instance for monitoring
-2. Install KubeFlow's Pytorch-Operator (in a bare minimum configuration).
-   * KubeFlow is used to create and manage Training jobs for Pytorch Training jobs. However, you can also
-      extend the work by making use of KubeFlows TF-Operator, to make use of Tensorflow.
-3. (Optional) Deploy KubeFlow PyTorch Job using an example project.
-4. Install an NFS server.
-   * To simplify FLTK's deployment, an NFS server is used to allow for the creation of `ReadWriteMany` volumes in Kubernetes.
-      These volumes are, for example, used to create a centralized logging point, that allows for easy extraction of data
-      from the `Extractor` pod.
-5. Setup and install the `Extractor` pod.
-   * The `Extractor` pod is used to create the required volume claims, as well as create a single access point to gain
-     insight into the training process. Currently, it spawns a pod that runs the a `Tensorboard` instance, as a
-     `SummaryWriter` is used to record progress in a `Tensorboard` format. These are written to a `ReadWriteMany` mounted
-     on a pods `$WORKING_DIR/logging` by default during execution.
-6. Deploy a default FLTK experiment.
-
-### (Optional) setup Kubernetes Dashboard
-Kubernetes Dashboard provides a comprehensive interface into some metrics, logs and status information of your cluster
-and the deployments it's running. To setup this dashboard, Helm can be used as follows:
+#### Creating and uploading Docker container 
 
 
-```bash
-helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
-helm install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard
+The following commands will all (unless specified otherwise) be executed in the project root of the git repo.
+Before we do so, first we need to setup a Python interpreter/environmen, this can also be used for development.
+
+
+-   First we will create and active a Python venv.
+
+    ``` bash
+    python3 -m venv venv
+    source venv/bin/activate
+    pip3 install -r requirements.txt
+    ```
+
+-   Then we will download the datasets using a Python script in the same
+    terminal (or another terminal with the `venv` activated).
+
+    ``` bash
+    python3 -m fltk extractor ./configs/example_cloud_experiment.json
+    ```
+
+Afterwards, we can run the following commands to build the Docker
+container. With the use of BuildKit, consecutive builds allow to use cached requirements. Speeding
+up your builds when adding Python dependencies to your project.
+
+``` bash
+DOCKER_BUILDKIT=1 docker build . --tag gcr.io/<project-id>/fltk
+docker push gcr.io/<project-id>/fltk
 ```
 
-After setup completes, running the following commands (in case you change the release name to something different, you can 
-fetch the command using `helm status your-release-name --namespace optional-namespace-name`) to connect to your Kubernetes
-Dashboard.
-```bash
-export POD_NAME=$(kubectl get pods -n default -l "app.kubernetes.io/name=kubernetes-dashboard,app.kubernetes.io/instance=kubernetes-dashboard" -o jsonpath="{.items[0].metadata.name}")
-kubectl -n default port-forward $POD_NAME 8443:8443
-```
+#### Setting up the Extractor 
 
-Then browsing to [https://localhost:8443](https://localhost:8443) on your machine will connect you to the Dashboard instance.
-Note that the certificate is self-signed of the Kubernetes Dashboard, so your browser may give warnings that the site is 
-unsafe.
+This section only needs to be run once, as this will set up the
+TensorBoard service, as well as create the Volumes needed for the
+deployment of the `Orchestrator`'s chart. It does, however, require you
+to have pushed the docker container to a registry that can be accessed
+from your Cluster.
 
-### Installing KubeFlow + PyTorch-Operator
-Kubeflow is an ML toolkit that allows to for a wide range of distributed machine and deep learning operations on Kubernetes clusters. 
-FLTK makes use of the 1.3 release. We will deploy a minimal configuration, following the documentation of KubeFlows 
-[manifests repository](https://github.com/kubeflow/manifests). If you have already setup KubeFlow (and PyTorch-Operator) 
-you may want to skip this step.
+N.B. that removing the `Extractor` chart will result in the deletion of
+the Persistent Volumes once all Claims are released. This will remove
+the data that is stored on these volumes. Make sure to copy the contents
+of these directories to your local file system before uninstalling the
+`Extractor` Helm chart. The following commands deploy the `Extractor`
+Helm chart, under the name `extractor` in the `test` Namespace.\
+Make sure to update the project name in the `chart` of the extractor in case you have changed
+the default `PROJECT_ID`.
 
-```bash
-git clone https://github.com/kubeflow/manifests.git --branch=v1.3-branch
-cd manifests
-```
-
-You might want to read the `README.md` file for more information. Using Kustomize, we will install the default configuration
-files for each KubeFlow component that is needed for a minimal setup. If you have already worked with KubeFlow on GKE
-you might want to follow the GKE deployment on the official KubeFlow documentation. This will, however, result in a slightly 
-higher strain on your cluster, as more components will be installed.
-
-
-#### Setup cert-manager
-```bash
-kustomize build common/cert-manager/cert-manager/base | kubectl apply -f -
-# Wait before executing the following command, as 
-kustomize build common/cert-manager/kubeflow-issuer/base | kubectl apply -f -
-```
-
-#### Setup Isto
-```bash
-kustomize build common/istio-1-9/istio-crds/base | kubectl apply -f -
-kustomize build common/istio-1-9/istio-namespace/base | kubectl apply -f -
-kustomize build common/istio-1-9/istio-install/base | kubectl apply -f -
-```
-
-```bash
-kustomize build common/dex/overlays/istio | kubectl apply -f -
-```
-
-```bash
-kustomize build common/oidc-authservice/base | kubectl apply -f -
-```
-
-#### Setup knative
-```bash
-
-kustomize build common/knative/knative-serving/base | kubectl apply -f -
-kustomize build common/istio-1-9/cluster-local-gateway/base | kubectl apply -f -
-```
-
-#### Setup KubeFlow
-```bash
-kustomize build common/kubeflow-namespace/base | kubectl apply -f -
-```
-
-```bash
-kustomize build common/kubeflow-roles/base | kubectl apply -f -
-kustomize build common/istio-1-9/kubeflow-istio-resources/base | kubectl apply -f -
-```
-
-#### Setup PyTorch-Operator
-```bash
-kustomize build apps/pytorch-job/upstream/overlays/kubeflow | kubectl apply -f -
-```
-
-### (Optional) Testing KubeFlow deployment
-
-In case you want to test your KubeFlow deployment, an example training job can be run. For this, an example project of
-the pytorch-operator [repository](https://github.com/kubeflow/pytorch-operator/) can be used.
-
-```bash
-git checkout https://github.com/kubeflow/pytorch-operator.git
-cd pytorch-operator/examples/mnist
-```
-
-Follow the `README.md` instructions, and make sure to *rename* the image name in `pytorch-operator/examples/mnist/v1/pytorch_job_mnist_gloo.yaml`
-(line 33 and 35), to your project on GCE. Also commend out the `resource` descriptions in lines 20-22 and 36-38. Otherwise
-jobs require GPU support to run.
-
-Build and push the Docker container, and execute the command to launch your first PyTorchJob on your cluster.
-
-```bash
-kubectl create -f ./v1/pytorch_job_mnist_gloo.yaml
-```
-
-### Create experiment Namespace
-Create your namespace in your cluster, that will later be used to deploy experiments. This guide (and the default
-setup of the project) assumes that the namespace `test` is used. To create a namespace, run the following command with your cluster credentials set up before running these commands.
-
-```bash
-kubectl namespace create test
-```
-
-### Installing NFS
-During the execution, `ReadWriteMany` persistent volumes are needed. This is because each training processes master
-pod uses a`SummaryWriter` to log the training progress. As such, multiple containers on potentially different nodes require 
-read-write access to a single volume. One way to resolve this is to make use of Google Firestore (or 
-equivalent on your service provider of choice). However, this will incur significant operating costs, as operation starts at 1 TiB (~200 USD per month). As such, we will deploy our own a NFS on our cluster. 
-
-In case this does not need your scalability requirements, you may want to set up a (sharded) CouchDB instance, and use
-that as a data store. This is not provided in this guide.
-
-
-For FLTK, we make use of the `nfs-server-provisioner` Helm chart created by `kvaps`, which neatly wraps this functionality in an easy
-to deploy chart. Make sure to install the NFS server in the same *namespace* as where you want to run your experiments.
-
-Running the following commands will deploy a `nfs-server` instance (named `nfs-server`) with the default configuration. 
-In addition, it creates a Persistent Volume of `20 Gi`, allowing for `20 Gi` `ReadWriteMany` persistent volume claims. 
-You may want to change this amount, depending on your need. Other service providers, such as DigitalOcean, might require the
-`storageClass` to be set to `do-block-storage` instead of `default`.
-
-```bash
-helm repo add kvaps https://kvaps.github.io/charts
-helm update
-helm install nfs-server kvaps/nfs-server-provisioner --namespace test --set persistence.enabled=true,persistence.storageClass=standard,persistence.size=20Gi
-```
-
-To create a Persistent Volume (for a Persistent Volume Claim), the following syntax should be used, similar to the Persistent
-Volume description provided in [./charts/extractor/templates/fl-log-claim-persistentvolumeclaim.yaml](./charts/extractor/templates/fl-log-claim-persistentvolumeclaim.yaml).
-Which creates a Persistent Volume that uses the values provided in [./charts/fltk-values.yaml](./charts/fltk-values.yaml).
-
-
-**N.B.** If you wish to use a Volume as both **ReadWriteOnce** and **ReadOnlyMany**, GCE does **NOT** provide this functionality
-You'll need to either create a **ReadWriteMany** Volume with read-only Claims, or ensure that the writer completes before 
-the readers are spawned (and thus allowing for **ReadWriteOnce** to be allowed during deployment). For more information
-consult the Kubernetes and GKE Kubernetes 
-
-### Creating and pushing Docker containers
-On your remote cluster, you need to have set up a docker registry. For example, Google provides the Google Container Registry
-(GCR). In this example, we will make use of GCR, to push our container to a project `test-bed-distml` under the tag `fltk`.
-
-This requires you to have enabled the GCR in your GCE project beforehand. Make sure that your docker installation supports
-Docker Buildkit, or remove the `DOCKER_BUILDKIT=1` part from the command before running (this might require additional changes
-in the Dockerfile).
-
-**N.B.** When running for the first time, make sure to have downloaded the Datasets used in the repo.
-This can be done by executing the following command with an activated environment.
-
-```bash
-python3 -m fltk extractor configs/example_cloud_experiment.json
-```
-
-To build the container and push to your GCR repository, execute the following commands.
-```bash
-DOCKER_BUILDKIT=1 docker build . --tag gcr.io/test-bed-distml/fltk
-docker push gcr.io/test-bed-distml/fltk
-```
-
-**N.B.** when running in Minikube, you can also set up a local registry. An example of how this can be achieved 
-can be found [in this Medium post by Shashank Srivastava](https://shashanksrivastava.medium.com/how-to-set-up-minikube-to-use-your-local-docker-registry-10a5b564883).
-
-
-### Setting up the Extractor
-
-This section only needs to be run once, as this will set up the TensorBoard service, as well as create the Volumes needed
-for the deployment of the `Orchestrator`'s chart. It does, however, require you to have pushed the docker container to a 
-registry that can be accessed from your Cluster.
-
-**N.B.** that removing the `Extractor` chart will result in the deletion of the Persistent Volumes once all Claims are 
-released. This **will remove** the data that is stored on these volumes. **Make sure to copy**  the contents of these directories to your local file system before uninstalling the `Extractor` Helm chart. The following commands deploy the `Extractor`
-Helm chart, under the name `extractor` in the `test` namespace.
-```bash
+``` bash
 cd charts
-helm install extractor -f values.yaml --namespace test
+helm install extractor ./extractor -f fltk-values.yaml --namespace test
 ```
 
-And wait for it to deploy. (Check with `helm ls --namespace test`)
+And wait for it to deploy. (Check with `helm ls –namespace test`)
 
-**N.B.** To download data from the `Extrator` node (which mounts the logging director), the following `kubectl`
- command can be used. This will download the data in the logging directory to your file system. Note that downloading
-many small files is slow (as they will be compressed individually). The command assumes that the default name is used 
-`fl-extractor`.
+N.B. To download data from the `Extractor` node (which mounts the
+logging director), the following `kubectl` command can be used. This
+will download the data in the logging directory to your file system.
+Note that downloading many small files is slow (as they will be
+compressed individually). The command assumes that the default name is
+used `fl-extractor`.
 
-```bash
+``` bash
 kubectl cp --namespace test fl-extractor:/opt/federation-lab/logging ./logging
 ```
 
-⚠️ Make sure to test your configurations before running your experiments, to ensure that your data is written in a
-persistent fashion. Writing to a directory that is not mounted to an NFS disk may result in dataloss.
+Which will copy the data to a directory logging (you may have to create
+this directory using `mkdir logging`).
 
-⚠️ For federated learning experiments, data is written by the Federator to a disk, as such only a single mount of an
-NFS is needed  (see for example how [`V1PytorchTrainJob`](fltk/util/cluster/client.py)s are constructed by the Orchestrator).
-It is advisable to load the data of Federated learning experiments using the `pandas` library, this can be done as follows.
-For data exploration, using a Jupyter Notebook may be advisable.
+#### Launching an experiment 
 
-```python
-import pandas as pd
-experiment_file = 'path/to/your/experiment.csv'
-df = pd.read_csv(experiment_file)
-
-df
-```
-This should display the contents of the csv file parsed into a `pd.DataFrame`, which should have the following schema.
-```
-round_id,train_duration,test_duration,round_duration,num_epochs,trained_items,accuracy,train_loss,test_loss,timestamp,node_name,confusion_matrix
-```
+We have now completed the setup of the project and can continue by
+running actual experiments.
 
 
-### Launching an experiment
-We have now completed the setup of the project and can continue by running actual experiments. If no errors occur, this
-should. You may also skip this step and work on your code, but it might be good to test your deployment
-before running into trouble later.
+##### Federated Experiment
 
-#### Federated Experiment
 ```bash
 helm install flearner charts/orchestrator --namespace test -f charts/fltk-values.yaml\
   --set-file orchestrator.experiment=./configs/federated_tasks/example_arrival_config.json,\
   orchestrator.configuration=./configs/example_cloud_experiment.json
 ```
 
-#### Distributed Experiment
+##### Distributed Experiment
+
 ```bash
 helm install flearner charts/orchestrator --namespace test -f charts/fltk-values.yaml\
   --set-file orchestrator.experiment=./configs/distributed_tasks/example_arrival_config.json,\
   orchestrator.configuration=./configs/example_cloud_experiment.json
 ```
 
-**N.B.** The `./configs/distributed_tasks` and `./configs/distributed_tasks` dictories contain experiment configurations,
-i.e. which networks should be run, etc. The `./configs/example_cloud_experiment.json` file contains shared configuration 
-information, e.g. on how to log experiments. Make sure to ensure that all data can be saved to a persistent volume. 
-E.g. by creating a shared volume for `models` and saving to the corresponding directory.
-
-To debug the deployment append with the `--debug` flag, note that you may need to uninstall a prior deployment.
-Alternatively, you can use the `upgrade` argument, however, currently the orchestrator does not support updated
-releases. Pull requests are welcome for adding this functionality.
-
-**N.B.** Passing the `--set-file` flag is optional, but will take by default the 
-`benchmarking/example_cloud_experiment.json` file. This follows the symlink in `charts/orchestrator/configs/`, 
-as Helm does not allow for accessing files outside a charts directory.
-
-This will spawn an `fl-server` Pod in the `test` Namespace, which will spawn Pods (using `V1PyTorchJobs`), that
-run experiments. It will currently make use of the [`configs/example_cloud_experiment.json`](configs/benchmarking/example_cloud_experiment.json)
-default configuration. As described in the [values](./charts/orchestrator/values.yaml) file of the `Orchestrator`s Helm chart
-
+## Deployment (manual)
+Please refer to the wiki pages to see how to deploy manually. This has been replaced to rely on terraform in the future
+(see above).
 
 ## Running tests
 In addition to the FLTK framework implementation, some tests are available to prevent regression of bugs. Currently, only a limited subset of features 
@@ -551,4 +336,4 @@ Which will collect and run all the tests in the repository, and show in `verbose
 ## Known issues / Limitations
 
 * Currently, there is no GPU support in the Docker containers, for this the `Dockerfile` will need to be updated to
-accomodate for this.
+accommodate for this.
