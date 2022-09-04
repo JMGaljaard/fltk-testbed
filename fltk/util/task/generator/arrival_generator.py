@@ -246,6 +246,7 @@ class SequentialArrivalGenerator(ArrivalGenerator):
         description: JobDescription
         for job_name, description in self.job_dict.items():
             # TODO: Ensure seeds are set properly
+            raise NotImplementedError("Run is to be re-implemented for BatchedArrivals in an upcomming release")
             for repl, seed in enumerate(description.job_class_parameters.experiment_configuration.random_seed):
                 replication_name = f"{job_name}_{repl}_{seed}"
                 train_task = TrainTask(identity=replication_name,

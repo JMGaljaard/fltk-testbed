@@ -280,7 +280,6 @@ class ExperimentDescription:
     configurations for repetitions. See also JobDescription to define types of jobs, and
     ExperimentConfiguration to set the configuration of experiments.
     """
-    experiment_configuration: ExperimentConfiguration
     train_tasks: List[JobDescription]
 
 

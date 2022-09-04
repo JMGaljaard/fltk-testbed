@@ -233,7 +233,6 @@ class FederatedArrivalTask(ArrivalTask):
 
     @staticmethod
     def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> T:
-        # TODO: Check type-maps
         task = FederatedArrivalTask(
                 id=u_id,
                 network=arrival.get_network(),
