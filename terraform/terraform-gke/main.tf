@@ -7,8 +7,9 @@ module "gke" {
   name              = var.cluster_name
   # Create a ZONAL cluster, disallowing the cluster to span multiple regions in a zone.
   # Alternatively, for scheduling cross-regions, utilize `zone` and `regions` instead of `regional` and `region`
-  regional          = false
+  regional          = var.regional_deployment
   region            = var.project_region
+  zones		    = var.project_zones
   network           = module.gcp-network.network_name
   subnetwork        = module.gcp-network.subnets_names[0]
   ip_range_pods     = var.ip_range_pods_name
@@ -67,10 +68,8 @@ module "gke" {
   ]
 
   node_pools_oauth_scopes = {
-    all = []
-
-    default-node-pool = [
-      "https://www.googleapis.com/auth/cloud-platform",
+    all = [
+      "https://www.googleapis.com/auth/devstorage.read_only",
     ]
   }
 

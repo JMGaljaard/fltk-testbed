@@ -213,7 +213,7 @@ class DistributedArrivalTask(ArrivalTask):
                 priority=arrival.get_priority(),
                 dataset=arrival.get_dataset(),
                 loss_function=arrival.task.network_configuration.loss_function,
-                seed=random.randint(0, sys.maxsize),
+                seed=random.randint(0, 2**32 - 2),
                 replication=replication,
                 type_map=collections.OrderedDict({
                     'Master': MASTER_REPLICATION,

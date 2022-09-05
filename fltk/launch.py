@@ -11,6 +11,7 @@ import torch.distributed as dist
 from kubernetes import config
 from torch.distributed import rpc
 from fltk.core.distributed import DistClient, download_datasets
+from fltk.util.config.definitions.orchestrator import get_orchestrator
 from fltk.core import Client, Federator
 from fltk.nets.util.reproducability import init_reproducibility, init_learning_reproducibility
 from fltk.util.cluster.client import ClusterManager
@@ -18,7 +19,7 @@ from fltk.util.cluster.client import ClusterManager
 from fltk.util.cluster.worker import should_distribute
 from fltk.util.config import DistributedConfig, FedLearningConfig, retrieve_config_network_params, get_learning_param_config, \
     DistLearningConfig
-from fltk.util.config.definitions import get_orchestrator, OrchestratorType
+from fltk.util.config.definitions import OrchestratorType
 
 from fltk.util.environment import retrieve_or_init_env, retrieve_env_config
 
@@ -121,8 +122,8 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
     logging.info("Starting orchestrator")
     pool.apply(orchestrator.run)
 
-    pool.close()
     pool.join()
+    pool.close()
 
     logging.info("Stopped execution of Orchestrator...")
 
