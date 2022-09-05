@@ -1,9 +1,16 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union, Type, Dict
 
+import torch
 import yaml
 import logging
+
+from torch.nn.modules.loss import _Loss
+
+from fltk.util.config.definitions import Loss
 
 from fltk.util.config.distributed_config import DistributedConfig
 from fltk.util.config.learning_config import FedLearningConfig, get_safe_loader, DistLearningConfig

@@ -226,8 +226,8 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask) -> List[str]
         command = 'python3 -m fltk remote experiments/node.config.yaml'
     else:
         # TODO: Set correct backend depending on CUDA.
-        command = (f'python3 -m fltk client {config.config_path} {task.id} '
-                   f'experiments/node.config.json --backend gloo')
+        command = (f'python3 -m fltk client experiments/node.config.yaml {task.id} '
+                   f'{config.config_path} --backend gloo')
     return command.split(' ')
 
 

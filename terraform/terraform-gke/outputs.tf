@@ -4,11 +4,6 @@ output "kubernetes_endpoint" {
   value       = module.gke.endpoint
 }
 
-output "ca_certificate" {
-  description = "The cluster ca certificate (base64 encoded)"
-  value       = module.gke.ca_certificate
-}
-
 output "terraform_service_account" {
   description = "The default service account used for running nodes (user-provided)"
   value       = module.gke.service_account

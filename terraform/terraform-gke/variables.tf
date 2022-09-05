@@ -16,10 +16,23 @@ variable "cluster_name" {
   description = "Name of the GKE cluster to be deployed in project <project_id>."
 }
 
+variable "regional_deployment" {
+  type = bool
+  default = false
+  description = "Whether to deploy regional (additional 0.10 USD/hour cost for management) for higher availability."
+}
+
+
 variable "project_region" {
   type = string
   default = "us-central1"
   description = "GKE region to deploy cluster in."
+}
+
+variable "project_zones" {
+  type = list
+  default = ["us-central1-c"]
+  description = "GKE zones to deploy in. Zonal deployment will only take first zone."
 }
 
 variable "description" {

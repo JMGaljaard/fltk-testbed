@@ -10,7 +10,7 @@ from sklearn.metrics import confusion_matrix
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.core.distributed.dist_node import DistNode
-from fltk.datasets import get_dist_dataset
+from fltk.util.config.definitions.dataset import get_dist_dataset
 from fltk.nets import get_net
 from fltk.nets.util import calculate_class_precision, calculate_class_recall, save_model, load_model_from_file
 from fltk.schedulers import MinCapableStepLR, LearningScheduler
@@ -19,6 +19,7 @@ from fltk.util.results import EpochData
 
 if TYPE_CHECKING:
     from fltk.util.config import DistributedConfig, DistLearningConfig
+
 
 class DistClient(DistNode):
 

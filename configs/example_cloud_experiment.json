@@ -11,7 +11,7 @@
       "namespace": "test"
    },
    "execution_config": {
-      "duration": 3600,
+      "duration": 60,
       "experiment_prefix": "cloud_experiment",
       "cuda": false,
       "tensorboard": {

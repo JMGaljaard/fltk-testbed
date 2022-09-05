@@ -1,4 +1,4 @@
- Default values for nfs-provisioner.
+# Default values for nfs-provisioner.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -10,6 +10,7 @@ image:
   repository: ${image_repository}
   tag: ${image_tag}
   pullPolicy: ${pull_policy}
+
 
 # For a list of available arguments
 # Please see https://github.com/kubernetes-incubator/external-storage/blob/master/nfs/docs/deployment.md#arguments
@@ -44,8 +45,7 @@ persistence:
   ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
   ##   GKE, AWS & OpenStack)
   ##
-  storageClass: "default"
-
+  storageClassName: "standard"
   accessMode: ReadWriteOnce
   size: ${nfs_size}
 

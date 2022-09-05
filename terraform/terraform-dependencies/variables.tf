@@ -21,6 +21,12 @@ variable "project_region" {
   description = "GKE region to deploy cluster in."
 }
 
+variable "project_zone" {
+  type = string
+  default = "us-central1-c"
+  description = "GKE region to deploy cluster in."
+}
+
 variable "description" {
   type = string
   default = "Managed by terraform FLTK testbed deployment"
@@ -50,19 +56,19 @@ variable "nfs_provider_information" {
    storage_size     = string
  })
   default = {
-    release_name     = "nfs-client-provisioner"
-    chart_name       = "nfs-client-provisioner"
+    release_name     = "nfs-server"
+    chart_name       = "nfs-server-provisioner"
     namespace        = "test"
     server_path      = "/mnt/kubernetes"
-    image_repository = "quay.io/external_storage/nfs-client-provisioner"
-    image_tag        = "v3.1.0-k8s1.11"
+    image_repository = "k8s.gcr.io/sig-storage/nfs-provisioner"
+    image_tag        = "v3.0.0"
     pull_policy      = "IfNotPresent"
-    storage_size     = "50"
+    storage_size     = "50Gi"
   }
 }
 
 variable "nfs_provisioner_repo_url" {
   description = "Repository URL to locate the utilized helm charts"
   type        = string
-  default     = "https://kvaps.github.io/charts"
+  default     = "https://charts.helm.sh/stable"
 }
