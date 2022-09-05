@@ -1,8 +1,8 @@
-from .cifar10 import CIFAR10Dataset
-from .cifar100 import CIFAR100Dataset
-from .fashion_mnist import FashionMNISTDataset
-from .mnist import MNIST
-from .dataset import Dataset
+from fltk.datasets.cifar10 import CIFAR10Dataset
+from fltk.datasets.cifar100 import CIFAR100Dataset
+from fltk.datasets.fashion_mnist import  FashionMNISTDataset
+from fltk.datasets.mnist import MNIST
+from fltk.util.config.definitions import Dataset
 
 def available_dataparallel_datasets():
     return {
@@ -34,4 +34,11 @@ def get_test_loader_path(name: Dataset) -> str:
 
 
 def get_dist_dataset(name: Dataset):
+    """
+    Function to retrieve distributed dataset (Distributed Learning Experiment).
+    @param name: Definition name of the datset.
+    @type name: Dataset
+    @return:
+    @rtype:
+    """
     return available_dataparallel_datasets()[name]

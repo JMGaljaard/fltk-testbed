@@ -1,22 +1,21 @@
 {
    "cluster": {
       "orchestrator": {
-         "wait_for_clients": true,
-         "service": "fl-server.test.svc.cluster.local",
-         "nic": "eth0"
+         "orchestrator_type": "simulated"
       },
       "client": {
          "prefix": "client",
          "tensorboard_active": false
       },
-      "image": "gcr.io/test-bed-distml/fltk:latest"
+      "image": "gcr.io/test-bed-fltk/fltk:latest",
+      "namespace": "test"
    },
    "execution_config": {
       "duration": 3600,
       "experiment_prefix": "cloud_experiment",
-      "cuda": true,
+      "cuda": false,
       "tensorboard": {
-         "active": false,
+         "active": true,
          "record_dir": "logging"
       },
       "net": {
@@ -28,7 +27,7 @@
          "epoch_save_end_suffix": "end"
       },
       "reproducibility": {
-         "torch_seed": 42,
+         "torch_seed": 2053695854357871005,
          "arrival_seed": 123
       }
    }
