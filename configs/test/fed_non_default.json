@@ -1,65 +1,70 @@
-[
-  {
+{
+  "trainTasks": [{
     "type": "federated",
-    "jobClassParameters": {
-      "networkConfiguration": {
-        "network": "FashionMNISTResNet",
-        "lossFunction": "MSELoss",
-        "dataset": "fashion-mnist"
-      },
-      "systemParameters": {
-        "dataParallelism": 2,
-        "configurations": {
+    "jobClassParameters": [
+      {
+        "networkConfiguration": {
+          "network": "FashionMNISTResNet",
+          "lossFunction": "MSELoss",
+          "dataset": "fashion-mnist"
+        },
+        "systemParameters": {
+          "dataParallelism": 2,
+          "configurations": {
+            "default": {
+              "cores": "1000m",
+              "memory": "1Gi"
+            }
+          }
+        },
+        "hyperParameters": {
           "default": {
-            "cores": "1000m",
-            "memory": "1Gi"
-          }
-        }
-      },
-      "hyperParameters": {
-        "default": {
-          "batchSize": 1,
-          "testBatchSize": 1,
-          "learningRateDecay": 0.0002,
-          "optimizerConfig": {
-            "type": "AdamW",
-            "learningRate": 0.01,
-            "betas": [0.999, 0.9]
+            "totalEpochs": 4,
+            "batchSize": 1,
+            "testBatchSize": 1,
+            "learningRateDecay": 0.0002,
+            "optimizerConfig": {
+              "type": "AdamW",
+              "learningRate": 0.01,
+              "betas": [
+                0.999,
+                0.9
+              ]
+            },
+            "schedulerConfig": {
+              "schedulerStepSize": 500,
+              "schedulerGamma": 0.2,
+              "minimumLearningRate": 2e-10
+            }
           },
-          "schedulerConfig": {
-            "schedulerStepSize": 500,
-            "schedulerGamma": 0.2,
-            "minimumLearningRate": 2e-10
+          "configurations": {
+            "Master": null,
+            "Worker": null
           }
         },
-        "configurations": {
-          "Master": null,
-          "Worker": null
-        }
-      },
-      "learningParameters": {
-        "totalEpochs": 4,
-        "rounds": 42,
-        "epochsPerRound": 2,
-        "cuda": true,
-        "clientsPerRound": 1,
-        "dataSampler": {
-          "type": "uniform",
-          "qValue": 0.07,
-          "seed": 42,
-          "shuffle": true
+        "learningParameters": {
+          "rounds": 42,
+          "epochsPerRound": 2,
+          "cuda": true,
+          "clientsPerRound": 1,
+          "dataSampler": {
+            "type": "uniform",
+            "qValue": 0.07,
+            "seed": 42,
+            "shuffle": true
+          },
+          "aggregation": "Sum"
         },
-        "aggregation": "Sum"
-      },
-      "experimentConfiguration": {
-        "randomSeed": [
-          142
-        ],
-        "workerReplication": {
-          "Master": 1,
-          "Worker": 1
+        "experimentConfiguration": {
+          "randomSeed": [
+            2053695854357871005
+          ],
+          "workerReplication": {
+            "Master": 1,
+            "Worker": 1
+          }
         }
       }
-    }
-  }
-]
+    ]
+  }]
+}

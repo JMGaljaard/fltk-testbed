@@ -238,7 +238,7 @@ class FederatedArrivalTask(ArrivalTask):
                 network=arrival.get_network(),
                 dataset=arrival.get_dataset(),
                 loss_function=arrival.task.network_configuration.loss_function,
-                # seed=arrival.get_experiment_config().random_seed[replication],
+                seed=arrival.task.seed,
                 replication=replication,
                 type_map={'Master': MASTER_REPLICATION,
                           'Worker': arrival.task.system_parameters.data_parallelism},

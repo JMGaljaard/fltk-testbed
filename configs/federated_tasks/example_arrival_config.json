@@ -1,68 +1,70 @@
-[
-  {
+{
+  "trainTasks": [{
     "type": "federated",
-    "jobClassParameters": [{
-      "networkConfiguration": {
-        "network": "FashionMNISTCNN",
-        "lossFunction": "CrossEntropyLoss",
-        "dataset": "mnist"
-      },
-      "systemParameters": {
-        "dataParallelism": 4,
-        "configurations": {
-          "Master": {
-            "cores": "1000m",
-            "memory": "1Gi"
-          },
-          "Worker": {
-            "cores": "750m",
-            "memory": "1Gi"
-          }
-        }
-      },
-      "hyperParameters": {
-        "default": {
-          "batchSize": 128,
-          "testBatchSize": 128,
-          "learningRateDecay": 0.0002,
-          "optimizerConfig": {
-            "type": "SGD",
-            "learningRate": 0.01,
-            "momentum": 0.1
-          },
-          "schedulerConfig": {
-            "schedulerStepSize": 50,
-            "schedulerGamma": 0.5,
-            "minimumLearningRate": 1e-10
-          }
+    "jobClassParameters": [
+      {
+        "networkConfiguration": {
+          "network": "FashionMNISTCNN",
+          "lossFunction": "CrossEntropyLoss",
+          "dataset": "mnist"
         },
-        "configurations": {
-          "Master": null,
-          "Worker": {
-            "batchSize": 500,
-            "optimizerConfig": {
-              "learningRate": 0.05
+        "systemParameters": {
+          "dataParallelism": 4,
+          "configurations": {
+            "Master": {
+              "cores": "1000m",
+              "memory": "1Gi"
             },
-            "schedulerConfig": {
-              "schedulerStepSize": 2000
+            "Worker": {
+              "cores": "750m",
+              "memory": "1Gi"
             }
           }
-        }
-      },
-      "learningParameters": {
-        "totalEpochs": 0,
-        "rounds": 5,
-        "epochsPerRound": 1,
-        "cuda": false,
-        "clientsPerRound": 2,
-        "dataSampler": {
-          "type": "uniform",
-          "qValue": 0.07,
-          "seed": 42,
-          "shuffle": true
         },
-        "aggregation": "FedAvg"
+        "hyperParameters": {
+          "default": {
+            "batchSize": 128,
+            "testBatchSize": 128,
+            "learningRateDecay": 0.0002,
+            "optimizerConfig": {
+              "type": "SGD",
+              "learningRate": 0.01,
+              "momentum": 0.1
+            },
+            "schedulerConfig": {
+              "schedulerStepSize": 50,
+              "schedulerGamma": 0.5,
+              "minimumLearningRate": 1e-10
+            }
+          },
+          "configurations": {
+            "Master": null,
+            "Worker": {
+              "batchSize": 500,
+              "optimizerConfig": {
+                "learningRate": 0.05
+              },
+              "schedulerConfig": {
+                "schedulerStepSize": 2000
+              }
+            }
+          }
+        },
+        "learningParameters": {
+          "totalEpochs": 0,
+          "rounds": 5,
+          "epochsPerRound": 1,
+          "cuda": false,
+          "clientsPerRound": 2,
+          "dataSampler": {
+            "type": "uniform",
+            "qValue": 0.07,
+            "seed": 42,
+            "shuffle": true
+          },
+          "aggregation": "FedAvg"
+        }
       }
-    }]
-  }
-]
+    ]
+  }]
+}
