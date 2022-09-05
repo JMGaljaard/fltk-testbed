@@ -3,6 +3,7 @@ from typing import Type
 from fltk.util.config.definitions import ExperimentType
 from .task import DistributedArrivalTask, FederatedArrivalTask, ArrivalTask
 
+
 __job_type_lookup = {
     ExperimentType.DISTRIBUTED: DistributedArrivalTask,
     ExperimentType.FEDERATED: FederatedArrivalTask
