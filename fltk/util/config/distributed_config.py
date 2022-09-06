@@ -1,10 +1,18 @@
+from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from dataclasses_json import config, dataclass_json
+
 from fltk.util.config.definitions import OrchestratorType
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fltk.util.config import DistLearningConfig
+
 
 @dataclass_json
 @dataclass
@@ -20,8 +28,10 @@ class GeneralNetConfig:
 @dataclass_json
 @dataclass(frozen=True)
 class ReproducibilityConfig:
-    torch_seed: int
-    arrival_seed: int
+    """
+    Dataclass object to hold experiment configuration settings related to reproducibility of experiments.
+    """
+    seeds: List[int]
 
 
 @dataclass_json
@@ -139,7 +149,7 @@ class DistributedConfig:
         """
         return self.execution_config.log_path
 
-    def get_log_path(self, experiment_id: str, client_id: int, network_name: str) -> Path:
+    def get_log_path(self, experiment_id: str, client_id: int, learn_params: DistLearningConfig) -> Path:
         """
         Function to get the logging path that corresponds to a specific experiment, client and network that has been
         deployed as learning task.
@@ -153,7 +163,8 @@ class DistributedConfig:
         @rtype: Path
         """
         base_log = Path(self.execution_config.tensorboard.record_dir)
-        experiment_dir = Path(f"{self.execution_config.experiment_prefix}_{client_id}_{network_name}_{experiment_id}")
+        model, dataset, replication = learn_params.model, learn_params.dataset, learn_params.replication
+        experiment_dir = Path(f"{replication}/{self.execution_config.experiment_prefix}_{experiment_id}/{client_id}/{model}_{dataset}")
         return base_log.joinpath(experiment_dir)
 
     def get_data_path(self) -> Path:
