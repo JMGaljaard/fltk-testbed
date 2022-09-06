@@ -1,65 +1,58 @@
-
 variable "kubernetes_version" {
+  type        = string
   description = "Kubernetes version to use, note that kubeflow depends on version pre-1.22 for deployment as of now."
-  default = "1.21"
+  default     = "1.21"
 }
 
 variable "project_id" {
-  type = string
-  default = "test-bed-fltk"
+  type        = string
+  default     = "test-bed-fltk"
   description = "Google Cloud project name to create cluster in."
 }
 
 variable "cluster_name" {
-  type = string
-  default = "fltk-testbed-cluster"
+  type        = string
+  default     = "fltk-testbed-cluster"
   description = "Name of the GKE cluster to be deployed in project <project_id>."
 }
 
 variable "regional_deployment" {
-  type = bool
-  default = false
+  type        = bool
+  default     = false
   description = "Whether to deploy regional (additional 0.10 USD/hour cost for management) for higher availability."
 }
 
-
 variable "project_region" {
-  type = string
-  default = "us-central1"
+  type        = string
+  default     = "us-central1"
   description = "GKE region to deploy cluster in."
 }
 
 variable "project_zones" {
-  type = list
-  default = ["us-central1-c"]
+  type        = list(string)
+  default     = ["us-central1-c"]
   description = "GKE zones to deploy in. Zonal deployment will only take first zone."
 }
 
 variable "description" {
-  type = string
+  type        = string
   description = "Service account description"
-  default = "Managed by terraform FLTK testbed deployment"
+  default     = "Managed by terraform FLTK testbed deployment"
 }
 
 variable "account_id" {
   description = "The service account Identifier to be used to interact with Google cloud."
-  default = "terraform-iam-service-account"
-}
-
-variable "delete_on_destroy" {
-  type = bool
-  description = "Whether or not to tear down the entire project in GCP"
-  default = false
+  default     = "terraform-iam-service-account"
 }
 
 variable "network" {
   description = "Private network to be used by the cluster during deployment."
-  default = "gcp-private-network"
+  default     = "gcp-private-network"
 }
 
 variable "subnetwork" {
   description = "Subnetwork name for private network used in the cluster."
-  default = "gcp-private-subnetwork"
+  default     = "gcp-private-subnetwork"
 }
 
 variable "ip_range_pods_name" {
