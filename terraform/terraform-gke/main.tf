@@ -8,7 +8,7 @@ module "gke" {
   name              = var.cluster_name
   regional          = var.regional_deployment
   region            = var.project_region
-  zones		        = slice(var.project_zones, 0, 1)
+  zones             = slice(var.project_zones, 0, 1)
   network           = module.gcp-network.network_name
   subnetwork        = module.gcp-network.subnets_names[0]
   ip_range_pods     = var.ip_range_pods_name
@@ -92,15 +92,15 @@ module "gke" {
   }
 
   node_pools_taints = {
-    all = []
-    default-node-pool = []              # Default nodepool that will contain all the other pods
+    all               = []
+    default-node-pool = [] # Default nodepool that will contain all the other pods
 
     # Taint node pool for scheduling testbed-pods only/preferentially
     medium-fltk-pool-1 = [
       {
-        key    = "fltk.node"            # Taint is used in fltk pods
-        value  = "medium-e2"            # In case more explicit matching is required
-        effect = "PREFER_NO_SCHEDULE"   # Other Pods are preferably not scheduled on this pool
+        key    = "fltk.node"          # Taint is used in fltk pods
+        value  = "medium-e2"          # In case more explicit matching is required
+        effect = "PREFER_NO_SCHEDULE" # Other Pods are preferably not scheduled on this pool
       },
     ]
   }
