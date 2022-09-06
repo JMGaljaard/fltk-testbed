@@ -104,7 +104,7 @@ class ResourceWatchDog:
         self._logger.info("Starting with watching resources")
         while self._alive:
             schedule.run_pending()
-            time.sleep(1)
+            time.sleep(5)
 
     def __monitor_nodes(self) -> None:
         """
@@ -166,9 +166,9 @@ class ResourceWatchDog:
 
 class ClusterManager(metaclass=Singleton):
     """
-    Object to potentially further extend. This shows how the information of different Pods in a cluster can be
-    requested and parsed. Currently, it mainly exists to start the ResourceWatchDog, which now only logs the amount of
-    resources...
+    Object with basic monitoring functionality. This shows how the information of different Pods in a cluster can be
+    requested and parsed. Currently, it mainly exists to start the ResourceWatchDog, which now only keeps track of the
+    amount of resources requested/used in the cluster.
     """
 
     def __init__(self):
@@ -193,19 +193,18 @@ class ClusterManager(metaclass=Singleton):
         self.__thread_pool.apply_async(self._watchdog.start)
         self.__thread_pool.apply_async(self._run)
 
-    def _stop(self):
+    def stop(self):
         self._logger.info("Stopping execution of ClusterManager, halting components...")
         self._watchdog.stop()
         self.__alive = False
-        self.__thread_pool.join()
         self._logger.info("Successfully stopped execution of ClusterManager")
 
     def _run(self):
         while self.__alive:
-            self._logger.info("Still alive...")
-            time.sleep(10)
+            self._logger.debug("Still alive...")
+            time.sleep(5)
+        self._logger.info("Exiting ClusterManager loop.")
 
-        self._stop()
 
 
 def _generate_command(config: DistributedConfig, task: ArrivalTask) -> List[str]:
@@ -222,10 +221,8 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask) -> List[str]
     """
     federated = isinstance(task, FederatedArrivalTask)
     if federated:
-        # Perform Federated Learning experiment.
         command = 'python3 -m fltk remote experiments/node.config.yaml'
     else:
-        # TODO: Set correct backend depending on CUDA.
         command = (f'python3 -m fltk client experiments/node.config.yaml {task.id} '
                    f'{config.config_path} --backend gloo')
     return command.split(' ')
