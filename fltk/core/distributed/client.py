@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 import datetime
 import logging
 from pathlib import Path
-from typing import List, Tuple, Type, TYPE_CHECKING
+from typing import List, Tuple, TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -10,11 +11,11 @@ from sklearn.metrics import confusion_matrix
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.core.distributed.dist_node import DistNode
-from fltk.util.config.definitions.dataset import get_dist_dataset
 from fltk.nets import get_net
 from fltk.nets.util import calculate_class_precision, calculate_class_recall, save_model, load_model_from_file
 from fltk.schedulers import MinCapableStepLR, LearningScheduler
 from fltk.strategy import get_optimizer
+from fltk.util.config.definitions.dataset import get_dist_dataset
 from fltk.util.results import EpochData
 
 if TYPE_CHECKING:
@@ -60,9 +61,6 @@ class DistClient(DistNode):
         Function to prepare the learner, i.e. load all the necessary data into memory.
         @param distributed: Indicates whether the execution must be run in Distributed fashion with DDP.
         @type distributed: bool
-        @param backend: Which backend to use during training, needed when executing in distributed fashion,
-        for CPU execution the GLOO (default) backend must be used. For GPU execution, the NCCL execution is needed.
-        @type backend: dist.Backend
         @return: None
         @rtype: None
         """
@@ -259,7 +257,7 @@ class DistClient(DistNode):
         @deprecated Move function to utils directory.
         """
         self._logger.debug(f"Saving model to flat file storage. Saved at epoch #{epoch}")
-        save_model(self.model, self.config.get_save_model_folder_path(), epoch)
+        save_model(self.model, str(self.config.get_save_model_folder_path()), epoch)
 
     def log_progress(self, epoch_data: EpochData, epoch: int):
         """

@@ -277,8 +277,7 @@ class Federator(Node):
         # Client training
         training_futures: List[torch.Future] = []  # pylint: disable=no-member
 
-        def training_cb(fut: torch.Future, client_ref: LocalClient, client_weights, client_sizes,
-                        num_epochs):  # pylint: disable=no-member
+        def training_cb(fut: torch.Future, client_ref: LocalClient, client_weights, client_sizes, num_epochs):  # pylint: disable=no-member
             train_loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration, c_mat = fut.wait()
             self.logger.info(f'Training callback for client {client_ref.name} with accuracy={accuracy}')
             client_weights[client_ref.name] = weights

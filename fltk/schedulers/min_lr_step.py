@@ -21,8 +21,6 @@ class MinCapableStepLR(LearningScheduler):
 
     def __init__(self, optimizer: torch.optim.Optimizer, step_size, gamma, min_lr):
         """
-        :param logger: logger
-        :type logger: logger
         :param optimizer:
         :type optimizer: torch.optim
         :param step_size: # of epochs between LR updates

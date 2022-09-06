@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
+# noinspection PyUnresolvedReferences
 from typing import Type, List, Dict, Any, T, Union
 
 import re
@@ -29,11 +30,12 @@ def _eval_decoder(obj: Union[str, T]) -> Union[Any, T]:
         return eval(obj)
     return obj
 
-def get_safe_loader() -> yaml.SafeLoader:
+
+def get_safe_loader() -> Type[yaml.SafeLoader]:
     """
     Function to get a yaml SafeLoader that is capable of properly parsing yaml compatible floats.
 
-    By default otherwise loading a value such as `1e-10` will result in in being parsed as a string.
+    The default yaml loader would parse a value such as `1e-10` as a string, rather than a float.
 
     @return: SafeLoader capable of parsing scientificly notated yaml values.
     @rtype: yaml.SafeLoader
@@ -187,7 +189,7 @@ class DistLearningConfig(LearningConfig):  # pylint: disable=too-many-instance-a
     loss: Loss = Loss.cross_entropy_loss
 
     @staticmethod
-    def from_yaml(path: Path):
+    def from_yaml(path: Path) -> "DistLearningConfig":
         """
         Parse yaml file to dataclass. Re-implemented to rely on dataclasses_json to load data with tested library.
 

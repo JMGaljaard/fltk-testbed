@@ -15,8 +15,8 @@ import numpy as np
 from fltk.util.config.definitions.net import Nets
 from fltk.datasets.dataset import Dataset
 from fltk.util.singleton import Singleton
-from fltk.util.task.config.parameter import TrainTask, JobDescription, ExperimentParser, JobClassParameter, \
-    SystemParameters, HyperParameters, ExperimentConfiguration, LearningParameters
+from fltk.util.task.config.parameter import (TrainTask, JobDescription, ExperimentParser, SystemParameters,
+                                             HyperParameters,LearningParameters)
 
 
 @dataclass

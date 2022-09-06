@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import copy
 import os
-from typing import Callable, Any
+from typing import Callable, Any, Union
 import torch
 from torch.distributed import rpc
 from fltk.datasets.federated import get_fed_dataset
@@ -85,7 +85,7 @@ class Node(abc.ABC):
         Communication utility function.
         This is the entry points for all incoming RPC communication.
         The class object (self) will be loaded from the global space
-        and the callable method is executed within the context of self
+        and the callable method is executed within the context of self.
         :param method: Function to execute provided by remote client.
         :param sender: Name of other Client that has request a function to be called.
         :param args: Arguments to pass to function to execute.
@@ -174,7 +174,7 @@ class Node(abc.ABC):
         else:
             self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
 
-    def message(self, other_node: str, method: Callable, *args, **kwargs) -> torch.Future: # pylint: disable=no-member
+    def message(self, other_node: str, method: Union[Callable, str], *args, **kwargs) -> torch.Future: # pylint: disable=no-member
         """
         All communication with other nodes should go through this method.
         The attribute real_time determines if the communication should use RPC or if it is a direct object call.
@@ -186,7 +186,7 @@ class Node(abc.ABC):
             return rpc.rpc_sync(other_node, func, args=args_list,  kwargs=kwargs)
         return method(other_node, *args, **kwargs)
 
-    def message_async(self, other_node: str, method: Callable, *args, **kwargs) -> torch.Future: # pylint: disable=no-member
+    def message_async(self, other_node: str, method: Union[Callable, str], *args, **kwargs) -> torch.Future: # pylint: disable=no-member
         """
         This is the async version of 'message'.
         All communication with other nodes should go through this method.

@@ -1,5 +1,5 @@
 import random
-from typing import Iterator
+from typing import Iterator, List
 
 import numpy as np
 from torch.utils.data import DistributedSampler, Dataset
@@ -23,7 +23,7 @@ class DistributedSamplerWrapper(DistributedSampler):
 
     def order_by_label(self, dataset):
         # order the indices by label
-        ordered_by_label = [[] for i in range(len(dataset.classes))]
+        ordered_by_label: List[List[int]] = [[] for _ in range(len(dataset.classes))]
         for index, target in enumerate(dataset.targets):
             ordered_by_label[target].append(index)
 

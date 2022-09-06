@@ -126,7 +126,7 @@ def add_default_arguments(*parsers):
         parser.add_argument('--prefix', type=str, default=None)
 
 
-def create_all_subparsers(subparsers: ArgumentParser):
+def create_all_subparsers(subparsers):
     """
     Helper function to add all subparsers to an argparse object.
     @param subparsers: Subparser to add arguments to.

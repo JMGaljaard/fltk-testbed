@@ -1,4 +1,6 @@
 # pylint: disable=missing-class-docstring,invalid-name
+from typing import Type
+
 import torch
 import torch.nn.functional as F
 
@@ -63,7 +65,7 @@ class Bottleneck(torch.nn.Module):
 
 
 class Cifar10ResNet(torch.nn.Module):
-    def __init__(self, block: torch.nn.Module = BasicBlock, num_blocks=None, num_classes=10):
+    def __init__(self, block: Type[torch.nn.Module] = BasicBlock, num_blocks=None, num_classes=10):
         super(Cifar10ResNet, self).__init__()
         if num_blocks is None:
             num_blocks = [2, 2, 2, 2]

@@ -7,7 +7,7 @@ def _call_method(method, rref, *args, **kwargs):
 
 def _remote_method(method, rref, *args, **kwargs):
     """
-    executes method(*args, **kwargs) on the from the machine that owns rref
+    executes method(*args, **kwargs) on the 'from' the machine that owns rref
 
     very similar to rref.remote().method(*args, **kwargs), but method() doesn't have to be in the remote scope
     """
@@ -28,7 +28,7 @@ def _remote_method_async_by_info(method, worker_info, *args, **kwargs):
 def _remote_method_direct(method, other_node: str, *args, **kwargs):
     """
     Utility function for RPC communication between nodes.
-    :param method: A callable
+    :param method: A callable function.
     :param other_node: reference to other node
     :return: any
     """
