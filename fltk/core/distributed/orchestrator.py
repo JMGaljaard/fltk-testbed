@@ -5,7 +5,7 @@ import logging
 import time
 import uuid
 from queue import PriorityQueue
-from typing import OrderedDict, Dict, Type, Set
+from typing import OrderedDict, Dict, Type, Set, Union
 
 from jinja2 import Environment, FileSystemLoader
 from kubeflow.training import PyTorchJobClient
@@ -30,7 +30,7 @@ EXPERIMENT_DIR = 'experiments'
 __ENV = Environment(loader=FileSystemLoader(EXPERIMENT_DIR))
 
 
-def _generate_experiment_path_name(task: ArrivalTask, u_id: str, config: DistributedConfig):
+def _generate_experiment_path_name(task: ArrivalTask, u_id: Union[uuid.UUID, str], config: DistributedConfig):
     """
     Helper function to generate experiment name for logging without conflicts
     @param task: Arrival task for Task related information.
@@ -165,7 +165,7 @@ class Orchestrator(DistNode, abc.ABC):
     @abc.abstractmethod
     def run(self, clear: bool = False, experiment_replication: int = -1) -> None:
         """
-        Main loop of the Orchestrator for simulated arrivals. By default previous deployments are not stopped (i.e.
+        Main loop of the Orchestrator for simulated arrivals. By default, previous deployments are not stopped (i.e.
         PytorchTrainingJobs) on the cluster, which may interfere with utilization statistics of your cluster.
         Make sure to check if you want previous results to be removed.
         @param clear: Boolean indicating whether a previous deployment needs to be cleaned up (i.e. lingering jobs that
@@ -330,7 +330,7 @@ class BatchOrchestrator(Orchestrator):
                 job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
                 self._logger.info(f"Deploying on cluster: {curr_task.id}")
                 self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
-                self.deployed_tasks.append(curr_task)
+                self.deployed_tasks.add(curr_task)
 
                 # TODO: Extend this logic in your real project, this is only meant for demo purposes
                 # For now we exit the thread after scheduling a single task.

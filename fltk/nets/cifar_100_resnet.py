@@ -1,4 +1,6 @@
 # pylint: disable=missing-class-docstring,invalid-name
+from typing import Type
+
 import torch
 
 class BasicBlock(torch.nn.Module):
@@ -69,7 +71,7 @@ class Bottleneck(torch.nn.Module):
 
 
 class Cifar100ResNet(torch.nn.Module):
-    def __init__(self, block: torch.nn.Module = BasicBlock, num_block=None, num_classes=100):
+    def __init__(self, block: Type[torch.nn.Module] = BasicBlock, num_block=None, num_classes=100):
         super(Cifar100ResNet, self).__init__()
         if num_block is None:
             num_block = [2, 2, 2, 2]
@@ -94,7 +96,7 @@ class Cifar100ResNet(torch.nn.Module):
         Make resnet layers (I.e. not a singular (hidden) neuron layer), one layer may
         contain more than one residual blocks.
         Args:
-            block: block type, basic block or bottle-neck block
+            block: block type, basic block or bottleneck block
             out_channels: output depth channel number of this layer
             num_blocks: how many blocks per layer
             stride: the stride of the first block of this layer

@@ -52,8 +52,8 @@ def init_learning_reproducibility(params: DistLearningConfig) -> None:
     """
     Function to pre-set all seeds for libraries used during training. Allows for re-producible network initialization,
     and non-deterministic number generation. Allows to prevent 'lucky' draws in network initialization.
-    @param config: Execution configuration for the experiments to be run on the remote cluster.
-    @type config: ExecutionConfig
+    @param params: Execution parameters for the experiments to be run on the remote cluster.
+    @type params: DistLearningConfig
     @return: None
     @rtype: None
     """

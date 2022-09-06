@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Union, Type, Dict
-
 import logging
+from pathlib import Path
+from typing import Optional
 
 from fltk.util.config.definitions import Loss
-
 from fltk.util.config.distributed_config import DistributedConfig
 from fltk.util.config.learning_config import FedLearningConfig, get_safe_loader, DistLearningConfig
 
@@ -48,7 +46,7 @@ def get_learning_param_config(args, alt_path: str = None) -> Optional[DistLearni
     else:
         config_path = alt_path
     try:
-        learning_params = DistLearningConfig.from_yaml(Path(config_path))
+        learning_params: DistLearningConfig = DistLearningConfig.from_yaml(Path(config_path))
     except Exception as e:
         msg = f"Failed to get learning parameter configuration for distributed experiments: {e}"
         logging.info(msg)

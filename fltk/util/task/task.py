@@ -1,18 +1,17 @@
 import abc
 import collections
-import sys
 import uuid
 from dataclasses import field, dataclass
 # noinspection PyUnresolvedReferences
 import random
+# noinspection PyUnresolvedReferences
 from typing import OrderedDict, Optional, T, List
 from uuid import UUID
 
 from fltk.datasets.dataset import Dataset
 from fltk.util.config.definitions import Nets
-from fltk.util.task.config import SystemParameters, HyperParameters
-from fltk.util.task.config.parameter import SystemResources, LearningParameters, \
-    OptimizerConfig, SamplerConfiguration
+from fltk.util.task.config.parameter import (SystemResources, LearningParameters, OptimizerConfig, SamplerConfiguration,
+                                            SystemParameters, HyperParameters)
 from fltk.util.task.generator.arrival_generator import Arrival
 
 MASTER_REPLICATION: int = 1  # Static master replication value, dictated by PytorchTrainingJobs
@@ -73,7 +72,7 @@ class ArrivalTask(abc.ABC):
 
     def get_hyper_param(self, tpe, parameter):
         """
-        Helper function to acquire hyper-parameters as-though the configuration is a flat configuration file.
+        Helper function to acquire hyperparameters as-though the configuration is a flat configuration file.
         @param tpe:
         @type tpe:
         @param parameter:
@@ -94,14 +93,14 @@ class ArrivalTask(abc.ABC):
         """
         return getattr(self.learning_parameters, parameter)
 
-    def get_sampler_param(self, tpe: str, parameter: LearningParameters):
+    def get_sampler_param(self, tpe: str, parameter: str):
         """
         Helper function to acquire federated data sampler parameters as-though the configuration is a flat configuration
         file.
         @param tpe: Type indication for a learner, future version with heterogenous deployment would require this.
         @type tpe: str
-        @param parameter:
-        @type parameter:
+        @param parameter: Which parameter to get from the configuration object.
+        @type parameter: str
         @return:
         @rtype:
         """
@@ -169,8 +168,6 @@ class ArrivalTask(abc.ABC):
     def get_net_param(self, parameter):
         """
         Helper function to acquire network parameters as-though the configuration is a flat configuration file.
-        @param tpe:
-        @type tpe:
         @param parameter:
         @type parameter:
         @return:
@@ -240,8 +237,10 @@ class FederatedArrivalTask(ArrivalTask):
                 loss_function=arrival.task.network_configuration.loss_function,
                 seed=arrival.task.seed,
                 replication=replication,
-                type_map={'Master': MASTER_REPLICATION,
-                          'Worker': arrival.task.system_parameters.data_parallelism},
+                type_map=collections.OrderedDict({
+                    'Master': MASTER_REPLICATION,
+                    'Worker': arrival.task.system_parameters.data_parallelism
+                }),
                 system_parameters=arrival.get_system_config(),
                 hyper_parameters=arrival.get_parameter_config(),
                 priority=arrival.get_priority(),
