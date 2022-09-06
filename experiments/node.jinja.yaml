@@ -1,3 +1,4 @@
+replication: {{ replication }}
 batch_size: {{ task.get_hyper_param(tpe, 'bs') }}
 test_batch_size: {{ task.get_hyper_param(tpe, 'test_bs') }}
 cuda: {{ task.get_learn_param('cuda') }}
