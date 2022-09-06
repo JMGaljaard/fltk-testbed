@@ -1,3 +1,4 @@
+replication: -1
 batch_size: 500
 test_batch_size: 1000
 cuda: False
@@ -11,5 +12,5 @@ dataset: fashion-mnist
 max_epoch: 44
 learning_rate: 1e3
 learning_rate_decay: 0.0002
-seed: 2053695854357871005
+seed: 2746317213
 loss: MSELoss

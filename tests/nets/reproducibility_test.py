@@ -30,9 +30,9 @@ class TestReproducibleNet(unittest.TestCase):
             map(lambda x: [x], models)
         )
         def test_reproducible_initialization(self, network_class: Type[torch.nn.Module]): # pylint: disable=missing-function-docstring
-            init_reproducibility()
+            init_reproducibility(seed=42)
             param_1: OrderedDict[str, torch.nn.Module] = network_class().state_dict()
-            init_reproducibility()
+            init_reproducibility(seed=42)
             param_2: OrderedDict[str, torch.nn.Module] = network_class().state_dict()
 
             for key, value in param_1.items():
