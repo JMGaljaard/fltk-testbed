@@ -1,4 +1,4 @@
-
+# Create private network with ranges for pods and services.
 module "gcp-network" {
   source  = "terraform-google-modules/network/google"
   version = ">= 4.0.1, < 5.0.0"
