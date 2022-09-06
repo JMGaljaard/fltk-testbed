@@ -301,7 +301,8 @@ class TrainTask:
     priority: Optional[int] = None                                                      # Allow for sorting/priority.
     experiment_type: ExperimentType = field(compare=False, metadata=config(field_name="type"), default=None)
 
-    def __init__(self, identity: str,
+    def __init__(self,
+                 identity: str,
                  job_parameters: JobClassParameter,
                  priority: Priority = None,
                  replication: int = None,
