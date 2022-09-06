@@ -80,9 +80,9 @@ class DistClient(DistNode):
                                           self.learning_params.scheduler_gamma,
                                           self.learning_params.min_lr)
 
-        if self.config.execution_config.tensorboard.active:
+        if self.config.execution_config.tensorboard.active and self._id == 0:
             self.tb_writer = SummaryWriter(
-                str(self.config.get_log_path(self._task_id, self._id, self.learning_params.model)))
+                str(self.config.get_log_path(self._task_id, self._id, self.learning_params)))
 
     def stop_learner(self):
         """
