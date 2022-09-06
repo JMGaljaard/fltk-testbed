@@ -58,6 +58,7 @@ def get_safe_loader() -> yaml.SafeLoader:
 @dataclass_json
 @dataclass
 class LearningConfig:
+    replication: int = field(metadata=dict(required=False, missing=-1))
     batch_size: int = field(metadata=dict(required=False, missing=128))
     test_batch_size: int = field(metadata=dict(required=False, missing=128))
     cuda: bool = field(metadata=dict(required=False, missing=False))
