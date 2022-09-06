@@ -11,7 +11,7 @@ import torch.distributed as dist
 from kubernetes import config
 from torch.distributed import rpc
 from fltk.core.distributed import DistClient, download_datasets
-from fltk.util.config.definitions.orchestrator import get_orchestrator
+from fltk.util.config.definitions.orchestrator import get_orchestrator, get_arrival_generator
 from fltk.core import Client, Federator
 from fltk.nets.util.reproducability import init_reproducibility, init_learning_reproducibility
 from fltk.util.cluster.client import ClusterManager
@@ -19,12 +19,10 @@ from fltk.util.cluster.client import ClusterManager
 from fltk.util.cluster.worker import should_distribute
 from fltk.util.config import DistributedConfig, FedLearningConfig, retrieve_config_network_params, get_learning_param_config, \
     DistLearningConfig
-from fltk.util.config.definitions import OrchestratorType
 
 from fltk.util.environment import retrieve_or_init_env, retrieve_env_config
 
 # Define types for clarity in execution
-from fltk.util.task.generator.arrival_generator import SimulatedArrivalGenerator, SequentialArrivalGenerator
 
 Rank = NewType('Rank', int)
 NIC = NewType('NIC', str)
@@ -66,32 +64,16 @@ def exec_distributed_client(task_id: str, conf: DistributedConfig = None,
     print(epoch_data)
 
 
-def get_arrival_generator(config: DistributedConfig, experiment: str):
-    """
-    Retrieval function to create generator functions
-    @param config:
-    @type config:
-    @param experiment:
-    @type experiment:
-    @return:
-    @rtype:
-    """
-    __lookup = {
-        OrchestratorType.BATCH: SequentialArrivalGenerator,
-        OrchestratorType.SIMULATED: SimulatedArrivalGenerator
-    }
-
-    return __lookup.get(config.cluster_config.orchestrator.orchestrator_type, None)(Path(experiment))
-
-
-def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
+def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, replication: int = 1):
     """
     Default runner for the Orchestrator that is based on KubeFlow
     @param args: Commandline arguments passed to the execution. Might be removed in a future commit.
     @type args: Namespace
-    @param config: Configuration for execution of Orchestrators components, needed for spinning up components of the
+    @param conf: Configuration for execution of Orchestrators components, needed for spinning up components of the
     Orchestrator.
-    @type config: Optional[DistributedConfig]
+    @type conf: Optional[DistributedConfig]
+    @param replication: Replication index of the experiment.
+    @type replication: int
     @return: None
     @rtype: None
     """
@@ -99,7 +81,7 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
     logging.info("Starting Orchestrator, initializing resources....")
     if args.local:
         logging.info("Loading local configuration file")
-        # config.load_kube_config()
+        config.load_kube_config()
     else:
         logging.info("Loading in cluster configuration file")
         config.load_incluster_config()
@@ -107,7 +89,7 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
         conf.cluster_config.load_incluster_namespace()
         conf.cluster_config.load_incluster_image()
 
-
+    # TODO: Move ClusterManager one level up, to allow for re-use
     cluster_manager = ClusterManager()
     arrival_generator = get_arrival_generator(conf, args.experiment)
     orchestrator = get_orchestrator(conf, cluster_manager, arrival_generator)
@@ -120,12 +102,11 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None):
     logging.info("Starting arrival generator")
     pool.apply_async(arrival_generator.start, args=[conf.get_duration()])
     logging.info("Starting orchestrator")
-    pool.apply(orchestrator.run)
+    pool.apply(orchestrator.run, kwds={"experiment_replication": replication})
 
-    pool.join()
     pool.close()
 
-    logging.info("Stopped execution of Orchestrator...")
+    logging.info(f"Stopped execution of Orchestrator replication: {replication}.")
 
 
 def launch_extractor(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC] = None,
@@ -335,10 +316,14 @@ def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NI
     logging.basicConfig(level=logging.DEBUG,
                         datefmt='%m-%d %H:%M')
 
-    # TODO: Set arrival seeds correctly, and launch experiments.
-    # TODO: Make sure to wait for experiments to complete.
 
     # Set the seed for arrivals, torch seed is mostly ignored. Set the `arrival_seed` to a different value
     # for each repetition that you want to run an experiment with.
-    init_reproducibility(conf.execution_config)
-    exec_orchestrator(args=args, conf=conf)
+    for replication, experiment_seed in enumerate(conf.execution_config.reproducibility.seeds):
+        try:
+            logging.info(f"Starting with experiment replication: {replication} with seed: {experiment_seed}")
+            init_reproducibility(conf.execution_config)
+            exec_orchestrator(args=args, conf=conf, replication=replication+1)
+        except Exception as e:
+            logging.info(f"Execution of replication {replication} with seed {experiment_seed} failed."
+                         f"Reason: {e}")
