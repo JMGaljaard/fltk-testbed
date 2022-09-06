@@ -1,3 +1,4 @@
+replication: 2
 batch_size: 1
 test_batch_size: 1
 cuda: True

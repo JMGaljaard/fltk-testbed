@@ -40,7 +40,7 @@ def init_reproducibility(config: Optional[ExecutionConfig] = None, seed: Optiona
 
 
     torch.manual_seed(torch_seed)
-    if config.cuda:
+    if seed or (config and config.cuda):
         torch.cuda.manual_seed_all(torch_seed)
         cuda_reproducible_backend(True)
     np.random.seed(rand_seed)

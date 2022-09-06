@@ -27,8 +27,7 @@
          "epoch_save_end_suffix": "end"
       },
       "reproducibility": {
-         "torch_seed": 2053695854357871005,
-         "arrival_seed": 123
+         "seeds": [44]
       }
    }
 }
