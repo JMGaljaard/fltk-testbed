@@ -1,15 +1,14 @@
 data "google_client_config" "default" {}
 
-# In case of using a gke deployment, use the GKE provider. Otherwise we create a container cluster.
+# Create a ZONAL cluster, disallowing the cluster to span multiple regions in a zone.
+# Alternatively, for scheduling cross-regions, utilize `zone` and `regions` instead of `regional` and `region`
 module "gke" {
   source            = "terraform-google-modules/kubernetes-engine/google"
   project_id        = var.project_id
   name              = var.cluster_name
-  # Create a ZONAL cluster, disallowing the cluster to span multiple regions in a zone.
-  # Alternatively, for scheduling cross-regions, utilize `zone` and `regions` instead of `regional` and `region`
   regional          = var.regional_deployment
   region            = var.project_region
-  zones		    = var.project_zones
+  zones		        = slice(var.project_zones, 0, 1)
   network           = module.gcp-network.network_name
   subnetwork        = module.gcp-network.subnets_names[0]
   ip_range_pods     = var.ip_range_pods_name
@@ -66,7 +65,8 @@ module "gke" {
       initial_node_count = 0
     },
   ]
-
+  # Allow the pods in the node pool to pull from gcr.io/<project-id>/<container-name>
+  # Changes here after creation of a pool will not be updated by Terraform.
   node_pools_oauth_scopes = {
     all = [
       "https://www.googleapis.com/auth/devstorage.read_only",
@@ -95,6 +95,7 @@ module "gke" {
     all = []
     default-node-pool = []              # Default nodepool that will contain all the other pods
 
+    # Taint node pool for scheduling testbed-pods only/preferentially
     medium-fltk-pool-1 = [
       {
         key    = "fltk.node"            # Taint is used in fltk pods
