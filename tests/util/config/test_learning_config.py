@@ -32,7 +32,8 @@ class FedLearningConfigTest(unittest.TestCase):
                                 scheduler_step_size=50,
                                 scheduler_gamma=0.5,
                                 min_lr=1e-10,
-                                optimizer=Optimizations.sgd)
+                                optimizer=Optimizations.sgd,
+                                replication=-1)
     def setUp(self):
         self.learning_params = FedLearningConfig.from_yaml(Path(TEST_PARAM_CONF_FEDERATED))
 
