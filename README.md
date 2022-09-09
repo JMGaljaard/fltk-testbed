@@ -218,7 +218,7 @@ Before we do so, first we need to setup a Python interpreter/environmen, this ca
     ``` bash
     python3 -m venv venv
     source venv/bin/activate
-    pip3 install -r requirements.txt
+    pip3 install -r requirements-cpu.txt
     ```
 
 -   Then we will download the datasets using a Python script in the same
@@ -337,3 +337,4 @@ Which will collect and run all the tests in the repository, and show in `verbose
 
 * Currently, there is no GPU support in the Docker containers, for this the `Dockerfile` will need to be updated to
 accommodate for this.
+* Currently, the `GLOO` backend is chosen only, when using CUDA capable devices, the `NCCL` backend is recommended.
