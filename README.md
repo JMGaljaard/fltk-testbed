@@ -233,7 +233,7 @@ container. With the use of BuildKit, consecutive builds allow to use cached requ
 up your builds when adding Python dependencies to your project.
 
 ``` bash
-DOCKER_BUILDKIT=1 docker build . --tag gcr.io/<project-id>/fltk
+DOCKER_BUILDKIT=1 docker build --platform linux/amd64 . --tag gcr.io/<project-id>/fltk
 docker push gcr.io/<project-id>/fltk
 ```
 
