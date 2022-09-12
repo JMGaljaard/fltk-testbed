@@ -27,7 +27,8 @@
          "epoch_save_end_suffix": "end"
       },
       "reproducibility": {
-         "seeds": [42]
+         "seeds": [42],
+         "parallel_execution": true
       }
    }
 }

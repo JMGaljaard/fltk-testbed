@@ -78,6 +78,7 @@ class ExecutionConfig:
 @dataclass
 class OrchestratorConfig:
     orchestrator_type: OrchestratorType
+    parallel_execution: bool = True
 
 
 @dataclass_json
