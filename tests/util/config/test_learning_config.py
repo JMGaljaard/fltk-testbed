@@ -6,12 +6,11 @@ from pathlib import Path
 import yaml
 
 from fltk.core.distributed.orchestrator import render_template
-from fltk.util.config import DistLearnerConfig, FedLearnerConfig, get_safe_loader
+from fltk.util.config import DistLearnerConfig, FedLearnerConfig, get_safe_loader, ExperimentParser
 from fltk.util.config.definitions import Optimizations
 from fltk.util.task import FederatedArrivalTask, DistributedArrivalTask
-from fltk.util.config.experiment import ExperimentParser
-from fltk.util.task.train_task import TrainTask
 from fltk.util.task.generator.arrival_generator import Arrival
+from fltk.util.task.train_task import TrainTask
 
 TEST_FED_CONF = './configs/test/fed_non_default.json'
 TEST_DIST_CONF = './configs/test/dist_non_default.json'

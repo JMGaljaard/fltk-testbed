@@ -7,6 +7,7 @@ from enum import Enum, unique
 from typing import Dict, Type, Union
 
 import torch
+# noinspection PyProtectedMember
 from torch.nn.modules.loss import _Loss
 
 

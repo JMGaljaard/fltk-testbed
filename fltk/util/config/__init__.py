@@ -9,6 +9,7 @@ from fltk.util.config.distributed_config import DistributedConfig
 from fltk.util.config.learner_config import FedLearnerConfig, get_safe_loader, DistLearnerConfig
 from fltk.util.config.experiment_config import ExperimentConfig, ExperimentParser
 
+
 def retrieve_config_network_params(conf: FedLearnerConfig, nic=None, host=None):
     if hasattr(conf, 'system'):
         system_attr = getattr(conf, 'system')

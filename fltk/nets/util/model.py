@@ -1,15 +1,15 @@
 from __future__ import annotations
+
 import logging
 from collections import OrderedDict
 from pathlib import Path
+from typing import TYPE_CHECKING
 from typing import Union, Type
 
-import deprecate
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from fltk.util.results import EpochData
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from fltk.util.config import DistributedConfig

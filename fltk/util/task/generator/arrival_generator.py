@@ -13,11 +13,11 @@ from typing import Dict, List, OrderedDict, Optional, Any
 
 import numpy as np
 
-from fltk.util.config.definitions.net import Nets
 from fltk.datasets.dataset import Dataset
+from fltk.util.config.definitions.net import Nets
+from fltk.util.config.experiment_config import (HyperParameters, SystemParameters, LearningParameters, JobDescription,
+                                                ExperimentParser)
 from fltk.util.singleton import Singleton
-from fltk.util.config.experiment import HyperParameters, SystemParameters, LearningParameters, JobDescription, \
-    ExperimentParser
 from fltk.util.task.train_task import TrainTask
 
 

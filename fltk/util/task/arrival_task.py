@@ -3,13 +3,14 @@ import collections
 import random
 import uuid
 from dataclasses import field, dataclass
-from typing import OrderedDict, Optional, T, List  # noinspection PyUnresolvedReferences
+# noinspection PyUnresolvedReferences
+from typing import OrderedDict, Optional, T, List
 from uuid import UUID
 
 from fltk.datasets.dataset import Dataset
 from fltk.util.config.definitions import Nets
-from fltk.util.config.experiment import OptimizerConfig, HyperParameters, SystemResources, SystemParameters, \
-    SamplerConfiguration, LearningParameters
+from fltk.util.config.experiment_config import (OptimizerConfig, HyperParameters, SystemResources, SystemParameters,
+                                                SamplerConfiguration, LearningParameters)
 from fltk.util.task.generator.arrival_generator import Arrival
 
 MASTER_REPLICATION: int = 1  # Static master replication value, dictated by PytorchTrainingJobs

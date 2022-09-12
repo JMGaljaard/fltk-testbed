@@ -158,8 +158,6 @@ class DistributedConfig:
         @type experiment_id: str
         @param client_id: Rank of the client.
         @type client_id: int
-        @param network_name: Name of the network that is to be trained.
-        @type network_name: str
         @return: Path representation of the directory/path should be logged by the training process.
         @rtype: Path
         """
