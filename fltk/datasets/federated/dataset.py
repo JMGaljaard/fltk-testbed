@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-from fltk.util.config import FedLearningConfig
+from fltk.util.config import FedLearnerConfig
 from fltk.util.log import getLogger
 
 
@@ -13,7 +13,7 @@ class FedDataset:
     test_loader = None
     logger = getLogger(__name__)
 
-    def __init__(self, args: FedLearningConfig):
+    def __init__(self, args: FedLearnerConfig):
         self.args = args
 
     def get_args(self):

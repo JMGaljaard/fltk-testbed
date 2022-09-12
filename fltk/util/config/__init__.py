@@ -6,10 +6,10 @@ from typing import Optional
 
 from fltk.util.config.definitions import Loss
 from fltk.util.config.distributed_config import DistributedConfig
-from fltk.util.config.learning_config import FedLearningConfig, get_safe_loader, DistLearningConfig
+from fltk.util.config.learner_config import FedLearnerConfig, get_safe_loader, DistLearnerConfig
+from fltk.util.config.experiment_config import ExperimentConfig, ExperimentParser
 
-
-def retrieve_config_network_params(conf: FedLearningConfig, nic=None, host=None):
+def retrieve_config_network_params(conf: FedLearnerConfig, nic=None, host=None):
     if hasattr(conf, 'system'):
         system_attr = getattr(conf, 'system')
         if 'federator' in system_attr:
@@ -37,7 +37,7 @@ def get_distributed_config(args, alt_path: str = None) -> Optional[DistributedCo
     return config
 
 
-def get_learning_param_config(args, alt_path: str = None) -> Optional[DistLearningConfig]:
+def get_learning_param_config(args, alt_path: str = None) -> Optional[DistLearnerConfig]:
     """
     Retrieve learning parameter configuration from Disk for distributed learning experiments.
     """
@@ -46,7 +46,7 @@ def get_learning_param_config(args, alt_path: str = None) -> Optional[DistLearni
     else:
         config_path = alt_path
     try:
-        learning_params: DistLearningConfig = DistLearningConfig.from_yaml(Path(config_path))
+        learning_params: DistLearnerConfig = DistLearnerConfig.from_yaml(Path(config_path))
     except Exception as e:
         msg = f"Failed to get learning parameter configuration for distributed experiments: {e}"
         logging.info(msg)

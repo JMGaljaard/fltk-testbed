@@ -10,7 +10,7 @@ from torch.utils.data import TensorDataset
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from fltk.util.config import DistLearningConfig
+    from fltk.util.config import DistLearnerConfig
 
 
 class Dataset(abc.ABC):
@@ -18,7 +18,7 @@ class Dataset(abc.ABC):
     Dataset implementation for Distributed learning experiments.
     """
 
-    def __init__(self, config, learning_params: DistLearningConfig, rank: int, world_size: int):
+    def __init__(self, config, learning_params: DistLearnerConfig, rank: int, world_size: int):
         self.config = config
         self.learning_params = learning_params
 

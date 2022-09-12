@@ -15,8 +15,8 @@ from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container,
 
 from fltk.util.cluster.conversion import Convert
 from fltk.util.singleton import Singleton
-from fltk.util.task.config.parameter import SystemResources
-from fltk.util.task.task import DistributedArrivalTask, ArrivalTask, FederatedArrivalTask
+from fltk.util.config.experiment import SystemResources
+from fltk.util.task.arrival_task import DistributedArrivalTask, ArrivalTask, FederatedArrivalTask
 
 from typing import TYPE_CHECKING
 
