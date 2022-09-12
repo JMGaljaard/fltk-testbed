@@ -11,7 +11,7 @@ from fltk.util.config.definitions import OrchestratorType
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from fltk.util.config import DistLearningConfig
+    from fltk.util.config import DistLearnerConfig
 
 
 @dataclass_json
@@ -150,7 +150,7 @@ class DistributedConfig:
         """
         return self.execution_config.log_path
 
-    def get_log_path(self, experiment_id: str, client_id: int, learn_params: DistLearningConfig) -> Path:
+    def get_log_path(self, experiment_id: str, client_id: int, learn_params: DistLearnerConfig) -> Path:
         """
         Function to get the logging path that corresponds to a specific experiment, client and network that has been
         deployed as learning task.

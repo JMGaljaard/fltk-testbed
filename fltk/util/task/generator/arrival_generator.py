@@ -9,15 +9,16 @@ from datetime import timedelta
 from pathlib import Path
 from queue import Queue
 from random import choices
-from typing import Dict, List, Union, OrderedDict, Optional, Any
+from typing import Dict, List, OrderedDict, Optional, Any
 
 import numpy as np
 
 from fltk.util.config.definitions.net import Nets
 from fltk.datasets.dataset import Dataset
 from fltk.util.singleton import Singleton
-from fltk.util.task.config.parameter import (TrainTask, JobDescription, ExperimentParser, SystemParameters,
-                                             HyperParameters,LearningParameters)
+from fltk.util.config.experiment import HyperParameters, SystemParameters, LearningParameters, JobDescription, \
+    ExperimentParser
+from fltk.util.task.train_task import TrainTask
 
 
 @dataclass

@@ -17,8 +17,8 @@ from fltk.nets.util.reproducability import init_reproducibility, init_learning_r
 from fltk.util.cluster.client import ClusterManager
 
 from fltk.util.cluster.worker import should_distribute
-from fltk.util.config import DistributedConfig, FedLearningConfig, retrieve_config_network_params, get_learning_param_config, \
-    DistLearningConfig
+from fltk.util.config import DistributedConfig, FedLearnerConfig, retrieve_config_network_params, get_learning_param_config, \
+    DistLearnerConfig
 
 from fltk.util.environment import retrieve_or_init_env, retrieve_env_config
 
@@ -33,7 +33,7 @@ launch_signature = Callable[[Path, Path, Optional[Rank], Optional[NIC], Optional
 
 
 def exec_distributed_client(task_id: str, conf: DistributedConfig = None,
-                            learning_params: DistLearningConfig = None,
+                            learning_params: DistLearnerConfig = None,
                             namespace: Namespace = None):
     """
     Helper function to start the execution of the distributed client training loop.
@@ -220,7 +220,7 @@ def launch_single(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
     # We can iterate over all the experiments in the directory and execute it, as long as the system remains the same!
     # System = machines and its configuration
     print(conf_path)
-    s_conf = FedLearningConfig.from_yaml(conf_path)
+    s_conf = FedLearnerConfig.from_yaml(conf_path)
     s_conf.world_size = conf.num_clients + 1
     s_conf.replication_id = prefix
     federator_node = Federator('federator', 0, conf.world_size, s_conf)
@@ -254,7 +254,7 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
     @return: None
     @rtype: None
     """
-    r_conf = FedLearningConfig.from_yaml(conf_path)
+    r_conf = FedLearnerConfig.from_yaml(conf_path)
     r_conf.world_size = r_conf.num_clients + 1
     r_conf.replication_id = prefix
     if rank and not (nic and host):

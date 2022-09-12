@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from fltk.util.log import getLogger
 
 if TYPE_CHECKING:
-    from fltk.util.config import FedLearningConfig
+    from fltk.util.config import FedLearnerConfig
 
 # Global dictionary to enable peer to peer communication between clients
 global_vars = {}
@@ -36,7 +36,7 @@ class Node(abc.ABC):
     dataset: Any
     logger = getLogger(__name__)
 
-    def __init__(self, identifier: str, rank: int, world_size: int, config: FedLearningConfig):
+    def __init__(self, identifier: str, rank: int, world_size: int, config: FedLearnerConfig):
         self.config = config
         self.id = identifier # pylint: disable=invalid-name
         self.rank = rank
@@ -46,7 +46,7 @@ class Node(abc.ABC):
         global_vars['self'] = self
         self._config(config)
 
-    def _config(self, config: FedLearningConfig):
+    def _config(self, config: FedLearnerConfig):
         self.logger.setLevel(config.log_level.value)
         self.config.rank = self.rank
         self.config.world_size = self.world_size

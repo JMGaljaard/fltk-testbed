@@ -1,12 +1,11 @@
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-# noinspection PyUnresolvedReferences
-from typing import List, Optional, OrderedDict, Any, Union, Tuple, Type, Dict, MutableMapping, T
+from typing import Optional, Union, Tuple, Dict, Any, MutableMapping, Type, OrderedDict, List, T
 
 from dataclasses_json import dataclass_json, LetterCase, config
 
-from fltk.util.config.definitions import DataSampler, Nets, Aggregations, Optimizations, Dataset, ExperimentType, Loss
+from fltk.util.config.definitions import Optimizations, Nets, Dataset, DataSampler, Aggregations, ExperimentType, Loss
 
 
 def _none_factory() -> None:
@@ -152,6 +151,7 @@ class HyperParameters:
     def get(self, tpe: str):
         return self.configurations[tpe]
 
+
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class Priority:
@@ -232,18 +232,6 @@ class LearningParameters:
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
-class ExperimentConfiguration:
-    """
-    Dataclass representing Experiment configuration parameters such as a list of random seeds and the replication of
-    worker types. For now only `Master' and `Worker' are accepted as types by KubeFlow, so make sure to set these
-    accordingly in the configuration file.
-    """
-    random_seed: List[int]
-    worker_replication: Optional[OrderedDict[str, int]] = None
-
-
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass(frozen=True)
 class JobClassParameter:
     """
     Dataclass describing the job specific parameters (system and hyper).
@@ -274,58 +262,13 @@ class JobDescription:
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
-class ExperimentDescription:
+class ExperimentConfig:
     """
     Dataclass object containing the configuration of an entire experiment, including
     configurations for repetitions. See also JobDescription to define types of jobs, and
     ExperimentConfiguration to set the configuration of experiments.
     """
     train_tasks: List[JobDescription]
-
-
-@dataclass(order=True)
-class TrainTask:
-    """
-    Training description used by the orchestrator to generate tasks. Contains 'transposed' information of the
-    configuration file.
-
-    Dataclass is ordered, to allow for ordering of arrived tasks in a PriorityQueue (can be used for scheduling).
-    """
-    network_configuration: NetworkConfiguration = field(compare=False)
-    system_parameters: SystemParameters = field(compare=False)
-    hyper_parameters: HyperParameters = field(compare=False)
-    learning_parameters: Optional[LearningParameters] = field(compare=False)
-    seed: int = field(compare=False)
-    identifier: str = field(compare=False)
-    replication: Optional[int] = field(compare=False, default=None)                     # Utilized for batch arrivals.
-    priority: Optional[int] = None                                                      # Allow for sorting/priority.
-    experiment_type: ExperimentType = field(compare=False, metadata=config(field_name="type"), default=None)
-
-    def __init__(self,
-                 identity: str,
-                 job_parameters: JobClassParameter,
-                 priority: Priority = None,
-                 replication: int = None,
-                 experiment_type: ExperimentType = None,
-                 seed: int = None):
-        """
-        Overridden init method for dataclass, to allow for transposing a JobDescription to a flattened TrainTask, which
-        contains the required information to schedule a task.
-        @param job_parameters:
-        @type job_parameters:
-        @param priority:
-        @type priority:
-        """
-        self.identifier = identity
-        self.network_configuration = job_parameters.network_configuration
-        self.system_parameters = job_parameters.system_parameters
-        self.hyper_parameters = job_parameters.hyper_parameters
-        if priority:
-            self.priority = priority.priority
-        self.learning_parameters = job_parameters.learning_parameters
-        self.replication = replication
-        self.experiment_type = experiment_type
-        self.seed = seed
 
 
 class ExperimentParser:  # pylint: disable=too-few-public-methods
@@ -336,12 +279,12 @@ class ExperimentParser:  # pylint: disable=too-few-public-methods
     def __init__(self, config_path: Path):
         self.__config_path = config_path
 
-    def parse(self) -> ExperimentDescription:
+    def parse(self) -> ExperimentConfig:
         """
         Parse function to load JSON conf into JobDescription objects. Any changes to the JSON file format
         should be reflected by the classes used. For more information refer to the dataclasses JSON
         documentation https://pypi.org/project/dataclasses-json/.
         """
         with open(self.__config_path, 'r') as config_file:
-            experiment = ExperimentDescription.from_json(config_file.read())
+            experiment = ExperimentConfig.from_json(config_file.read())
         return experiment

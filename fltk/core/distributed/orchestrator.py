@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import abc
 import collections
 import logging
@@ -6,6 +7,7 @@ import time
 import uuid
 from queue import PriorityQueue
 from typing import OrderedDict, Dict, Type, Set, Union
+from typing import TYPE_CHECKING
 
 from jinja2 import Environment, FileSystemLoader
 from kubeflow.training import PyTorchJobClient
@@ -15,11 +17,8 @@ from kubernetes.client import V1ConfigMap, V1ObjectMeta
 
 from fltk.core.distributed.dist_node import DistNode
 from fltk.util.cluster.client import construct_job, ClusterManager
-from fltk.util.task import get_job_arrival_class
-from fltk.util.task.generator.arrival_generator import ArrivalGenerator, Arrival
-from fltk.util.task.task import DistributedArrivalTask, FederatedArrivalTask, ArrivalTask
-
-from typing import TYPE_CHECKING
+from fltk.util.task import get_job_arrival_class, DistributedArrivalTask, FederatedArrivalTask, ArrivalTask
+from fltk.util.task.generator import ArrivalGenerator
 
 if TYPE_CHECKING:
     from fltk.util.config import DistributedConfig

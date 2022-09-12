@@ -13,7 +13,7 @@ from fltk.strategy import get_optimizer
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from fltk.util.config import FedLearningConfig
+    from fltk.util.config import FedLearnerConfig
 
 
 class Client(Node):
@@ -22,7 +22,7 @@ class Client(Node):
     """
     running = False
 
-    def __init__(self, identifier: str, rank: int, world_size: int, config: FedLearningConfig):
+    def __init__(self, identifier: str, rank: int, world_size: int, config: FedLearnerConfig):
         super().__init__(identifier, rank, world_size, config)
 
         self.loss_function = self.config.get_loss_function()()

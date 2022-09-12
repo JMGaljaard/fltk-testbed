@@ -59,7 +59,7 @@ def get_safe_loader() -> Type[yaml.SafeLoader]:
 # fixme: With python 3.10, this can be done with the dataclass kw_only kwarg.
 @dataclass_json
 @dataclass
-class LearningConfig:
+class LearnerConfig:
     replication: int = field(metadata=dict(required=False, missing=-1))
     batch_size: int = field(metadata=dict(required=False, missing=128))
     test_batch_size: int = field(metadata=dict(required=False, missing=128))
@@ -72,7 +72,7 @@ class LearningConfig:
 
 @dataclass_json
 @dataclass
-class FedLearningConfig(LearningConfig):
+class FedLearnerConfig(LearnerConfig):
     loss_function: Loss = Loss.cross_entropy_loss
     # Number of communication epochs.
     rounds: int = 2
@@ -158,24 +158,24 @@ class FedLearningConfig(LearningConfig):
         you prefer to create json based configuration files.
 
         >>> with open("configs/example.json") as f:
-        >>>     FedLearningConfig.from_json(f.read())
+        >>>     FedLearnerConfig.from_json(f.read())
 
         @param path: Path pointing to configuration yaml file.
         @type path: Path
         @return: Configuration dataclass representation of the configuration file.
-        @rtype: FedLearningConfig
+        @rtype: FedLearnerConfig
         """
         getLogger(__name__).debug(f'Loading yaml from {path.absolute()}')
         safe_loader = get_safe_loader()
         with open(path) as file:
             content = yaml.load(file, Loader=safe_loader)
-            conf = FedLearningConfig.from_dict(content)
+            conf = FedLearnerConfig.from_dict(content)
         return conf
 
 
 @dataclass_json
 @dataclass
-class DistLearningConfig(LearningConfig):  # pylint: disable=too-many-instance-attributes
+class DistLearnerConfig(LearnerConfig):  # pylint: disable=too-many-instance-attributes
     """
     Class encapsulating LearningParameters, for now used under DistributedLearning.
     """
@@ -189,7 +189,7 @@ class DistLearningConfig(LearningConfig):  # pylint: disable=too-many-instance-a
     loss: Loss = Loss.cross_entropy_loss
 
     @staticmethod
-    def from_yaml(path: Path) -> "DistLearningConfig":
+    def from_yaml(path: Path) -> "DistLearnerConfig":
         """
         Parse yaml file to dataclass. Re-implemented to rely on dataclasses_json to load data with tested library.
 
@@ -197,18 +197,18 @@ class DistLearningConfig(LearningConfig):  # pylint: disable=too-many-instance-a
         you prefer to create json based configuration files.
 
         >>> with open("configs/example.json") as f:
-        >>>     DistLearningConfig.from_json(f.read())
+        >>>     DistLearnerConfig.from_json(f.read())
 
         @param path: Path pointing to configuration yaml file.
         @type path: Path
         @return: Configuration dataclass representation of the configuration file.
-        @rtype: FedLearningConfig
+        @rtype: FedLearnerConfig
         """
         getLogger(__name__).debug(f'Loading yaml from {path.absolute()}')
         safe_loader = get_safe_loader()
         with open(path) as file:
             content = yaml.load(file, Loader=safe_loader)
-            conf = DistLearningConfig.from_dict(content)
+            conf = DistLearnerConfig.from_dict(content)
         return conf
 
 

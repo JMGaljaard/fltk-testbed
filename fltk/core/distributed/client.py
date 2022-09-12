@@ -19,13 +19,13 @@ from fltk.util.config.definitions.dataset import get_dist_dataset
 from fltk.util.results import EpochData
 
 if TYPE_CHECKING:
-    from fltk.util.config import DistributedConfig, DistLearningConfig
+    from fltk.util.config import DistributedConfig, DistLearnerConfig
 
 
 class DistClient(DistNode):
 
     def __init__(self, rank: int, task_id: str, world_size: int, config: DistributedConfig = None,
-                 learning_params: DistLearningConfig = None):
+                 learning_params: DistLearnerConfig = None):
         """
         @param rank: PyTorch rank provided by KubeFlow setup.
         @type rank: int
@@ -34,7 +34,7 @@ class DistClient(DistNode):
         @param config: Parsed configuration file representation to extract runtime information from.
         @type config: DistributedConfig
         @param learning_params: Hyper-parameter configuration to be used during the training process by the learner.
-        @type learning_params: DistLearningConfig
+        @type learning_params: DistLearnerConfig
         """
         self._logger = logging.getLogger(f'Client-{rank}-{task_id}')
 

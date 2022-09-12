@@ -9,8 +9,8 @@ from parameterized import parameterized
 
 from fltk.core.client import Client
 from fltk.core.distributed import DistClient
-from fltk.util.config import DistributedConfig, get_distributed_config, get_learning_param_config, FedLearningConfig, \
-    DistLearningConfig
+from fltk.util.config import DistributedConfig, get_distributed_config, get_learning_param_config, FedLearnerConfig, \
+    DistLearnerConfig
 
 from fltk.datasets.dataset import Dataset as DS
 from fltk.util.config.definitions import Nets, Dataset
@@ -37,7 +37,7 @@ def _limit_dataset(dist_client: Union[DistClient, Client]):
 
 class TestLocalDistLearnerSmoke(unittest.TestCase):
     test_dist_config: DistributedConfig = None
-    test_dist_learn_param: DistLearningConfig = None
+    test_dist_learn_param: DistLearnerConfig = None
 
     def setUp(self):
         self.test_dist_config = get_distributed_config(None, TEST_DIST_CONF)
@@ -56,10 +56,10 @@ class TestLocalDistLearnerSmoke(unittest.TestCase):
 
 
 class TestFederatedLearnerSmoke(unittest.TestCase):
-    learning_config: FedLearningConfig = None
+    learning_config: FedLearnerConfig = None
 
     def setUp(self):
-        self.learning_config = FedLearningConfig.from_yaml(Path(TEST_PARAM_CONF_FEDERATED))
+        self.learning_config = FedLearnerConfig.from_yaml(Path(TEST_PARAM_CONF_FEDERATED))
 
     @parameterized.expand(
         [[f"{x.value}-{y.value}", x, y] for x, y in MODEL_SET_PAIRING]
