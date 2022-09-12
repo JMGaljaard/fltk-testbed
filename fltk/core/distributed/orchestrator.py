@@ -256,23 +256,21 @@ class SimulatedOrchestrator(Orchestrator):
             while not self.pending_tasks.empty():
                 curr_task: ArrivalTask = self.pending_tasks.get()
                 self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
+                # Create persistent logging information. A these will not be deleted by the Orchestrator, as such, they
+                # allow you to retrieve information of experiments after removing the PytorchJob after completion.
+                config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task,
+                                                                            config=self._config,
+                                                                            u_id=curr_task.id,
+                                                                            replication=experiment_replication)
+                self._create_config_maps(config_dict)
 
-                try:
-                    # Create persistent logging information. A these will not be deleted by the Orchestrator, as such, they
-                    # allow you to retrieve information of experiments after removing the PytorchJob after completion.
-                    config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task,
-                                                                                config=self._config,
-                                                                                u_id=curr_task.id,
-                                                                                replication=experiment_replication)
-                    self._create_config_maps(config_dict)
+                job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
+                self._logger.info(f"Deploying on cluster: {curr_task.id}")
+                self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
+                self.deployed_tasks.add(curr_task)
 
-                    job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
-                    self._logger.info(f"Deploying on cluster: {curr_task.id}")
-                    self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
-                    self.deployed_tasks.add(curr_task)
-                except:
-                    pass
-
+                # TODO: Extend this logic in your real project, this is only meant for demo purposes
+                # For now we exit the thread after scheduling a single task.
 
             self._logger.info("Still alive...")
             # Prevent high cpu utilization by sleeping between checks.
@@ -307,13 +305,13 @@ class BatchOrchestrator(Orchestrator):
             self._clear_jobs()
         while self._alive and time.time() - start_time < self._config.get_duration():
             # 1. Check arrivals
-            # If new arrivals, store them in arrival list
+            # If new arrivals, store them in arrival PriorityQueue
             while not self._arrival_generator.arrivals.empty():
                 arrival = self._arrival_generator.arrivals.get()
                 task = _generate_task(arrival)
                 self._logger.debug(f"Arrival of: {task}")
                 self.pending_tasks.put(task)
-
+            # 2. Schedule all tasks that arrived previously
             while not self.pending_tasks.empty():
                 # Do blocking request to priority queue
                 curr_task: ArrivalTask = self.pending_tasks.get()
@@ -331,9 +329,9 @@ class BatchOrchestrator(Orchestrator):
                 self._logger.info(f"Deploying on cluster: {curr_task.id}")
                 self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
                 self.deployed_tasks.add(curr_task)
+                if not self._config.cluster_config.orchestrator.parallel_execution:
+                    self.wait_for_jobs_to_complete()
 
-                # TODO: Extend this logic in your real project, this is only meant for demo purposes
-                # For now we exit the thread after scheduling a single task.
             self.stop()
 
             self._logger.debug("Still alive...")
