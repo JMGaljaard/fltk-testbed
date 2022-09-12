@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass
 from multiprocessing.pool import ThreadPool
 from typing import Dict, List, Tuple, Optional, OrderedDict, Union
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import schedule
@@ -15,12 +17,10 @@ from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container,
 
 from fltk.util.cluster.conversion import Convert
 from fltk.util.singleton import Singleton
-from fltk.util.config.experiment import SystemResources
 from fltk.util.task.arrival_task import DistributedArrivalTask, ArrivalTask, FederatedArrivalTask
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
+    from fltk.util.config.experiment_config import SystemResources
     from fltk.util.config import DistributedConfig
 
 @dataclass
@@ -188,6 +188,7 @@ class ClusterManager(metaclass=Singleton):
         """
         self._logger.info("Spinning up cluster manager...")
         # Set debugging to WARNING only, as otherwise DEBUG statements will flood the logs.
+        # noinspection PyUnresolvedReferences
         client.rest.logger.setLevel(logging.WARNING)
         self.__alive = True
         self.__thread_pool.apply_async(self._watchdog.start)

@@ -4,8 +4,8 @@ from typing import Optional
 from dataclasses_json import config
 
 from fltk.util.config.definitions import ExperimentType
-from fltk.util.config.experiment import NetworkConfiguration, SystemParameters, HyperParameters, LearningParameters, \
-    JobClassParameter, Priority
+from fltk.util.config.experiment_config import (NetworkConfiguration, SystemParameters, HyperParameters, Priority,
+                                                LearningParameters, JobClassParameter)
 
 
 @dataclass(order=True)

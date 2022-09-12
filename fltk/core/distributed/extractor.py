@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from fltk.util.config import DistributedConfig
 
 
+# noinspection PyUnresolvedReferences
 def download_datasets(args: Namespace, config: DistributedConfig):
     """
     Function to Download datasets to a system. This is currently meant to be run (using the extractor mode of FLTK) to

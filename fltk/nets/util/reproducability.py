@@ -8,6 +8,7 @@ from fltk.util.config.distributed_config import ExecutionConfig
 from fltk.util.config import DistLearnerConfig
 
 
+# noinspection PyUnresolvedReferences
 def cuda_reproducible_backend(cuda: bool) -> None:
     """
     Function to set the CUDA backend to reproducible (i.e. deterministic) or to default configuration (per PyTorch

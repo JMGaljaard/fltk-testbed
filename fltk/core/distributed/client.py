@@ -48,7 +48,8 @@ class DistClient(DistNode):
 
         # Create model and dataset
         self.loss_function = self.learning_params.get_loss_function()()
-        self.dataset = get_dist_dataset(self.learning_params.dataset)(self.config, self.learning_params, self._id, self._world_size)
+        self.dataset = get_dist_dataset(self.learning_params.dataset)(self.config, self.learning_params, self._id,
+                                                                      self._world_size)
         self.model = get_net(self.learning_params.model)()
         self.device = self._init_device()
 
@@ -80,7 +81,7 @@ class DistClient(DistNode):
 
         if self.config.execution_config.tensorboard.active and self._id == 0:
             self.tb_writer = SummaryWriter(
-                str(self.config.get_log_path(self._task_id, self._id, self.learning_params)))
+                    str(self.config.get_log_path(self._task_id, self._id, self.learning_params)))
 
     def stop_learner(self):
         """
@@ -91,7 +92,7 @@ class DistClient(DistNode):
         self._logger.info(f"Tearing down Client {self._id}")
         self.tb_writer.close()
 
-    def _init_device(self, default_device: torch.device = torch.device('cpu')): # pylint: disable=no-member
+    def _init_device(self, default_device: torch.device = torch.device('cpu')):  # pylint: disable=no-member
         """
         Initialize Torch to use available devices. Either prepares CUDA device, or disables CUDA during execution to run
         with CPU only inference/training.
@@ -102,7 +103,7 @@ class DistClient(DistNode):
         @rtype: None
         """
         if self.config.cuda_enabled() and torch.cuda.is_available():
-            return torch.device('cuda') # pylint: disable=no-member
+            return torch.device('cuda')  # pylint: disable=no-member
         # Force usage of CPU
         torch.cuda.is_available = lambda: False
         return default_device
@@ -188,7 +189,7 @@ class DistClient(DistNode):
                 outputs = self.model(images)
                 # Currently, the FLTK framework assumes that a classification task is performed (hence max).
                 # Future work may add support for non-classification training.
-                _, predicted = torch.max(outputs.data, 1) # pylint: disable=no-member
+                _, predicted = torch.max(outputs.data, 1)  # pylint: disable=no-member
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
