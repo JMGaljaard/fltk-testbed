@@ -1,7 +1,8 @@
 {
    "cluster": {
       "orchestrator": {
-         "orchestrator_type": "simulated"
+         "orchestrator_type": "simulated",
+         "parallel_execution": true
       },
       "client": {
          "prefix": "client",
