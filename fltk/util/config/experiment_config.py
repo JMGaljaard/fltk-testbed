@@ -10,10 +10,13 @@ from fltk.util.config.definitions import Optimizations, Nets, Dataset, DataSampl
 
 
 def _none_factory() -> None:
-    """
-    Helper function to construct a default 'None' value.
-    @return: Default None value.
-    @rtype: None
+    """Helper function to construct a default 'None' value.
+
+    Args:
+
+    Returns:
+      None: Default None value.
+
     """
     return None
 
@@ -21,9 +24,7 @@ def _none_factory() -> None:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class OptimizerConfig:
-    """
-    Dataclass containing learning Optimizer parameters for learning tasks.
-    """
+    """Dataclass containing learning Optimizer parameters for learning tasks."""
     type: Optional[Optimizations] = None
     momentum: Optional[Union[float, Tuple[float]]] = None
     betas: Optional[Union[float, Tuple[float]]] = None
@@ -33,9 +34,7 @@ class OptimizerConfig:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class SchedulerConfig:
-    """
-    Dataclass containing learning rate scheduler configuration.
-    """
+    """Dataclass containing learning rate scheduler configuration."""
     scheduler_step_size: Optional[int] = None
     scheduler_gamma: Optional[float] = None
     min_lr: Optional[float] = field(metadata=config(field_name="minimumLearningRate"), default_factory=_none_factory)
@@ -44,9 +43,7 @@ class SchedulerConfig:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class HyperParameterConfiguration:
-    """
-    Dataclass containing training hyper parameters for learning tasks.
-    """
+    """Dataclass containing training hyper parameters for learning tasks."""
     optimizer_config: Optional[OptimizerConfig] = field(metadata=config(field_name="optimizerConfig"),
                                                         default_factory=_none_factory)
     scheduler_config: Optional[SchedulerConfig] = field(metadata=config(field_name="schedulerConfig"),
@@ -57,28 +54,30 @@ class HyperParameterConfiguration:
     lr_decay: Optional[float] = field(metadata=config(field_name="learningRateDecay"), default_factory=_none_factory)
     total_epochs: int = None
 
-    def merge_default(self, other: Dict[str, Any]):
-        """
-        Function to merge a HyperParameterConfiguration object with a default configuration
-        @param other:
-        @type other:
-        @return:
-        @rtype:
+    def merge_default(self, other: Dict[str, Any]) -> "HyperParameterConfiguration":
+        """Function to merge a HyperParameterConfiguration object with a default configuration.
+
+        Args:
+          other (Dict[str, Any]): Non-default configuration to overwrite default HyperParameter configuration object.
+
+        Returns:
+          HyperParameterConfiguration: Merged configuration objects, allowing defaults to be overwritten
+
         """
         return HyperParameterConfiguration.from_dict({**self.__dict__, **other})  # pylint: disable=no-member
 
 
-def merge_optional(default_dict: Dict[str, Any], update_dict: Dict[str, Any], tpe: str):
-    """
-    Function to merge dictionaries to add set parameters from update dictionary into default dictionary.
-    @param default_dict: Default configuraiton dictionary.
-    @type default_dict: dict
-    @param update_dict: Update configuration to be merged into default configurations.
-    @type update_dict: dict
-    @param tpe: String representation of type of learner.
-    @type tpe: str
-    @return: Result of merged dictionaries.
-    @rtype: dict
+def merge_optional(default_dict: Dict[str, Any], update_dict: Dict[str, Any], tpe: str) -> Dict[str, Any]:
+    """Function to merge dictionaries to add set parameters from update dictionary into default dictionary.
+
+    Args:
+      default_dict (Dict[str, Any]): Default configuration dictionary to be overwritten by update_dict.
+      update_dict ((Dict[str, Any])): Update configuration to be merged into default configurations.
+      tpe (str): String representation of type of learner.
+
+    Returns:
+      Dict[str, Any]: Result of merged dictionaries.
+
     """
     default_copy = default_dict.copy()
     for k, v in default_copy.items():  # pylint: disable=invalid-name
@@ -98,19 +97,18 @@ def merge_optional(default_dict: Dict[str, Any], update_dict: Dict[str, Any], tp
 
 
 def merge_optional_dataclass(default: T, update: T, data_type: Type[T], learner_type: str) -> T:
-    """
-    Function to merge two dataclasses of same type to update a default object with an update dataclass containing
+    """Function to merge two dataclasses of same type to update a default object with an update dataclass containing
     only a few set parameters.
-    @param default: Default dataclass.
-    @type default: T
-    @param update: Update dataclass to merge into default.
-    @type update: T
-    @param data_type: Type of the two dataclasses.
-    @type data_type: Type[T]
-    @param learner_type: String representation of learner type.
-    @type learner_type: str
-    @return: Instance of the passed data_type.
-    @rtype: T
+
+    Args:
+      default (T): Default dataclass.
+      update (T): Update dataclass to merge into default.
+      data_type (Type[T]): Type of the two dataclasses, to return Type T of dataclass.
+      learner_type (str): String representation of learner type.
+
+    Returns:
+      T: Instance of the passed data_type.
+
     """
     if isinstance(update, default.__class__):
         merged = data_type.from_dict(merge_optional(default.to_dict(), update.to_dict(), learner_type))  # pylint: disable=no-member
@@ -121,9 +119,8 @@ def merge_optional_dataclass(default: T, update: T, data_type: Type[T], learner_
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class HyperParameters:
-    """
-    Learning HyperParameters.
-
+    """Learning HyperParameters.
+    
     bs: Number of images that are used during each forward/backward phase.
     max_epoch: Number of times epochs are executed.
     lr: Learning rate parameter, limiting the step size in the gradient update.
@@ -136,8 +133,6 @@ class HyperParameters:
         """
         Post init function that populates the hyperparameters of optionally configured elements of a HyperParam
         Configuration.
-        @return:
-        @rtype:
         """
 
         for learner_type in self.configurations.keys():
@@ -149,16 +144,22 @@ class HyperParameters:
 
                 self.configurations[learner_type] = updated_conf
 
-    def get(self, tpe: str):
+    def get(self, tpe: str) -> "HyperParameterConfiguration":
+        """Get function to retrieve HyperParameterConfiguration corresponding to a type of learner.
+
+        Args:
+            tpe (str): String representation of type of learner.
+
+        Returns:
+            HyperParameterConfiguration: Configuration corresponding to learner.
+        """
         return self.configurations[tpe]
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class Priority:
-    """
-    Job class priority, indicating the presedence of one arrival over another.
-    """
+    """Job class priority, indicating the presedence of one arrival over another."""
     priority: int
     probability: float
 
@@ -166,9 +167,7 @@ class Priority:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class SystemResources:
-    """
-    Dataclass representing SystemResources for Pods to be spawned in K8s.
-    """
+    """Dataclass representing SystemResources for Pods to be spawned in K8s."""
     cores: str
     memory: str
 
@@ -176,8 +175,8 @@ class SystemResources:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class SystemParameters:
-    """
-    System parameters to spawn pods with.
+    """System parameters to spawn pods with.
+
     data_parallelism: Number of pods (distributed) that will work together on training the network.
     executor_cores: Number of cores assigned to each executor.
     executor_memory: Amount of RAM allocated to each executor.
@@ -187,6 +186,15 @@ class SystemParameters:
     configurations: OrderedDict[str, SystemResources]
 
     def get(self, tpe: str):
+        """Get function to retrieve SystemParameters for Type. Currently only supports Master and Client per Kubeflow.
+
+        Args:
+          tpe (str): Type of Pod/Learner to retrieve SystemResources for.
+
+        Returns:
+            SystemResources: Configuration object for system resources corresponding to the requested type.
+
+        """
         if tpe in self.configurations:
             return self.configurations[tpe]
         # Fallback to default for alternative declaration.
@@ -196,9 +204,7 @@ class SystemParameters:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class NetworkConfiguration:
-    """
-    Dataclass describing the network and dataset that is 'trained' for a task.
-    """
+    """Dataclass describing the network and dataset that is 'trained' for a task."""
     network: Nets
     dataset: Dataset
     loss_function: Optional[Loss]
@@ -207,9 +213,7 @@ class NetworkConfiguration:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class SamplerConfiguration:
-    """
-    Dataclass containing configuration for datasampler to be used by learners.
-    """
+    """Dataclass containing configuration for datasampler to be used by learners."""
     type: DataSampler
     q_value: str
     seed: int
@@ -219,10 +223,7 @@ class SamplerConfiguration:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class LearningParameters:
-    """
-    Dataclass containing configuration parameters for the learning process itself. This includes the Federated learning
-    parameters as well as some system parameters like cuda.
-    """
+    """Dataclass containing configuration parameters for the learning process itself. This includes the Federated learning"""
     cuda: bool
     rounds: Optional[int] = None
     epochs_per_round: Optional[int] = None
@@ -234,9 +235,7 @@ class LearningParameters:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class JobClassParameter:
-    """
-    Dataclass describing the job specific parameters (system and hyper).
-    """
+    """Dataclass describing the job specific parameters (system and hyper)."""
     network_configuration: NetworkConfiguration
     system_parameters: SystemParameters
     hyper_parameters: HyperParameters
@@ -248,10 +247,9 @@ class JobClassParameter:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class JobDescription:
-    """
-    Dataclass describing the characteristics of a Job type, as well as the corresponding arrival statistic.
+    """Dataclass describing the characteristics of a Job type, as well as the corresponding arrival statistic.
     Currently, the arrival statistics is the lambda value used in a Poisson arrival process.
-
+    
     preemtible_jobs: indicates whether the jobs can be pre-emptively rescheduled by the scheduler. This is currently
     not implemented in FLTK, but could be added as a project (advanced).
     """
@@ -264,8 +262,7 @@ class JobDescription:
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class ExperimentConfig:
-    """
-    Dataclass object containing the configuration of an entire experiment, including
+    """Dataclass object containing the configuration of an entire experiment, including
     configurations for repetitions. See also JobDescription to define types of jobs, and
     ExperimentConfiguration to set the configuration of experiments.
     """
@@ -273,16 +270,13 @@ class ExperimentConfig:
 
 
 class ExperimentParser:  # pylint: disable=too-few-public-methods
-    """
-    Simple parser to load experiment configuration into a programmatic objects.
-    """
+    """Simple parser to load experiment configuration into a programmatic objects."""
 
     def __init__(self, config_path: Path):
         self.__config_path = config_path
 
     def parse(self) -> ExperimentConfig:
-        """
-        Parse function to load JSON conf into JobDescription objects. Any changes to the JSON file format
+        """Parse function to load JSON conf into JobDescription objects. Any changes to the JSON file format
         should be reflected by the classes used. For more information refer to the dataclasses JSON
         documentation https://pypi.org/project/dataclasses-json/.
         """

@@ -21,9 +21,14 @@ from fltk.util.config.definitions.loss import get_loss_function
 
 
 def _eval_decoder(obj: Union[str, T]) -> Union[Any, T]:
-    """
-    Decoder function to help decoding string objects to objects using the Python interpeter.
+    """Decoder function to help decoding string objects to objects using the Python interpeter.
     If a non-string object is passed it will return the argument
+
+    Args:
+      obj (Union[str, T]): Object to decode during evaluation.
+
+    Returns:
+        Union[Any, T]: Depending on object that was passed, instance of type T, or Any other Python object.
 
     """
     if isinstance(obj, str):
@@ -32,13 +37,15 @@ def _eval_decoder(obj: Union[str, T]) -> Union[Any, T]:
 
 
 def get_safe_loader() -> Type[yaml.SafeLoader]:
-    """
-    Function to get a yaml SafeLoader that is capable of properly parsing yaml compatible floats.
-
+    """Function to get a yaml SafeLoader that is capable of properly parsing yaml compatible floats.
+    
     The default yaml loader would parse a value such as `1e-10` as a string, rather than a float.
 
-    @return: SafeLoader capable of parsing scientificly notated yaml values.
-    @rtype: yaml.SafeLoader
+    Args:
+
+    Returns:
+      yaml.SafeLoader: SafeLoader capable of parsing scientificly notated yaml values.
+
     """
     # Current version of yaml does not parse numbers like 1e-10 correctly, resulting in a str type.
     # Credits to https://stackoverflow.com/a/30462009/14661801
@@ -60,6 +67,7 @@ def get_safe_loader() -> Type[yaml.SafeLoader]:
 @dataclass_json
 @dataclass
 class LearnerConfig:
+    """ """
     replication: int = field(metadata=dict(required=False, missing=-1))
     batch_size: int = field(metadata=dict(required=False, missing=128))
     test_batch_size: int = field(metadata=dict(required=False, missing=128))
@@ -73,6 +81,7 @@ class LearnerConfig:
 @dataclass_json
 @dataclass
 class FedLearnerConfig(LearnerConfig):
+    """ """
     loss_function: Loss = Loss.cross_entropy_loss
     # Number of communication epochs.
     rounds: int = 2
@@ -123,47 +132,58 @@ class FedLearnerConfig(LearnerConfig):
     output_path: Path = field(metadata=config(encoder=str, decoder=Path), default=Path('logging'))
 
     def update_rng_seed(self):
+        """ """
         torch.manual_seed(self.rng_seed)
 
     def get_default_model_folder_path(self):
+        """ """
         return self.default_model_folder_path
 
     def get_distributed(self):
+        """ """
         return self.distributed
 
     def get_sampler(self):
+        """ """
         return self.data_sampler
 
     def get_world_size(self):
+        """ """
         return self.world_size
 
     def get_rank(self):
+        """ """
         return self.rank
 
     def get_sampler_args(self):
+        """ """
         return tuple(self.data_sampler_args)
 
     def get_data_path(self):
+        """ """
         return self.data_path
 
     def get_loss_function(self) -> Type[_Loss]:
+        """ """
         return get_loss_function(self.loss_function)
 
     @staticmethod
     def from_yaml(path: Path):
-        """
-        Parse yaml file to dataclass. Re-implemented to rely on dataclasses_json to load data with tested library.
-
+        """Parse yaml file to dataclass. Re-implemented to rely on dataclasses_json to load data with tested library.
+        
         Alternatively, running the followign code would result in loading a JSON formatted configuration file, in case
         you prefer to create json based configuration files.
 
-        >>> with open("configs/example.json") as f:
-        >>>     FedLearnerConfig.from_json(f.read())
+        Args:
+          path(Path): Path pointing to configuration yaml file.
+          path: Path: 
 
-        @param path: Path pointing to configuration yaml file.
-        @type path: Path
-        @return: Configuration dataclass representation of the configuration file.
-        @rtype: FedLearnerConfig
+        Returns:
+          FedLearnerConfig: Configuration dataclass representation of the configuration file.
+
+        Examples:
+            >>> with open("configs/example.json") as f:
+            >>>     FedLearnerConfig.from_json(f.read())
         """
         getLogger(__name__).debug(f'Loading yaml from {path.absolute()}')
         safe_loader = get_safe_loader()
@@ -176,9 +196,7 @@ class FedLearnerConfig(LearnerConfig):
 @dataclass_json
 @dataclass
 class DistLearnerConfig(LearnerConfig):  # pylint: disable=too-many-instance-attributes
-    """
-    Class encapsulating LearningParameters, for now used under DistributedLearning.
-    """
+    """Class encapsulating LearningParameters, for now used under DistributedLearning."""
     optimizer_args: Dict[str, Any]
     model: Nets
     dataset: Dataset
@@ -190,19 +208,17 @@ class DistLearnerConfig(LearnerConfig):  # pylint: disable=too-many-instance-att
 
     @staticmethod
     def from_yaml(path: Path) -> "DistLearnerConfig":
-        """
-        Parse yaml file to dataclass. Re-implemented to rely on dataclasses_json to load data with tested library.
-
-        Alternatively, running the followign code would result in loading a JSON formatted configuration file, in case
+        """Parse yaml file to dataclass. Re-implemented to rely on dataclasses_json to load data with tested library.
+        
+        Alternatively, running the following code would result in loading a JSON formatted configuration file, in case
         you prefer to create json based configuration files.
 
-        >>> with open("configs/example.json") as f:
-        >>>     DistLearnerConfig.from_json(f.read())
+        Args:
+          path (Path): Path pointing to configuration yaml file.
 
-        @param path: Path pointing to configuration yaml file.
-        @type path: Path
-        @return: Configuration dataclass representation of the configuration file.
-        @rtype: FedLearnerConfig
+        Returns:
+          DistLearnerConfig: Configuration dataclass representation of the configuration file.
+
         """
         getLogger(__name__).debug(f'Loading yaml from {path.absolute()}')
         safe_loader = get_safe_loader()
@@ -213,7 +229,5 @@ class DistLearnerConfig(LearnerConfig):  # pylint: disable=too-many-instance-att
 
 
     def get_loss_function(self) -> Type[_Loss]:
-        """
-        Helper function to get loss_function based on definition _or_ string.
-        """
+        """Helper function to get loss_function based on definition _or_ string."""
         return get_loss_function(self.loss)

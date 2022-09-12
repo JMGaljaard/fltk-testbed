@@ -11,6 +11,17 @@ from fltk.util.config.experiment_config import ExperimentConfig, ExperimentParse
 
 
 def retrieve_config_network_params(conf: FedLearnerConfig, nic=None, host=None):
+    """
+
+    Args:
+      conf: FedLearnerConfig: 
+      nic:  (Default value = None)
+      host:  (Default value = None)
+
+    Returns:
+        str: NIC to use.
+        str: host to use.
+    """
     if hasattr(conf, 'system'):
         system_attr = getattr(conf, 'system')
         if 'federator' in system_attr:
@@ -22,6 +33,15 @@ def retrieve_config_network_params(conf: FedLearnerConfig, nic=None, host=None):
 
 
 def get_distributed_config(args, alt_path: str = None) -> Optional[DistributedConfig]:
+    """
+
+    Args:
+      args: 
+      alt_path: str:  (Default value = None)
+
+    Returns:
+        Optional[DistributedConfig]: When provided, DistributedConfig from Path specified during startup.
+    """
     if args:
         config_path = args.config
     else:
@@ -39,8 +59,14 @@ def get_distributed_config(args, alt_path: str = None) -> Optional[DistributedCo
 
 
 def get_learning_param_config(args, alt_path: str = None) -> Optional[DistLearnerConfig]:
-    """
-    Retrieve learning parameter configuration from Disk for distributed learning experiments.
+    """Retrieve learning parameter configuration from Disk for distributed learning experiments.
+
+    Args:
+      args: 
+      alt_path: str:  (Default value = None)
+
+    Returns:
+
     """
     if args:
         config_path = args.experiment_config
