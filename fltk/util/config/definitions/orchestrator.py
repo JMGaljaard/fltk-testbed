@@ -15,19 +15,24 @@ if TYPE_CHECKING:
 
 @unique
 class OrchestratorType(Enum):
+    """ """
     BATCH = 'batch'
     SIMULATED = 'simulated'
 
 
 def get_orchestrator(config: DistributedConfig, cluster_manager: ClusterManager, arrival_generator: ArrivalGenerator) -> Orchestrator:
-    """
-    Retrieve Orchestrator type given a Distributed (experiment) configuration. This allows for defining the
+    """Retrieve Orchestrator type given a Distributed (experiment) configuration. This allows for defining the
     type of experiment (Batch or Simulated arrivals) once, and letting the Orchestrator implementation
     make sure that the tasks are scheduled correctly.
-    @param config: Distributed (cluster) configuration object for experiments.
-    @type config: DistributedConfig
-    @return: Type of Orchestrator as requested by configuration object.
-    @rtype: Type[Orchestrator]
+
+    Args:
+      config (DistributedConfig): Distributed (cluster) configuration object for experiments.
+      cluster_manager (ClusterManager):
+      arrival_generator (ArrivalGenerator):
+
+    Returns:
+      Type[Orchestrator]: Type of Orchestrator as requested by configuration object.
+
     """
     __lookup = {
         OrchestratorType.BATCH: BatchOrchestrator,
@@ -39,14 +44,15 @@ def get_orchestrator(config: DistributedConfig, cluster_manager: ClusterManager,
 
 
 def get_arrival_generator(config: DistributedConfig, experiment: str) -> ArrivalGenerator:
-    """
-    Retrieval function to create generator functions
-    @param config: Distributed (cluster) configuration with general configuration.
-    @type config: DistributedConfig
-    @param experiment: Experiment name.
-    @type experiment: str
-    @return: ArrivalGenerator initialized with the experiment Path.
-    @rtype: ArrivalGenerator
+    """Retrieval function to create generator functions
+
+    Args:
+      config (DistributedConfig): Distributed (cluster) configuration with general configuration.
+      experiment (str): Experiment name.
+
+    Returns:
+      ArrivalGenerator: ArrivalGenerator object initialized with the experiment Path.
+
     """
     __lookup = {
         OrchestratorType.BATCH: SequentialArrivalGenerator,

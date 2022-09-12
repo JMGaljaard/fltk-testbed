@@ -13,6 +13,7 @@ from torch.nn.modules.loss import _Loss
 
 @unique
 class Loss(Enum):
+    """ """
     l1_loss = 'L1Loss'
     mse_loss = 'MSELoss'
     cross_entropy_loss = 'CrossEntropyLoss'
@@ -36,9 +37,15 @@ class Loss(Enum):
 
 
 def get_loss_function(request: Union[str, Loss]) -> Type[_Loss]:
-    """
-    Mapper function to map a request to a loss function. As fallback behavior the request is evaluated
+    """Mapper function to map a request to a loss function. As fallback behavior the request is evaluated
     using the Python interpreter to try to load an existing implementation dynamically.
+
+    Args:
+      request (Union[str, Loss]): Configured loss function to retrieve.
+
+    Returns:
+        Type[_Loss]: Class reference to loss function implementation of PyTorch.
+
     """
     __lookup_dict: Dict[Loss, Type[_Loss]] = {
         Loss.l1_loss: torch.nn.L1Loss,

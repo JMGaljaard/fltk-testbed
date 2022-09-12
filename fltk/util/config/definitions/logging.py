@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class LogLevel(Enum):
+    """ """
     CRITICAL = 50
     FATAL = CRITICAL
     ERROR = 40

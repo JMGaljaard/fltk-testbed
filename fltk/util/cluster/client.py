@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import logging
 import time
 from collections import defaultdict
@@ -16,7 +17,6 @@ from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container,
     V1VolumeMount, V1Toleration, V1Volume, V1PersistentVolumeClaimVolumeSource, V1ConfigMapVolumeSource
 
 from fltk.util.cluster.conversion import Convert
-from fltk.util.singleton import Singleton
 from fltk.util.task.arrival_task import DistributedArrivalTask, ArrivalTask, FederatedArrivalTask
 
 if TYPE_CHECKING:
@@ -164,7 +164,7 @@ class ResourceWatchDog:
         self._logger.debug(self._resource_lookup)
 
 
-class ClusterManager(metaclass=Singleton):
+class ClusterManager(abc.ABC):
     """
     Object with basic monitoring functionality. This shows how the information of different Pods in a cluster can be
     requested and parsed. Currently, it mainly exists to start the ResourceWatchDog, which now only keeps track of the

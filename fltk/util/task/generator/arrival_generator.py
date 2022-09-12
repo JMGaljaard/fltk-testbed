@@ -1,3 +1,4 @@
+import abc
 import collections
 import logging
 import multiprocessing
@@ -17,12 +18,11 @@ from fltk.datasets.dataset import Dataset
 from fltk.util.config.definitions.net import Nets
 from fltk.util.config.experiment_config import (HyperParameters, SystemParameters, LearningParameters, JobDescription,
                                                 ExperimentParser)
-from fltk.util.singleton import Singleton
 from fltk.util.task.train_task import TrainTask
 
 
 @dataclass
-class ArrivalGenerator(metaclass=Singleton): # pylint: disable=too-many-instance-attributes
+class ArrivalGenerator(abc.ABC): # pylint: disable=too-many-instance-attributes
     """
     Abstract Base Class for generating arrivals in the system. These tasks must be run
     """

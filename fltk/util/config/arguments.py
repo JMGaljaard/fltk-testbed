@@ -3,25 +3,30 @@ from argparse import ArgumentParser
 import torch.distributed as dist
 
 
-def _create_extractor_parser(subparsers):
+def _create_extractor_parser(subparsers) -> None:
     """
     Helper function to add extractor arguments.
-    @param subparsers: Subparser to add arguments to.
-    @type subparsers: Any
-    @return: None
-    @rtype: None
+
+    Args:
+      subparsers (Any): Subparser to add arguments to.
+
+    Returns:
+        None
+
     """
     extractor_parser = subparsers.add_parser('extractor')
     extractor_parser.add_argument('config', type=str)
 
 
 def _create_client_parser(subparsers) -> None:
-    """
-    Helper function to add client arguments.
-    @param subparsers: Subparser to add arguments to.
-    @type subparsers: Any
-    @return: None
-    @rtype: None
+    """Helper function to add client arguments.
+
+    Args:
+      subparsers(Any): Subparser to add arguments to.
+
+    Returns:
+      None
+
     """
     client_parser = subparsers.add_parser('client')
     client_parser.add_argument('experiment_config', type=str, help="Experiment specific config (yaml).")
@@ -34,12 +39,14 @@ def _create_client_parser(subparsers) -> None:
 
 
 def _create_cluster_parser(subparsers) -> None:
-    """
-    Helper function to add cluster execution arguments.
-    @param subparsers: Subparser to add arguments to.
-    @type subparsers: Any
-    @return: None
-    @rtype: None
+    """Helper function to add cluster execution arguments.
+
+    Args:
+      subparsers(Any): Subparser to add arguments to.
+
+    Returns:
+      None
+
     """
     cluster_parser = subparsers.add_parser('cluster')
     cluster_parser.add_argument('config', type=str)
@@ -48,12 +55,14 @@ def _create_cluster_parser(subparsers) -> None:
 
 
 def _create_container_util_parser(subparsers) -> None:
-    """
-    Helper function to add container util execution arguments.
-    @param subparsers: Subparser to add arguments to.
-    @type subparsers: Any
-    @return: None
-    @rtype: None
+    """Helper function to add container util execution arguments.
+
+    Args:
+      subparsers(Any): Subparser to add arguments to.
+
+    Returns:
+      None
+
     """
     util_docker_parser = subparsers.add_parser('util-docker')
     util_docker_parser.add_argument('name', type=str)
@@ -61,37 +70,43 @@ def _create_container_util_parser(subparsers) -> None:
 
 
 def _create_util_parser(subparsers):
-    """
-    Helper function to add util generation execution arguments.
-    @param subparsers: Subparser to add arguments to.
-    @type subparsers: Any
-    @return: None
-    @rtype: None
+    """Helper function to add util generation execution arguments.
+
+    Args:
+      subparsers(Any): Subparser to add arguments to.
+
+    Returns:
+      None: None
+
     """
     util_generate_parser = subparsers.add_parser('util-generate')
     util_generate_parser.add_argument('path', type=str)
 
 
 def _create_util_run_parser(subparsers) -> None:
-    """
-    Helper function to add util run execution arguments.
-    @param subparsers: Subparser to add arguments to.
-    @type subparsers: Any
-    @return: None
-    @rtype: None
+    """Helper function to add util run execution arguments.
+
+    Args:
+      subparsers(Any): Subparser to add arguments to.
+
+    Returns:
+      None: None
+
     """
     util_run_parser = subparsers.add_parser('util-run')
     util_run_parser.add_argument('path', type=str)
 
 
 def _create_remote_parser(subparsers) -> None:
-    """
-    Helper function to add remote Federated Learning execution arguments. Supports both Docker and K8s execution
+    """Helper function to add remote Federated Learning execution arguments. Supports both Docker and K8s execution
     using optional (positional) arguments.
-    @param subparsers: Subparser to add arguments to.
-    @type subparsers: Any
-    @return: None
-    @rtype: None
+
+    Args:
+      subparsers(Any): Subparser to add arguments to.
+
+    Returns:
+      None: None
+
     """
     remote_parser = subparsers.add_parser('remote')
     add_default_arguments(remote_parser)
@@ -102,24 +117,29 @@ def _create_remote_parser(subparsers) -> None:
 
 
 def _create_single_parser(subparsers) -> None:
-    """
-    Helper function to add Local single machine execution arguments.
-    @param subparsers: Subparser to add arguments to.
-    @type subparsers: Any
-    @return: None
-    @rtype: None
+    """Helper function to add Local single machine execution arguments.
+
+    Args:
+      subparsers(Any): Subparser to add arguments to.
+
+    Returns:
+      None: None
+
     """
     single_machine_parser = subparsers.add_parser('single')
     add_default_arguments(single_machine_parser)
 
 
 def add_default_arguments(*parsers):
-    """
-    Helper function to add default arguments shared between executions.
-    @param parsers: Subparser to add arguments to.
-    @type subparsers: Any
-    @return: None
-    @rtype: None
+    """Helper function to add default arguments shared between executions.
+
+    Args:
+      parsers: Subparser to add arguments to.
+      *parsers: 
+
+    Returns:
+      None: None
+
     """
     for parser in parsers:
         parser.add_argument('config', type=str, help='')
@@ -127,12 +147,14 @@ def add_default_arguments(*parsers):
 
 
 def create_all_subparsers(subparsers):
-    """
-    Helper function to add all subparsers to an argparse object.
-    @param subparsers: Subparser to add arguments to.
-    @type subparsers: Any
-    @return: None
-    @rtype: ArgumentParser
+    """Helper function to add all subparsers to an argparse object.
+
+    Args:
+      subparsers(Any): Subparser to add arguments to.
+
+    Returns:
+      ArgumentParser: None
+
     """
     _create_extractor_parser(subparsers)
     _create_client_parser(subparsers)
