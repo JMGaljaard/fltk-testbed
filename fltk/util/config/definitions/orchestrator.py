@@ -41,7 +41,7 @@ def get_orchestrator(config: DistributedConfig, cluster_manager: ClusterManager,
 def get_arrival_generator(config: DistributedConfig, experiment: str) -> ArrivalGenerator:
     """
     Retrieval function to create generator functions
-    @param config: Distributed (cluster) configuration with general coifguration.
+    @param config: Distributed (cluster) configuration with general configuration.
     @type config: DistributedConfig
     @param experiment: Experiment name.
     @type experiment: str

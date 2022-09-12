@@ -330,7 +330,7 @@ class TrainTask:
 
 class ExperimentParser:  # pylint: disable=too-few-public-methods
     """
-    Simpel parser to load load experiment configuration into a programmatic objects.
+    Simple parser to load experiment configuration into a programmatic objects.
     """
 
     def __init__(self, config_path: Path):
