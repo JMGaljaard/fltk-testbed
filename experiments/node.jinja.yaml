@@ -5,7 +5,7 @@ cuda: {{ task.get_learn_param('cuda') }}
 scheduler_step_size: {{ task.get_scheduler_param(tpe, 'scheduler_step_size') }}
 scheduler_gamma: {{ task.get_scheduler_param(tpe, 'scheduler_gamma') }}
 rounds: {{ task.get_learn_param('rounds') }}
-epochs: {{ task.get_hyper_param(tpe, 'total_epochs') }}
+epochs: {{ task.get_learn_param('epochs_per_round') }}
 lr: {{ task.get_optimizer_param(tpe, 'lr') }}
 momentum: {{ task.get_optimizer_param(tpe, 'momentum') }}
 shuffle: {{ task.get_sampler_param(tpe, 'shuffle') }}
