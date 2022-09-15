@@ -77,6 +77,7 @@ class Client(Node):
         start_time = time.time()
         running_loss = 0.0
         final_running_loss = 0.0
+        self.logger.info(f"[RD-{round_id}] kicking of local training for {num_epochs} local epochs")
         for local_epoch in range(num_epochs):
             effective_epoch = round_id * num_epochs + local_epoch
             progress = f'[RD-{round_id}][LE-{local_epoch}][EE-{effective_epoch}]'
@@ -87,7 +88,6 @@ class Client(Node):
 
             training_cardinality = len(self.dataset.get_train_loader())
             self.logger.info(f'{progress}{self.id}: Number of training samples: {training_cardinality}')
-
             for i, (inputs, labels) in enumerate(self.dataset.get_train_loader(), 0):
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
 
