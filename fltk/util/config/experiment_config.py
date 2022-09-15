@@ -273,13 +273,13 @@ class ExperimentParser:  # pylint: disable=too-few-public-methods
     """Simple parser to load experiment configuration into a programmatic objects."""
 
     def __init__(self, config_path: Path):
-        self.__config_path = config_path
+        self._config_path = config_path
 
     def parse(self) -> ExperimentConfig:
         """Parse function to load JSON conf into JobDescription objects. Any changes to the JSON file format
         should be reflected by the classes used. For more information refer to the dataclasses JSON
         documentation https://pypi.org/project/dataclasses-json/.
         """
-        with open(self.__config_path, 'r') as config_file:
+        with open(self._config_path, 'r') as config_file:
             experiment = ExperimentConfig.from_json(config_file.read())
         return experiment
