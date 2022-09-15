@@ -4,8 +4,10 @@ import random
 import uuid
 from dataclasses import field, dataclass
 # noinspection PyUnresolvedReferences
-from typing import OrderedDict, Optional, T, List
+from typing import Optional, T, List, OrderedDict
 from uuid import UUID
+
+from frozendict import FrozenOrderedDict
 
 from fltk.datasets.dataset import Dataset
 from fltk.util.config.definitions import Nets
@@ -16,7 +18,7 @@ from fltk.util.task.generator.arrival_generator import Arrival
 MASTER_REPLICATION: int = 1  # Static master replication value, dictated by PytorchTrainingJobs
 
 
-@dataclass
+@dataclass(frozen=True)
 class ArrivalTask(abc.ABC):
     """
     DataClass representation of an ArrivalTask, representing all the information needed to spawn a new learning task.
@@ -27,7 +29,7 @@ class ArrivalTask(abc.ABC):
     loss_function: str = field(compare=False)
     seed: int = field(compare=False)
     replication: int = field(compare=False)
-    type_map: Optional[OrderedDict[str, int]]
+    type_map: "Optional[FrozenOrderedDict[str, int]]"
     system_parameters: SystemParameters = field(compare=False)
     hyper_parameters: HyperParameters = field(compare=False)
     learning_parameters: LearningParameters = field(compare=False)
@@ -175,7 +177,7 @@ class ArrivalTask(abc.ABC):
         return getattr(self, parameter)
 
 
-@dataclass(order=True)
+@dataclass(order=True, frozen=True)
 class DistributedArrivalTask(ArrivalTask):
     """
     Object to contain configuration of training task. It describes the following properties;
@@ -211,7 +213,7 @@ class DistributedArrivalTask(ArrivalTask):
                 loss_function=arrival.task.network_configuration.loss_function,
                 seed=random.randint(0, 2**32 - 2),
                 replication=replication,
-                type_map=collections.OrderedDict({
+                type_map=FrozenOrderedDict({
                     'Master': MASTER_REPLICATION,
                     'Worker': arrival.task.system_parameters.data_parallelism - MASTER_REPLICATION
                 }),
@@ -221,7 +223,7 @@ class DistributedArrivalTask(ArrivalTask):
         return task
 
 
-@dataclass(order=True)
+@dataclass(order=True, frozen=True)
 class FederatedArrivalTask(ArrivalTask):
     """
     Task describing configuration objects for running FederatedLearning experiments on K8s.
@@ -236,7 +238,7 @@ class FederatedArrivalTask(ArrivalTask):
                 loss_function=arrival.task.network_configuration.loss_function,
                 seed=arrival.task.seed,
                 replication=replication,
-                type_map=collections.OrderedDict({
+                type_map=FrozenOrderedDict({
                     'Master': MASTER_REPLICATION,
                     'Worker': arrival.task.system_parameters.data_parallelism
                 }),
