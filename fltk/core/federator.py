@@ -305,6 +305,7 @@ class Federator(Node):
         time.sleep(3)
 
         updated_model = self.aggregation_method(client_weights, client_sizes)
+        self.logger.info(f"Aggregrating: {len(client_weights)} updates, using {self.config.aggregation}")
         self.update_nn_parameters(updated_model)
 
         test_accuracy, test_loss, conf_mat = self.test(self.net)
