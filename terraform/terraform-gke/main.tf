@@ -29,8 +29,8 @@ module "gke" {
       machine_type       = "e2-medium"
       node_locations     = "us-central1-c"
       auto_scaling       = false
+      node_count         = 3
       min_count          = 0
-      max_count          = 1
       local_ssd_count    = 0
       spot               = false
       disk_size_gb       = 64
@@ -42,15 +42,15 @@ module "gke" {
       auto_upgrade       = true
       service_account    = local.terraform_service_account
       preemptible        = false
-      initial_node_count = 1
+      initial_node_count = 0
     },
     {
       name               = "medium-fltk-pool-1"
-      machine_type       = "e2-medium"
+      machine_type       = "e2-highcpu-8"
       node_locations     = "us-central1-c"
-      auto_scaling       = false
+      auto_scaling       = false              # Make sure to set min/max count if you change this
+      node_count         = 4
       min_count          = 0
-      max_count          = 1
       local_ssd_count    = 0
       spot               = false
       disk_size_gb       = 64
