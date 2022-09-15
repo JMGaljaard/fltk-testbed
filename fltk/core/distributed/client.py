@@ -108,17 +108,6 @@ class DistClient(DistNode):
         torch.cuda.is_available = lambda: False
         return default_device
 
-    def load_default_model(self):
-        """
-        @deprecated Load a model from default model file. This function could be used to ensure consistent default model
-        behavior. When using PyTorch's DistributedDataParallel, however, the first step will always synchronize the
-        model.
-        """
-
-        model_file = Path(f'{self.model.__name__}.model')
-        default_model_path = Path(self.config.get_default_model_folder_path()).joinpath(model_file)
-        load_model_from_file(self.model, default_model_path)
-
     def train(self, epoch, log_interval: int = 50):
         """
         Function to start training, regardless of DistributedDataParallel (DPP) or local training. DDP will account for

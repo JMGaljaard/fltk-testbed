@@ -330,10 +330,7 @@ class BatchOrchestrator(Orchestrator):
                 self.deployed_tasks.add(curr_task)
                 if not self._config.cluster_config.orchestrator.parallel_execution:
                     self.wait_for_jobs_to_complete()
-
-            self.stop()
-
             self._logger.debug("Still alive...")
             time.sleep(self.SLEEP_TIME)
         self.wait_for_jobs_to_complete()
-        logging.info('Experiment completed, currently does not support waiting.')
+        logging.info('Experiment completed.')
