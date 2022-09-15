@@ -47,7 +47,7 @@ class ArrivalGenerator(abc.ABC): # pylint: disable=too-many-instance-attributes
         self.job_dict = collections.OrderedDict(
                 {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions.train_tasks)})
 
-    def start(self, args: List[Any], kwds: Dict[str, Any]):
+    def start(self, duration, seed):
         """
         Function to start arrival generator, requires to
         @param args: List of arguments to pass to the arrival generator at generation time.
@@ -61,7 +61,7 @@ class ArrivalGenerator(abc.ABC): # pylint: disable=too-many-instance-attributes
             self.set_logger()
         self.logger.info("Starting execution of arrival generator.")
         self.alive = True
-        self.run(*args, **kwds)
+        self.run(duration, seed)
 
     def stop(self) -> None:
         """
@@ -73,7 +73,7 @@ class ArrivalGenerator(abc.ABC): # pylint: disable=too-many-instance-attributes
         self.alive = False
 
     @abstractmethod
-    def run(self, duration: float, seed: Optional[int] = None) -> None:
+    def run(self, duration: float, seed: int) -> None:
         """
         Abstract function to run experiment generator for a specified time duration.
         @param duration: Time in seconds to run experiment generation.
@@ -270,10 +270,11 @@ class SequentialArrivalGenerator(ArrivalGenerator):
                 replication_name = f"{job_name}_{repl}_{seed}"
                 train_task = TrainTask(identity=replication_name,
                                        job_parameters=job_class_param,
-                                       priority=description.priority,
+                                       priority=None,
                                        replication=repl,
                                        experiment_type=description.experiment_type,
                                        seed=seed)
 
                 arrival = Arrival(None, train_task, job_name)
+                self.logger.info(f"(Sequentially) generate experiment: {replication_name}")
                 self.arrivals.put(arrival)

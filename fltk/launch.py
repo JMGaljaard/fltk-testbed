@@ -64,7 +64,7 @@ def exec_distributed_client(task_id: str, conf: DistributedConfig = None,
     print(epoch_data)
 
 
-def get_arrival_generator_args(conf: DistributedConfig, replication: int) -> Tuple[List[Any], Dict[str, Any]]:
+def get_arrival_generator_args(conf: DistributedConfig, replication: int) -> List[Any]:
     """
     Function to get arrival generator arguments based on current configuration of Orchestrator.
     @param conf:
@@ -74,10 +74,10 @@ def get_arrival_generator_args(conf: DistributedConfig, replication: int) -> Tup
     @return: Configuration for args and kwargs for the generator.
     @rtype: Tuple[List[Any], Dict[str, Any]]
     """
-    args, kwargs = [conf.get_duration()], {}
+    args = [conf.get_duration()]
     if conf.cluster_config.orchestrator.orchestrator_type == OrchestratorType.BATCH:
-        kwargs['seed'] = conf.execution_config.reproducibility.seeds[replication]
-    return args, kwargs
+        args.append(conf.execution_config.reproducibility.seeds[replication])
+    return args
 
 
 def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, replication: int = 0):
@@ -116,8 +116,8 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, re
     pool.apply(cluster_manager.start)
 
     logging.info("Starting arrival generator")
-    arv_gen_args, arv_gen_kwargs = get_arrival_generator_args(conf, replication)
-    pool.apply_async(arrival_generator.start, args=arv_gen_args, kwds=arv_gen_kwargs)
+    arv_gen_args = get_arrival_generator_args(conf, replication)
+    pool.apply_async(arrival_generator.start, args=arv_gen_args)
     logging.info("Starting orchestrator")
     pool.apply(orchestrator.run, kwds={"experiment_replication": replication})
 
@@ -294,7 +294,6 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
                 rank=rank,
                 world_size=r_conf.world_size,
                 rpc_backend_options=options
-
         )
         federator_node = Federator('federator', 0, r_conf.world_size, r_conf)
         federator_node.run()
