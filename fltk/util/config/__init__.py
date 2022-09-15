@@ -53,7 +53,7 @@ def get_distributed_config(args, alt_path: str = None) -> Optional[DistributedCo
             config = DistributedConfig.from_json(config_file.read())  # pylint: disable=no-member
             config.config_path = Path(args.config)
     except Exception as e:  # pylint: disable=broad-except
-        msg = f"Failed to get distributed config: {e}"
+        msg = f"Failed to get distributed config: {e}, path: {config_path}"
         logging.info(msg)
     return config
 
