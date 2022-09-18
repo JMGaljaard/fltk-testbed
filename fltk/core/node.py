@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import abc
 import copy
+import gc
 import os
 from typing import Callable, Any, Union
 
-import deprecate
 import torch
 from torch.distributed import rpc
 from fltk.datasets.federated import get_fed_dataset
@@ -56,6 +56,7 @@ class Node(abc.ABC):
         self.device = self.init_device()
         self.distributed = config.distributed
         self.net = get_net(self.config.net_name)()
+        self.net.to(self.device)
 
     def init_dataloader(self, world_size: int = None):
         """
@@ -125,7 +126,7 @@ class Node(abc.ABC):
         :param net:
         """
         self.net = net
-        # self.net.to(self.device)
+        self.net.to(self.device)
 
     def get_nn_parameters(self):
         """
@@ -153,19 +154,17 @@ class Node(abc.ABC):
             self.logger.warning(f"Could not find model: {model_file_path}")
         return model
 
-    def update_nn_parameters(self, new_params, is_offloaded_model = False):
+    def update_nn_parameters(self, new_params):
         """
         Update the NN's parameters by parameters provided by Federator.
 
         :param new_params: New weights for the neural network
         :type new_params: dict
         """
-        if is_offloaded_model:
-            pass
-            # self.offloaded_net.load_state_dict(copy.deepcopy(new_params), strict=True)
-        else:
-            self.logger.info("Updating parameters")
-            self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
+        self.logger.info("Updating parameters")
+        self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
+        del new_params
+        gc.collect()
 
     def message(self, other_node: str, method: Union[Callable, str], *args, **kwargs) -> torch.Future: # pylint: disable=no-member
         """
