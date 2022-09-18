@@ -49,8 +49,23 @@ class Client(Node):
         self.logger.info('Sending registration')
         self.message('federator', 'ping', 'new_sender')
         self.message('federator', 'register_client', self.id, self.rank)
+
+    def run(self):
+        """
+        Function to start running the Client after registration. This allows for processing requests by the main thread,
+        while the RPC requests can be made asynchronously.
+
+        Returns: None
+
+        """
         self.running = True
-        # self._event_loop()
+        event = multiprocessing.Event()
+        while self.running:
+            if not self.request_queue.empty():
+                self.logger.info("Got request, running synchronously")
+                request = self.request_queue.get()
+                self.result_queue.put(self.exec_round(*request))
+            event.wait(1)
 
     def stop_client(self):
         """
@@ -61,15 +76,6 @@ class Client(Node):
         """
         self.logger.info('Got call to stop event loop')
         self.running = False
-
-    def _event_loop(self):
-        return
-        self.logger.info('Starting event loop')
-        while self.running:
-            if not self.request_queue.empty():
-                self.result_queue.put(self.exec_round(*self.request_queue.get()))
-            time.sleep(5)
-        self.logger.info('Exiting node')
 
     def train(self, num_epochs: int, round_id: int):
         """
@@ -169,15 +175,6 @@ class Client(Node):
 
     def get_client_datasize(self):  # pylint: disable=missing-function-docstring
         return len(self.dataset.get_train_sampler())
-
-    def run(self):
-        event = multiprocessing.Event()
-        while self.running:
-            if not self.request_queue.empty():
-                self.logger.info("Got request, running synchronously")
-                request = self.request_queue.get()
-                self.result_queue.put(self.exec_round(*request))
-            event.wait(1)
 
     def request_round(self, num_epochs: int, round_id:int):
         event = multiprocessing.Event()
