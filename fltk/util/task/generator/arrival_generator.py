@@ -10,7 +10,7 @@ from datetime import timedelta
 from pathlib import Path
 from queue import Queue
 from random import choices
-from typing import Dict, List, OrderedDict, Optional, Any
+from typing import Dict, List, OrderedDict, Optional
 
 import numpy as np
 
@@ -22,7 +22,7 @@ from fltk.util.task.train_task import TrainTask
 
 
 @dataclass
-class ArrivalGenerator(abc.ABC): # pylint: disable=too-many-instance-attributes
+class ArrivalGenerator(abc.ABC):  # pylint: disable=too-many-instance-attributes
     """
     Abstract Base Class for generating arrivals in the system. These tasks must be run
     """
@@ -47,15 +47,18 @@ class ArrivalGenerator(abc.ABC): # pylint: disable=too-many-instance-attributes
         self.job_dict = collections.OrderedDict(
                 {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions.train_tasks)})
 
-    def start(self, duration, seed):
+    def start(self, duration: int, seed: Optional[int] = None):
         """
-        Function to start arrival generator, requires to
-        @param args: List of arguments to pass to the arrival generator at generation time.
-        @type args: List[Any]
-        @param kwds: Dictionary of keyword arguments to pass to the arrival generator at generation time.
-        @type: kwds: Dict[str, Any]
-        @return: None
-        @rtype: None
+        Function to start arrival generator, default requires a duration to be set. See also the DistributedConfig
+        for additional configuration that can be set for the Orchestrators.
+
+        Args:
+            duration (int): Duration (in seconds) to run the orchestrator.
+            seed (Optional[int]): Optionally required argument for specific/repeatable experiment runs. See also the
+            seed that is set before launching experiments.
+
+        Returns: None
+
         """
         if not self.logger:
             self.set_logger()
@@ -105,22 +108,22 @@ class Arrival:
     task: TrainTask
     task_id: str
 
-    def get_priority(self): # pylint: disable=missing-function-docstring
+    def get_priority(self):  # pylint: disable=missing-function-docstring
         return self.task.priority
 
-    def get_network(self) -> Nets: # pylint: disable=missing-function-docstring
+    def get_network(self) -> Nets:  # pylint: disable=missing-function-docstring
         return self.task.network_configuration.network
 
-    def get_dataset(self) -> Dataset: # pylint: disable=missing-function-docstring
+    def get_dataset(self) -> Dataset:  # pylint: disable=missing-function-docstring
         return self.task.network_configuration.dataset
 
-    def get_system_config(self) -> SystemParameters: # pylint: disable=missing-function-docstring
+    def get_system_config(self) -> SystemParameters:  # pylint: disable=missing-function-docstring
         return self.task.system_parameters
 
-    def get_parameter_config(self) -> HyperParameters: # pylint: disable=missing-function-docstring
+    def get_parameter_config(self) -> HyperParameters:  # pylint: disable=missing-function-docstring
         return self.task.hyper_parameters
 
-    def get_learning_config(self) -> LearningParameters: # pylint: disable=missing-function-docstring
+    def get_learning_config(self) -> LearningParameters:  # pylint: disable=missing-function-docstring
         return self.task.learning_parameters
 
 
