@@ -76,7 +76,7 @@ class ArrivalGenerator(abc.ABC):  # pylint: disable=too-many-instance-attributes
         self.alive = False
 
     @abstractmethod
-    def run(self, duration: float, seed: int) -> None:
+    def run(self, duration: int, seed: Optional[float] = None) -> None:
         """
         Abstract function to run experiment generator for a specified time duration.
         @param duration: Time in seconds to run experiment generation.
