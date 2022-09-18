@@ -287,6 +287,7 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
         )
         client_node = Client(f'client{rank}', rank, r_conf.world_size, r_conf)
         client_node.remote_registration()
+        client_node.run()
     else:
         print(f'Starting the PS (Fed) with world size={r_conf.world_size}')
         rpc.init_rpc(
@@ -295,8 +296,13 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
                 world_size=r_conf.world_size,
                 rpc_backend_options=options
         )
+
         federator_node = Federator('federator', 0, r_conf.world_size, r_conf)
-        federator_node.run()
+        try:
+            federator_node.run()
+        except Exception as e:
+            logging.critical(f"Federator failed execution with reason: {e}."
+                             f"{e.with_traceback()}")
         federator_node.stop_all_clients()
     print('Ending program')
     exit(0)
@@ -336,10 +342,11 @@ def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NI
     # Set the seed for arrivals, torch seed is mostly ignored. Set the `arrival_seed` to a different value
     # for each repetition that you want to run an experiment with.
     for replication, experiment_seed in enumerate(conf.execution_config.reproducibility.seeds):
+        logging.info(f"Starting with experiment replication: {replication} with seed: {experiment_seed}")
+        init_reproducibility(conf.execution_config)
+        exec_orchestrator(args=args, conf=conf, replication=replication)
         try:
-            logging.info(f"Starting with experiment replication: {replication} with seed: {experiment_seed}")
-            init_reproducibility(conf.execution_config)
-            exec_orchestrator(args=args, conf=conf, replication=replication)
+            pass
         except Exception as e:
             logging.info(f"Execution of replication {replication} with seed {experiment_seed} failed."
                          f"Reason: {e}")
