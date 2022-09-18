@@ -29,7 +29,7 @@ class ArrivalTask(abc.ABC):
     loss_function: str = field(compare=False)
     seed: int = field(compare=False)
     replication: int = field(compare=False)
-    type_map: "Optional[FrozenOrderedDict[str, int]]"
+    type_map: "Optional[FrozenOrderedDict[str, int]]" = field(compare=False)
     system_parameters: SystemParameters = field(compare=False)
     hyper_parameters: HyperParameters = field(compare=False)
     learning_parameters: LearningParameters = field(compare=False)
