@@ -169,6 +169,9 @@ class ClusterManager(abc.ABC):
     Object with basic monitoring functionality. This shows how the information of different Pods in a cluster can be
     requested and parsed. Currently, it mainly exists to start the ResourceWatchDog, which now only keeps track of the
     amount of resources requested/used in the cluster.
+
+    This object is provided to the Orchestrator to allow for keeping track of available resources to allow for
+    scheduling of training tasks for extending an Orchestrator for experiments..
     """
 
     def __init__(self):
