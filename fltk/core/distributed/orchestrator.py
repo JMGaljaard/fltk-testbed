@@ -238,7 +238,8 @@ class Orchestrator(DistNode, abc.ABC):
 
 class SimulatedOrchestrator(Orchestrator):
     """
-    Orchestrator implementation for Simulated arrivals. Currently, currently only Poisson inter-arrival times.
+    Orchestrator implementation for Simulated arrivals. Currently, only inter-arrival times following a Poisson process
+    are supported.
     """
 
     def __init__(self, cluster_mgr: ClusterManager, arrival_generator: ArrivalGenerator, config: DistributedConfig):
