@@ -33,7 +33,6 @@ numpy==1.22.3
 oauthlib==3.2.0
 packaging==21.0
 parameterized==0.8.1
-Pillow==8.3.2
 Pint==0.17
 pluggy==1.0.0
 prettyprinter==0.18.0
@@ -65,16 +64,10 @@ tensorboard-data-server==0.6.1
 tensorboard-plugin-wit==1.8.0
 threadpoolctl==2.1.0
 tomli==2.0.1
--f https://download.pytorch.org/whl/torch_stable.html
-torch==1.9.0+cpu; sys_platform != "darwin"
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==1.9.0; sys_platform == "darwin"
-torchmetrics==0.5.0
-torchsummary==1.5.1
--f https://download.pytorch.org/whl/torch_stable.html
-torchvision==0.10.0+cpu; sys_platform != "darwin"
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==1.9.0; sys_platform == "darwin"
+torch==1.12.1
+torchvision==0.13.1
+torchaudio==0.12.1
 tqdm==4.49.0
 typing-inspect==0.7.1
 typing_extensions==4.1.1
