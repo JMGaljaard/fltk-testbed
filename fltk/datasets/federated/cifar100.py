@@ -26,8 +26,10 @@ class FedCIFAR100Dataset(FedDataset):
             transforms.ToTensor(),
             normalize
         ])
-        self.train_dataset = datasets.CIFAR100(root=self.get_args().get_data_path(), train=True, download=True,
-                                              transform=transform)
+        self.train_dataset = datasets.CIFAR100(root=self.get_args().get_data_path(),
+                                               train=True,
+                                               download=True,
+                                               transform=transform)
         self.train_sampler = get_sampler(self.train_dataset, self.args)
         self.train_loader = DataLoader(self.train_dataset, batch_size=self.args.batch_size, sampler=self.train_sampler)
 

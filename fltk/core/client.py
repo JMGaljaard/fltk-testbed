@@ -61,11 +61,13 @@ class Client(Node):
         self.running = True
         event = multiprocessing.Event()
         while self.running:
+            # Hack for running on Kubeflow
             if not self.request_queue.empty():
-                self.logger.info("Got request, running synchronously")
                 request = self.request_queue.get()
+                self.logger.info(f"Got request, args: {request} running synchronously.")
                 self.result_queue.put(self.exec_round(*request))
             event.wait(1)
+        self.logger.info(f"Exiting client {self.id}")
 
     def stop_client(self):
         """
@@ -109,6 +111,7 @@ class Client(Node):
 
                 outputs = self.net(inputs)
                 loss = self.loss_function(outputs, labels)
+
                 running_loss += loss.detach().item()
                 loss.backward()
                 self.optimizer.step()
@@ -123,7 +126,9 @@ class Client(Node):
             end_time = time.time()
             duration = end_time - start_time
             self.logger.info(f'{progress} Train duration is {duration} seconds')
-
+        # Clear gradients before we send.
+        self.optimizer.zero_grad(set_to_none=True)
+        gc.collect()
         return final_running_loss, self.get_nn_parameters()
 
     def set_tau_eff(self, total):
@@ -154,7 +159,7 @@ class Client(Node):
                 outputs = self.net(images)
 
                 _, predicted = torch.max(outputs.data, 1)  # pylint: disable=no-member
-                total += labels.size(0)
+                total += int(labels.size(0))
                 correct += (predicted == labels).sum().detach().item()
 
                 targets_.extend(labels.cpu().view_as(predicted).numpy())

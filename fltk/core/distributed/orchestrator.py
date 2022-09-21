@@ -42,8 +42,9 @@ def _generate_experiment_path_name(task: ArrivalTask, u_id: Union[uuid.UUID, str
     @rtype: str
     """
     log_dir = config.execution_config.log_path
+    experiment_path = config.execution_config.experiment_prefix
     experiment_name = f"{task.dataset}_{task.network}_{u_id}_{task.replication}"
-    full_path = f"{log_dir}/{experiment_name}"
+    full_path = f"{log_dir}/{experiment_path}/{experiment_name}"
     return full_path
 
 
@@ -209,7 +210,7 @@ class Orchestrator(DistNode, abc.ABC):
             self._v1.create_namespaced_config_map(self._config.cluster_config.namespace,
                                                   config_map)
 
-    def wait_for_jobs_to_complete(self):
+    def wait_for_jobs_to_complete(self, ret=False):
         """
         Function to wait for all tasks to complete. This allows to wait for all the resources to free-up after running
         an experiment. Thereby allowing for running multiple experiments on a single cluster, without letting
@@ -225,14 +226,15 @@ class Orchestrator(DistNode, abc.ABC):
                     logging.debug(msg=f"Could not retrieve job_status for {task.id}")
                     job_status = None
 
-                if job_status and job_status in {'Completed', 'Failed'}:
+                if job_status and job_status in {'Completed', 'Failed', 'Succeeded'}:
                     logging.info(f"{task.id} was completed with status: {job_status}, moving to completed")
                     task_to_move.add(task)
                 else:
                     logging.info(f"Waiting for {task.id} to complete")
-
             self.completed_tasks.update(task_to_move)
             self.deployed_tasks.difference_update(task_to_move)
+            if ret:
+                return
             time.sleep(self.SLEEP_TIME)
 
 
@@ -311,7 +313,7 @@ class BatchOrchestrator(Orchestrator):
         if clear:
             self._clear_jobs()
         duration = self._config.get_duration()
-        while self._alive and (duration < 0 or not time.time() - start_time < duration):
+        while self._alive and ((duration < 0) or not time.time() - start_time < duration):
             # 1. Check arrivals
             # If new arrivals, store them in arrival PriorityQueue
             while not self._arrival_generator.arrivals.empty():
@@ -338,8 +340,7 @@ class BatchOrchestrator(Orchestrator):
                 self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
                 self.deployed_tasks.add(curr_task)
                 if not self._config.cluster_config.orchestrator.parallel_execution:
-                    self.wait_for_jobs_to_complete()
-            self._logger.debug("Still alive...")
-            time.sleep(self.SLEEP_TIME)
-        self.wait_for_jobs_to_complete()
+                    self.wait_for_jobs_to_complete(ret=True)
+            self.wait_for_jobs_to_complete(ret=False)
+            self.stop()
         logging.info('Experiment completed.')

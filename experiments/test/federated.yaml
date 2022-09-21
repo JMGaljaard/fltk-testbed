@@ -5,7 +5,7 @@ cuda: false
 scheduler_step_size: 500
 scheduler_gamma: 0.2
 rounds: 1
-epochs: 2500
+epochs: 0
 lr: 0.05
 momentum: 0.011
 shuffle: True
@@ -18,7 +18,7 @@ loss_function: CrossEntropyLoss
 clients_per_round: 1
 distributed: true
 single_machine: false
-aggregation: Sum
+aggregation: FedAvg
 dataset_name: mnist
 net_name: FashionMNISTCNN
 data_sampler: uniform
