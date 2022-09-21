@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import gc
+
 import numpy as np
 import sklearn
 import time
@@ -210,7 +212,7 @@ class Federator(Node):
             # responses.append((client, _remote_method_async(Client.set_tau_eff, client.ref, total)))
         # torch.futures.wait_all([x[1] for x in responses])
 
-    def test(self, net) -> Tuple[float, float, np.array]:
+    def test(self, net) -> Tuple[float, float, np.array, float]:
         """
         Function to test the learned global model by the Federator. This does not take the client distributions in
         account but is centralized.
@@ -233,7 +235,7 @@ class Federator(Node):
                 outputs = net(images)
 
                 _, predicted = torch.max(outputs.data, 1)  # pylint: disable=no-member
-                total += labels.size(0)
+                total += int(labels.size(0))
                 correct += (predicted == labels).sum().item()
 
                 targets_.extend(labels.cpu().view_as(predicted).numpy())
@@ -247,7 +249,7 @@ class Federator(Node):
         end_time = time.time()
         duration = end_time - start_time
         self.logger.info(f'Test duration is {duration} seconds')
-        return accuracy, loss, confusion_mat
+        return accuracy, loss, confusion_mat, duration
 
     def exec_round(self, com_round_id: int):
         """
@@ -300,20 +302,30 @@ class Federator(Node):
             time.sleep(0.1)
             # self.logger.info('')
             # self.logger.info(f'Waiting for other clients')
-
+        send_receive_duration = time.time() - start_time
         self.logger.info('Continue with rest [1]')
         time.sleep(3)
-
-        updated_model = self.aggregation_method(client_weights, client_sizes)
         self.logger.info(f"Aggregrating: {len(client_weights)} updates, using {self.config.aggregation}")
-        self.update_nn_parameters(updated_model)
+        updated_model = self.aggregation_method(client_weights, client_sizes)
+        self.logger.info(f"Updating global model.")
 
-        test_accuracy, test_loss, conf_mat = self.test(self.net)
+        self.update_nn_parameters(updated_model)
+        del client_weights
+        gc.collect()
+        self.logger.info(f"Testing global model.")
+
+        test_accuracy, test_loss, conf_mat, test_duration = self.test(self.net)
         self.logger.info(f'[Round {com_round_id:>3}] Federator has a accuracy of {test_accuracy} and loss={test_loss}')
 
         end_time = time.time()
         duration = end_time - start_time
-        record = FederatorRecord(len(selected_clients), com_round_id, duration, test_loss, test_accuracy,
+        record = FederatorRecord(num_selected_clients=len(selected_clients),
+                                 round_id=com_round_id,
+                                 round_duration=duration,
+                                 test_duration=test_duration,
+                                 send_receive_duration=send_receive_duration,
+                                 test_loss=test_loss,
+                                 test_accuracy=test_accuracy,
                                  confusion_matrix=conf_mat)
         self.exp_data.append(record)
         self.logger.info(f'[Round {com_round_id:>3}] Round duration is {duration} seconds')

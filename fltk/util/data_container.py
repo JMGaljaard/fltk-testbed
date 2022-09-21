@@ -16,7 +16,9 @@ class DataRecord:
 class FederatorRecord(DataRecord):
     num_selected_clients: int
     round_id: int
-    round_duration: int
+    round_duration: float
+    test_duration: float
+    send_receive_duration: float
     test_loss: float
     test_accuracy: float
     # Accuracy per class?
