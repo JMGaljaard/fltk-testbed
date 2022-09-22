@@ -67,8 +67,3 @@ variable "nfs_provider_information" {
   }
 }
 
-variable "nfs_provisioner_repo_url" {
-  description = "Repository URL to locate the utilized helm charts"
-  type        = string
-  default     = "https://charts.helm.sh/stable"
-}
