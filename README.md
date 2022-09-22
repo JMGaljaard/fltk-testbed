@@ -168,7 +168,7 @@ python3 -m fltk extractor ./configs/example_cloud_experiment.json
 ```
 
 ## Deployment (Terraform)
-To setup the the test-bed using Terraform, the following setup needs to be done. This can be achieved through following
+To setup the test-bed using Terraform, the following setup needs to be done. This can be achieved through following
 the steps described in [`jupyter/terraform_notebook.ipynb`](jupyter/terraform_notebook.ipynb).
 
 ### Prerequisites
@@ -185,7 +185,7 @@ python3 -m venv venv-jupyter
 source venv-jupyter/bin/activate
 
 # Install python dependencies for running the notebook
-pip3 install jupyter ipython bash_kernel
+pip3 install -r requirements-jupyter.txt
 # Install bash kernel to use for the notebook
 python3 -m bash_kernel.install
 ```
@@ -198,8 +198,11 @@ When running the notebook (through an IDE or browser), make sure to set the kern
 To start working in the notebook, run the following command in a bash shell, and follow the steps in the notebook.
 
 ```bash
-cd jupyter
-jupyter notebook
+# To open browser automatically
+jupyter notebook jupyter/
+
+# To avoid opening in the browser and display the link instead
+jupyter notebook jupyter/ --no-browser
 ```
 
 Click on the link that is displayed in the output, default is `localhost:8888`, and open the terraform notebook.
@@ -213,9 +216,9 @@ The following commands will all (unless specified otherwise) be executed in the 
 Before we do so, first we need to setup a Python interpreter/environmen, this can also be used for development.
 
 
--   First we will create and active a Python venv.
+-   First we will create and activate a Python venv.
 
-    ``` bash
+    ```bash
     python3 -m venv venv
     source venv/bin/activate
     pip3 install -r requirements-cpu.txt
@@ -224,7 +227,7 @@ Before we do so, first we need to setup a Python interpreter/environmen, this ca
 -   Then we will download the datasets using a Python script in the same
     terminal (or another terminal with the `venv` activated).
 
-    ``` bash
+    ```bash
     python3 -m fltk extractor ./configs/example_cloud_experiment.json
     ```
 
@@ -232,7 +235,7 @@ Afterwards, we can run the following commands to build the Docker
 container. With the use of BuildKit, consecutive builds allow to use cached requirements. Speeding
 up your builds when adding Python dependencies to your project.
 
-``` bash
+```bash
 DOCKER_BUILDKIT=1 docker build --platform linux/amd64 . --tag gcr.io/<project-id>/fltk
 docker push gcr.io/<project-id>/fltk
 ```
@@ -254,7 +257,7 @@ Helm chart, under the name `extractor` in the `test` Namespace.\
 Make sure to update the project name in the `chart` of the extractor in case you have changed
 the default `PROJECT_ID`.
 
-``` bash
+```bash
 cd charts
 helm install extractor ./extractor -f fltk-values.yaml --namespace test
 ```
@@ -268,8 +271,9 @@ Note that downloading many small files is slow (as they will be
 compressed individually). The command assumes that the default name is
 used `fl-extractor`.
 
-``` bash
-kubectl cp --namespace test fl-extractor:/opt/federation-lab/logging ./logging
+```bash
+EXTRACTOR_POD_NAME=$(kubectl get pods -n test -l "app.kubernetes.io/name=fltk.extractor" -o jsonpath="{.items[0].metadata.name}")
+kubectl cp -n test $EXTRACTOR_POD_NAME:/opt/federation-lab/logging ./logging
 ```
 
 Which will copy the data to a directory logging (you may have to create
@@ -284,7 +288,7 @@ running actual experiments.
 ##### Federated Experiment
 
 ```bash
-helm install flearner charts/orchestrator --namespace test -f charts/fltk-values.yaml\
+helm install flearner charts/orchestrator --namespace test -f charts/fltk-values.yaml \
   --set-file orchestrator.experiment=./configs/federated_tasks/example_arrival_config.json,\
   orchestrator.configuration=./configs/example_cloud_experiment.json
 ```
@@ -292,7 +296,7 @@ helm install flearner charts/orchestrator --namespace test -f charts/fltk-values
 ##### Distributed Experiment
 
 ```bash
-helm install flearner charts/orchestrator --namespace test -f charts/fltk-values.yaml\
+helm install flearner charts/orchestrator --namespace test -f charts/fltk-values.yaml \
   --set-file orchestrator.experiment=./configs/distributed_tasks/example_arrival_config.json,\
   orchestrator.configuration=./configs/example_cloud_experiment.json
 ```
