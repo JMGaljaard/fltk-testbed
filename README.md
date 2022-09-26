@@ -235,6 +235,7 @@ Afterwards, we can run the following commands to build the Docker
 container. With the use of BuildKit, consecutive builds allow to use cached requirements. Speeding
 up your builds when adding Python dependencies to your project.
 
+N.B. make sure to have run `gcloud auth configure-docker`, and allow Docker to run sudo-less [link](https://cloud.google.com/artifact-registry/docs/docker/authentication).
 ```bash
 DOCKER_BUILDKIT=1 docker build --platform linux/amd64 . --tag gcr.io/<project-id>/fltk
 docker push gcr.io/<project-id>/fltk
