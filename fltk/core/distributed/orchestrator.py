@@ -212,7 +212,7 @@ class Orchestrator(DistNode, abc.ABC):
             self._v1.create_namespaced_config_map(self._config.cluster_config.namespace,
                                                   config_map)
 
-    def wait_for_jobs_to_complete(self, ret=False, others: Optional[List[str]] = None):
+    def wait_for_jobs_to_complete(self, others: Optional[List[str]] = None):
         """
         Function to wait for all tasks to complete. This allows to wait for all the resources to free-up after running
         an experiment. Thereby allowing for running multiple experiments on a single cluster, without letting
@@ -322,7 +322,7 @@ class BatchOrchestrator(Orchestrator):
             if wait_historical:
                 curr_jobs = self._client.get(namespace="test")
                 jobs = [job['metadata']['name'] for job in curr_jobs['items']]
-                self.wait_for_jobs_to_complete(ret=False, others=jobs)
+                self.wait_for_jobs_to_complete(others=jobs)
             start_time = time.time()
 
             if clear:
@@ -365,9 +365,9 @@ class BatchOrchestrator(Orchestrator):
             # Either wait to complete, or continue. Note that the orchestrator currently does not support scaling
             # experiments up or down.
             if not self._config.cluster_config.orchestrator.parallel_execution:
-                self.wait_for_jobs_to_complete(ret=True)
+                self.wait_for_jobs_to_complete()
         if self._config.cluster_config.orchestrator.parallel_execution:
-            self.wait_for_jobs_to_complete(ret=False)
+            self.wait_for_jobs_to_complete()
         logging.info('Experiment completed.')
         # Stop experiment
         self.stop()
