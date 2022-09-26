@@ -19,11 +19,26 @@ MASTER_REPLICATION: int = 1  # Static master replication value, dictated by Pyto
 
 
 @dataclass(frozen=True)
-class ArrivalTask(abc.ABC):
+class _ArrivalTask(abc.ABC):
     """
-    DataClass representation of an ArrivalTask, representing all the information needed to spawn a new learning task.
+    Private parent of ArrivalTasks, used internally for allowing to track
     """
     id: UUID = field(compare=False)  # pylint: disable=invalid-name
+
+@dataclass(frozen=True)
+class HistoricalArrivalTask(abc.ABC):
+    """
+    Dataclass to contain historical tasks, allowing for keeping track of tasks deployed in older deployments.
+    """
+    pass
+
+
+@dataclass(frozen=True)
+class ArrivalTask(_ArrivalTask):
+    """
+    DataClass representation of an ArrivalTask, representing all the information needed to spawn a new learning task.
+    Allows for sorting by priority (integer) in case priority queues are needed.
+    """
     network: Nets = field(compare=False)
     dataset: Dataset = field(compare=False)
     loss_function: str = field(compare=False)
@@ -57,8 +72,7 @@ class ArrivalTask(abc.ABC):
         @rtype: OrderedDict[str, SystemResources]
         """
         sys_conf = self.system_parameters
-        ret_dict = collections.OrderedDict(
-                [(tpe, sys_conf.get(tpe)) for tpe in self.type_map.keys()])
+        ret_dict = collections.OrderedDict([(tpe, sys_conf.get(tpe)) for tpe in self.type_map.keys()])
         return ret_dict
 
     def typed_replica_count(self, replica_type: str) -> int:
@@ -193,17 +207,19 @@ class DistributedArrivalTask(ArrivalTask):
     @staticmethod
     def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> T:
         """
-        Construct a DistributedArrivalTask from an Arrival object. This will create a task with random seed in
+        Construct a DistributedArrivalTask from an Arrival object.
+
+        Create DistributedArrivalTask from Arrival. This will create a task with random seed in
         [0, sys.maxsize] for randomness. It assumes that the random seed/performance of the model itself is not
-        important on it own, but the reproducability is.
-        @param arrival: Arrival object containing the configuration of a task to be scheduled.
-        @type arrival: Arrival
-        @param u_id: Unique identifier to prevent collisions from happening on experiments.
-        @type u_id: uuid.UUID
-        @param replication:
-        @type replication:
-        @return:
-        @rtype:
+        important on it own, but the reproducibility is. Word size is assumed to be equal to data_parallism (leader
+        inclusive).
+        Args:
+            arrival (Arrival): Arrival to create FederatedArrivalTask from.
+            u_id (UUID): Unique experiment ID to related back to the FedArv.task.
+            replication (int): Replication index (for book-keeping).
+
+        Returns: FederatedArrivalTask with pre-set seed, and parallelism.
+
         """
         task = DistributedArrivalTask(
                 id=u_id,
@@ -230,7 +246,18 @@ class FederatedArrivalTask(ArrivalTask):
     """
 
     @staticmethod
-    def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> T:
+    def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> "FederatedArrivalTask":
+        """
+        Create FederatedArrivalTask from Arrival, with pre-defined seed of Task (assuming replicable experiments),
+        replication, and number of workers equal to data parallelism.
+        Args:
+            arrival (Arrival): Arrival to create FederatedArrivalTask from.
+            u_id (UUID): Unique experiment ID to related back to the FedArv.task.
+            replication (int): Replication index (for book-keeping).
+
+        Returns: FederatedArrivalTask with pre-set seed, and parallelism.
+
+        """
         task = FederatedArrivalTask(
                 id=u_id,
                 network=arrival.get_network(),
