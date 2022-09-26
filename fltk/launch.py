@@ -345,9 +345,8 @@ def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NI
     for replication, experiment_seed in enumerate(conf.execution_config.reproducibility.seeds):
         logging.info(f"Starting with experiment replication: {replication} with seed: {experiment_seed}")
         init_reproducibility(conf.execution_config)
-        exec_orchestrator(args=args, conf=conf, replication=replication)
         try:
-            pass
+            exec_orchestrator(args=args, conf=conf, replication=replication)
         except Exception as e:
             logging.info(f"Execution of replication {replication} with seed {experiment_seed} failed."
                          f"Reason: {e}")
