@@ -76,12 +76,6 @@ def main():
               _save_get(args, 'prefix'),
               args,
               distributed_config)
-    try:
-        pass
-    except Exception as e:
-        print(f"Failed with reason: {e}")
-        parser.print_help()
-        sys.exit(1)
     sys.exit(0)
 
 
