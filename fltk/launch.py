@@ -271,6 +271,7 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
 
     msg = f'Starting with host={host} and port={os.environ["MASTER_PORT"]} and interface={nic}'
     logging.log(logging.INFO, msg)
+    # fixme: Move to async implementation to prevent CPP memory leak
     options = rpc.TensorPipeRpcBackendOptions(
             num_worker_threads=16 if rank == 0 else 4,
             rpc_timeout=0,  # infinite timeout
