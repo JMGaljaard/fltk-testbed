@@ -26,7 +26,6 @@ from fltk.util.task.generator import ArrivalGenerator
 if TYPE_CHECKING:
     from fltk.util.config import DistributedConfig
 
-
 # Setup required variables for Jinja templates.
 EXPERIMENT_DIR = 'experiments'
 __ENV = Environment(loader=FileSystemLoader(EXPERIMENT_DIR))
@@ -196,11 +195,11 @@ class Orchestrator(DistNode, abc.ABC):
             self._logger.info(f'Deleting: {job_name}')
             try:
                 self._client.custom_api.delete_namespaced_custom_object(
-                        PYTORCHJOB_GROUP,
-                        PYTORCHJOB_VERSION,
-                        namespace,
-                        PYTORCHJOB_PLURAL,
-                        job_name)
+                    PYTORCHJOB_GROUP,
+                    PYTORCHJOB_VERSION,
+                    namespace,
+                    PYTORCHJOB_PLURAL,
+                    job_name)
             except Exception as excp:
                 self._logger.warning(f'Could not delete: {job_name}. Reason: {excp}')
 
@@ -239,7 +238,8 @@ class Orchestrator(DistNode, abc.ABC):
                     logging.info(f"{task.id} was completed with status: {job_status}, moving to completed")
                     task_to_move.add(task)
                 else:
-                    logging.info(f"Waiting for {task.id} to complete, {self.pending_tasks.qsize()} pending, {self._arrival_generator.arrivals.qsize()} arrivals")
+                    logging.info(
+                        f"Waiting for {task.id} to complete, {self.pending_tasks.qsize()} pending, {self._arrival_generator.arrivals.qsize()} arrivals")
             self.completed_tasks.update(task_to_move)
             self.deployed_tasks.difference_update(task_to_move)
             time.sleep(self.SLEEP_TIME)
@@ -287,26 +287,29 @@ class SimulatedOrchestrator(Orchestrator):
         # Let's assume that we all deployed jobs have just started, we need to run
         # amount_of_jobs_before_cluster_resize + len(self.deployed_tasks) jobs
         # We can run amount_of_jobs_we_can_run_before_cluster_resize jobs before the cluster can be scaled up again
-        excessive_spots = amount_of_jobs_we_can_run_before_cluster_resize - (amount_of_jobs_before_cluster_resize +
-                                                                             len(self.deployed_tasks))
+        excessive_spots = amount_of_jobs_we_can_run_before_cluster_resize - amount_of_jobs_before_cluster_resize
 
         # We should leave at most one job running
-        return max(0, min(self.nodes_running - 1, math.floor(excessive_spots / self._config.cluster_config.max_pods_per_node)))
+        return max(0, min(self.nodes_running - 1,
+                          math.floor(excessive_spots / self._config.cluster_config.max_pods_per_node)))
 
     def get_earliest_unclaimed_task(self) -> Union[uuid.UUID, None]:
         start_times = self.job_start_times.copy()
         while len(start_times) > 0:
-            minval = min(start_times.values())
-            res = list(filter(lambda x: start_times[x] == minval, start_times))[0]
-            if res in self.resource_claims:
-                del start_times[res]
+            earliest_job_id = min(start_times, key=start_times.get)
+            if earliest_job_id in self.resource_claims:
+                del start_times[earliest_job_id]
             else:
-                return res
-        return None
+                return earliest_job_id
+        return None  # todo support this: scale up and deploy longest waiting jobs
 
     def resize(self) -> None:
-        """HERE WE SHOULD SCALE DOWN THE AMOUNT OF RESOURCES AND RETURN THE NEW AMOUNT OF RESOURCES"""
+        """resize cluster"""
+        # todo: difference between virtual and physical machines
         # todo: implement this
+        # todo: moving average of cluster resize time
+        # self.nodes_running contains new amount of nodes
+
 
     def deploy(self, curr_task: ArrivalTask, replication: int):
         self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
@@ -357,6 +360,8 @@ class SimulatedOrchestrator(Orchestrator):
         #   check the amount of pods per node: configured/configurable
         #   The amount of time required to resize cluster (set in self.AVERAGE_TIME_TO_RESIZE_CLUSTER)
         #   A way to resize the cluster
+        #   Priority queue for keeping tracks what jobs should run when to support scaling up when no claims possible
+        #   queueing theory applying to scale down stuff (see formulas in lecture)
         self._alive = True
         start_time = time.time()
         if clear:
