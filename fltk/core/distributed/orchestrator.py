@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import collections
 import logging
+import math
 import re
 import time
 import uuid
@@ -246,14 +247,116 @@ class Orchestrator(DistNode, abc.ABC):
 
 class SimulatedOrchestrator(Orchestrator):
     """
-    Orchestrator implementation for Simulated arrivals. Currently, only inter-arrival times following a Poisson process
-    are supported.
+    Orchestrator implementation for Simulated arrivals. Currently, supports only Poisson inter-arrival times.
     """
 
     def __init__(self, cluster_mgr: ClusterManager, arrival_generator: ArrivalGenerator, config: DistributedConfig):
         super().__init__(cluster_mgr, arrival_generator, config)
 
+    AVERAGE_TIME_TO_RESIZE_CLUSTER = 60  # todo change this
+
+    job_start_times: Dict[uuid.UUID, float] = dict()  # job_id -> start_time
+    resource_claims: Dict[
+        uuid.UUID, ArrivalTask] = dict()  # running job_id -> job_id that will take its position in next round
+    nodes_running = 0
+    average_inter_arrival_time = -1  # We calculate this value ourselves to simulate real arrivals instead of simulated
+    average_service_time = -1
+    time_of_last_job_arrival = -1
+
+    def can_scale_down(self):
+        """
+        Returns the amount of nodes that can be removed from cluster
+        """
+        # I believe we should keep the minimum amount of nodes at 1, in case jobs have a very long inter-arrival time
+        if self.average_inter_arrival_time <= 0 or self.time_of_last_job_arrival <= 0 or self.nodes_running <= 1:
+            return 0
+
+        # We calculate the amount of jobs that may arrive before the cluster can be scaled up again after
+        # being scaled down
+        # 2 * self.AVERAGE_TIME_TO_RESIZE_CLUSTER because we need to consider the time it takes to scale up and down
+        amount_of_jobs_before_cluster_resize = math.ceil(
+            2 * self.AVERAGE_TIME_TO_RESIZE_CLUSTER / self.average_inter_arrival_time)
+
+        # The amount of pods that we can still start on current capacity:
+        available_spots = self.nodes_running * self._config.cluster_config.max_pods_per_node - len(self.deployed_tasks)
+
+        # On 1 available spot, we can run 2 * self.AVERAGE_TIME_TO_RESIZE_CLUSTER / self.average_service_time jobs
+        amount_of_jobs_we_can_run_before_cluster_resize = available_spots * (2 * self.AVERAGE_TIME_TO_RESIZE_CLUSTER
+                                                                             / self.average_service_time)
+
+        # Let's assume that we all deployed jobs have just started, we need to run
+        # amount_of_jobs_before_cluster_resize + len(self.deployed_tasks) jobs
+        # We can run amount_of_jobs_we_can_run_before_cluster_resize jobs before the cluster can be scaled up again
+        excessive_spots = amount_of_jobs_we_can_run_before_cluster_resize - (amount_of_jobs_before_cluster_resize +
+                                                                             len(self.deployed_tasks))
+
+        # We should leave at most one job running
+        return max(0, min(self.nodes_running - 1, math.floor(excessive_spots / self._config.cluster_config.max_pods_per_node)))
+
+    def get_earliest_unclaimed_task(self) -> Union[uuid.UUID, None]:
+        start_times = self.job_start_times.copy()
+        while len(start_times) > 0:
+            minval = min(start_times.values())
+            res = list(filter(lambda x: start_times[x] == minval, start_times))[0]
+            if res in self.resource_claims:
+                del start_times[res]
+            else:
+                return res
+        return None
+
+    def resize(self) -> None:
+        """HERE WE SHOULD SCALE DOWN THE AMOUNT OF RESOURCES AND RETURN THE NEW AMOUNT OF RESOURCES"""
+        # todo: implement this
+
+    def deploy(self, curr_task: ArrivalTask, replication: int):
+        self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
+        # Create persistent logging information. A these will not be deleted by the Orchestrator, as such, they
+        # allow you to retrieve information of experiments after removing the PytorchJob after completion.
+        config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task,
+                                                                    config=self._config,
+                                                                    u_id=curr_task.id,
+                                                                    replication=replication)
+        self._create_config_maps(config_dict)
+
+        job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
+        self._logger.info(f"Deploying on cluster: {curr_task.id}")
+        self.job_start_times[curr_task.id] = time.time()
+        self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
+        self.deployed_tasks.add(curr_task)
+
+    def check_if_jobs_finished(self, experiment_replication):
+        task_to_move = set()
+        for task in self.deployed_tasks:
+            job_status = self._client.get_job_status(name=f"trainjob-{task.id}", namespace='test')
+            if job_status != 'Running':
+                logging.info(f"{task.id} was completed with status: {job_status}, moving to completed")
+                task_to_move.add(task)
+                # update average service time
+                if self.average_service_time == -1:
+                    self.average_service_time = time.time() - self.job_start_times[task.id]
+                else:
+                    # moving average
+                    self.average_service_time = self.average_service_time * 0.9 + \
+                                                (time.time() - self.job_start_times[task.id]) * 0.1
+                # remove from start times
+                del self.job_start_times[task.id]
+                # remove from resource claims
+                if task.id in self.resource_claims:
+                    # deploy task if claimed
+                    self.deploy(self.resource_claims[task.id], experiment_replication)
+                    del self.resource_claims[task.id]
+            else:
+                logging.info(f"Waiting for {task.id} to complete")
+
+        self.completed_tasks.update(task_to_move)
+        self.deployed_tasks.difference_update(task_to_move)
+
     def run(self, clear: bool = False, experiment_replication: int = -1) -> None:
+        # todo what we still need:
+        #   initial amount of resources: configured
+        #   check the amount of pods per node: configured/configurable
+        #   The amount of time required to resize cluster (set in self.AVERAGE_TIME_TO_RESIZE_CLUSTER)
+        #   A way to resize the cluster
         self._alive = True
         start_time = time.time()
         if clear:
@@ -261,31 +364,59 @@ class SimulatedOrchestrator(Orchestrator):
         while self._alive and time.time() - start_time < self._config.get_duration():
             # 1. Check arrivals
             # If new arrivals, store them in arrival list
-            while not self._arrival_generator.arrivals.empty():
-                arrival = self._arrival_generator.arrivals.get()
-                task = _generate_task(arrival)
-                self._logger.debug(f"Arrival of: {task}")
-                self.pending_tasks.put(task)
+            if not self._arrival_generator.arrivals.empty():
+                # job has arrived. update inter-arrival time estimate
+                if self.time_of_last_job_arrival > 0:
+                    if self.average_inter_arrival_time == -1:
+                        self.average_inter_arrival_time = time.time() - self.time_of_last_job_arrival
+                    else:
+                        # moving average
+                        self.average_inter_arrival_time = self.average_inter_arrival_time * 0.9 + \
+                                                          (time.time() - self.time_of_last_job_arrival) * 0.1
 
-            # Deploy all pending tasks without logic
+                self.time_of_last_job_arrival = time.time()
+                while not self._arrival_generator.arrivals.empty():
+                    arrival = self._arrival_generator.arrivals.get()
+                    task = _generate_task(arrival)
+                    self._logger.debug(f"Arrival of: {task}")
+                    self.pending_tasks.put(task)
+
+            # Deploy all pending tasks using SkyScraper
             while not self.pending_tasks.empty():
-                curr_task: ArrivalTask = self.pending_tasks.get()
-                self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
-                # Create persistent logging information. A these will not be deleted by the Orchestrator, as such, they
-                # allow you to retrieve information of experiments after removing the PytorchJob after completion.
-                config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task,
-                                                                            config=self._config,
-                                                                            u_id=curr_task.id,
-                                                                            replication=experiment_replication)
-                self._create_config_maps(config_dict)
+                if len(self.deployed_tasks) < self.nodes_running * self._config.cluster_config.max_pods_per_node:
+                    # We have enough capacity for job: directly deploy
+                    self.deploy(self.pending_tasks.get(), experiment_replication)
+                elif self.average_inter_arrival_time == -1 or self.average_service_time == -1:
+                    # We don't know the inter-arrival time or service time yet, so we cannot make a decision
+                    # Scale up
+                    self.nodes_running += 1
+                    self.resize()
+                    self.deploy(self.pending_tasks.get(), experiment_replication)
+                else:
+                    # todo should we use self.average_inter_arrival_time to estimate if we should scale up?
+                    #    or: does this happen implicitly?
+                    # Get earliest started task, which position has not yet been claimed by a pending job
+                    earliest_task = self.get_earliest_unclaimed_task()
+                    # Calculate expected amount of time until that job will be finished
+                    expected_remaining_time = self.average_service_time - (
+                            time.time() - self.job_start_times[earliest_task])
 
-                job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
-                self._logger.info(f"Deploying on cluster: {curr_task.id}")
-                self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
-                self.deployed_tasks.add(curr_task)
+                    # Is it faster to scale up or wait for job to finish?
+                    if expected_remaining_time > self.AVERAGE_TIME_TO_RESIZE_CLUSTER:
+                        # Scale up
+                        self.nodes_running += 1
+                        self.resize()
+                        self.deploy(self.pending_tasks.get(), experiment_replication)
+                    else:
+                        # Claim position
+                        self.resource_claims[earliest_task] = self.pending_tasks.get()
 
-                # TODO: Extend this logic in your real project, this is only meant for demo purposes
-                # For now we exit the thread after scheduling a single task.
+            self.check_if_jobs_finished(experiment_replication)
+
+            if (remove_nodes := self.can_scale_down()) > 0:
+                self._logger.info(f"Scaling down cluster by {remove_nodes} nodes")
+                self.nodes_running -= remove_nodes
+                self.resize()
 
             self._logger.info("Still alive...")
             # Prevent high cpu utilization by sleeping between checks.
