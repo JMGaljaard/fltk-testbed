@@ -15,7 +15,8 @@ resource "kustomization_resource" "training_operator" {
 # Create NFS resource
 resource "helm_release" "nfs_client_provisioner" {
   name       = var.nfs_provider_information.release_name
-  chart      = "charts/nfs-server-provisioner-1.1.3.tgz"
+  repository = var.nfs_provisioner_repo_url
+  chart      = var.nfs_provider_information.chart_name
 
   namespace        = var.nfs_provider_information.namespace
   create_namespace = true
