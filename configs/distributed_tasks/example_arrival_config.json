@@ -2,7 +2,7 @@
   "trainTasks": [
     {
       "type": "distributed",
-      "lambda": 1.5,
+      "lambda": 0.8,
       "preemptJobs": false,
       "jobClassParameters": [
         {
@@ -33,7 +33,7 @@
           },
           "hyperParameters": {
             "default": {
-              "totalEpochs": 100,
+              "totalEpochs": 5,
               "batchSize": 128,
               "testBatchSize": 128,
               "learningRateDecay": 0.0002,

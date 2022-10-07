@@ -80,7 +80,11 @@ docs/_build/
 target/
 
 # Jupyter Notebook
+jupyter/
 .ipynb_checkpoints
+
+#cluster config
+configs/example_cloud_experiment.json
 
 # IPython
 profile_default/
@@ -152,6 +156,7 @@ logging/*
 ### Helm ###
 # Chart dependencies
 **/charts/*.tgz
+charts/fltk-values.yaml
 
 ### Terraform ###
 # Local .terraform directories

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Tuple, TYPE_CHECKING
 
 import numpy as np
+import psutil
 import torch
 from sklearn.metrics import confusion_matrix
 from torch.utils.tensorboard import SummaryWriter
@@ -212,7 +213,11 @@ class DistClient(DistNode):
         start_time_train = datetime.datetime.now()
         epoch_results = []
         for epoch in range(1, max_epoch):
+
+            psutil.cpu_percent()
             train_loss = self.train(epoch)
+            cpu_usage = psutil.cpu_percent()
+
 
             # Let only the 'master node' work on training. Possibly DDP can be used
             # to have a distributed test loader as well to speed up (would require
@@ -232,6 +237,7 @@ class DistClient(DistNode):
                              loss_train=train_loss,
                              accuracy=accuracy,
                              loss=test_loss,
+                             cpu_usage=cpu_usage,
                              class_precision=class_precision,
                              class_recall=class_recall,
                              confusion_mat=confusion_mat,
@@ -267,4 +273,12 @@ class DistClient(DistNode):
 
             self.tb_writer.add_scalar('accuracy per epoch',
                                       epoch_data.accuracy,
+                                      epoch)
+                                      
+            self.tb_writer.add_scalar('latency per epoch',
+                                      epoch_data.duration_train,
+                                      epoch)
+
+            self.tb_writer.add_scalar('cpu usage per epoch',
+                                      epoch_data.cpu_usage,
                                       epoch)
