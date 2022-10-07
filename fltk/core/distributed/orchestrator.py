@@ -256,26 +256,29 @@ class SimulatedOrchestrator(Orchestrator):
     AVERAGE_TIME_TO_RESIZE_CLUSTER = 60  # todo change this
 
     job_start_times: Dict[uuid.UUID, float] = dict()  # job_id -> start_time
-    resource_claims: Dict[
-        uuid.UUID, ArrivalTask] = dict()  # running job_id -> job_id that will take its position in next round
+    # running job_id -> job_id that will take its position in next round
+    resource_claims: Dict[uuid.UUID, ArrivalTask] = dict()  
     nodes_running = 0
-    average_inter_arrival_time = -1  # We calculate this value ourselves to simulate real arrivals instead of simulated
-    average_service_time = -1
-    time_of_last_job_arrival = -1
+
+     # We calculate this value ourselves to simulate real arrivals instead of simulated
+    average_interarrival_time = None
+    average_service_time = None
+    time_of_last_job_arrival = None
 
     def can_scale_down(self):
         """
         Returns the amount of nodes that can be removed from cluster
         """
         # I believe we should keep the minimum amount of nodes at 1, in case jobs have a very long inter-arrival time
-        if self.average_inter_arrival_time <= 0 or self.time_of_last_job_arrival <= 0 or self.nodes_running <= 1:
+        if self.average_interarrival_time is None or self.time_of_last_job_arrival is None or \
+           average_service_time is None or self.nodes_running <= 1:
             return 0
 
         # We calculate the amount of jobs that may arrive before the cluster can be scaled up again after
         # being scaled down
         # 2 * self.AVERAGE_TIME_TO_RESIZE_CLUSTER because we need to consider the time it takes to scale up and down
         amount_of_jobs_before_cluster_resize = math.ceil(
-            2 * self.AVERAGE_TIME_TO_RESIZE_CLUSTER / self.average_inter_arrival_time)
+            2 * self.AVERAGE_TIME_TO_RESIZE_CLUSTER / self.average_interarrival_time)
 
         # The amount of pods that we can still start on current capacity:
         available_spots = self.nodes_running * self._config.cluster_config.max_pods_per_node - len(self.deployed_tasks)
@@ -327,6 +330,11 @@ class SimulatedOrchestrator(Orchestrator):
         self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
         self.deployed_tasks.add(curr_task)
 
+    def _update_service_time():
+        delta = time.time() - self.job_start_times[task.id]
+        ait = self.average_service_time
+        self.average_service_time = (ait * 0.9 + delta * 0.1 if ait is not None else ait)
+
     def check_if_jobs_finished(self, experiment_replication):
         task_to_move = set()
         for task in self.deployed_tasks:
@@ -334,13 +342,8 @@ class SimulatedOrchestrator(Orchestrator):
             if job_status != 'Running':
                 logging.info(f"{task.id} was completed with status: {job_status}, moving to completed")
                 task_to_move.add(task)
-                # update average service time
-                if self.average_service_time == -1:
-                    self.average_service_time = time.time() - self.job_start_times[task.id]
-                else:
-                    # moving average
-                    self.average_service_time = self.average_service_time * 0.9 + \
-                                                (time.time() - self.job_start_times[task.id]) * 0.1
+                self._update_service_time()
+
                 # remove from start times
                 del self.job_start_times[task.id]
                 # remove from resource claims
@@ -354,6 +357,11 @@ class SimulatedOrchestrator(Orchestrator):
         self.completed_tasks.update(task_to_move)
         self.deployed_tasks.difference_update(task_to_move)
 
+    def _scale_up(self, replication):
+        self.nodes_running += 1
+        self.resize()
+        self.deploy(self.pending_tasks.get(), replication)
+        
     def run(self, clear: bool = False, experiment_replication: int = -1) -> None:
         # todo what we still need:
         #   initial amount of resources: configured
@@ -366,18 +374,13 @@ class SimulatedOrchestrator(Orchestrator):
         start_time = time.time()
         if clear:
             self._clear_jobs()
-        while self._alive and time.time() - start_time < self._config.get_duration():
+            
+        while self._alive and ((time.time() - start_time) < self._config.get_duration()):
             # 1. Check arrivals
             # If new arrivals, store them in arrival list
             if not self._arrival_generator.arrivals.empty():
-                # job has arrived. update inter-arrival time estimate
-                if self.time_of_last_job_arrival > 0:
-                    if self.average_inter_arrival_time == -1:
-                        self.average_inter_arrival_time = time.time() - self.time_of_last_job_arrival
-                    else:
-                        # moving average
-                        self.average_inter_arrival_time = self.average_inter_arrival_time * 0.9 + \
-                                                          (time.time() - self.time_of_last_job_arrival) * 0.1
+                if self.time_of_last_job_arrival is not None:
+                    self._update_service_time()
 
                 self.time_of_last_job_arrival = time.time()
                 while not self._arrival_generator.arrivals.empty():
@@ -388,30 +391,27 @@ class SimulatedOrchestrator(Orchestrator):
 
             # Deploy all pending tasks using SkyScraper
             while not self.pending_tasks.empty():
-                if len(self.deployed_tasks) < self.nodes_running * self._config.cluster_config.max_pods_per_node:
+                pods = self.nodes_running * self._config.cluster_config.max_pods_per_node
+                if len(self.deployed_tasks) < pods:
                     # We have enough capacity for job: directly deploy
                     self.deploy(self.pending_tasks.get(), experiment_replication)
-                elif self.average_inter_arrival_time == -1 or self.average_service_time == -1:
+                elif self.average_interarrival_time is None or self.average_service_time is None:
                     # We don't know the inter-arrival time or service time yet, so we cannot make a decision
                     # Scale up
-                    self.nodes_running += 1
-                    self.resize()
-                    self.deploy(self.pending_tasks.get(), experiment_replication)
+                    self._scale_up(experiment_replication)
                 else:
-                    # todo should we use self.average_inter_arrival_time to estimate if we should scale up?
+                    # todo should we use self.average_interarrival_time to estimate if we should scale up?
                     #    or: does this happen implicitly?
                     # Get earliest started task, which position has not yet been claimed by a pending job
                     earliest_task = self.get_earliest_unclaimed_task()
-                    # Calculate expected amount of time until that job will be finished
-                    expected_remaining_time = self.average_service_time - (
-                            time.time() - self.job_start_times[earliest_task])
 
+                    # Calculate expected amount of time until that job will be finished
+                    next_finish = time.time() - self.job_start_times[earliest_task]                    
+                    expected_remaining_time = self.average_service_time - next_finish
+                    
                     # Is it faster to scale up or wait for job to finish?
                     if expected_remaining_time > self.AVERAGE_TIME_TO_RESIZE_CLUSTER:
-                        # Scale up
-                        self.nodes_running += 1
-                        self.resize()
-                        self.deploy(self.pending_tasks.get(), experiment_replication)
+                        self._scale_up(experiment_replication)
                     else:
                         # Claim position
                         self.resource_claims[earliest_task] = self.pending_tasks.get()
