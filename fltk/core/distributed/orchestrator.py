@@ -12,6 +12,7 @@ from typing import OrderedDict, Dict, Type, Set, Union, Optional, List
 from typing import TYPE_CHECKING
 from functools import total_ordering
 
+from google.cloud import container_v1
 from jinja2 import Environment, FileSystemLoader
 from kubeflow.training import PyTorchJobClient
 from kubeflow.training.constants.constants import PYTORCHJOB_GROUP, PYTORCHJOB_VERSION, PYTORCHJOB_PLURAL
@@ -259,13 +260,13 @@ class Orchestrator(DistNode, abc.ABC):
                 try:
                     job_status = self._client.get_job_status(
                         name=f"trainjob-{task.id}", namespace='test')
-                except Exception as e:
+                except Exception:
                     logging.debug(
                         msg=f"Could not retrieve job_status for {task.id}")
                     job_status = None
 
                 if job_status and job_status in {
-                        'Completed', 'Failed', 'Succeeded'
+                    'Completed', 'Failed', 'Succeeded'
                 }:
                     logging.info(
                         f"{task.id} was completed with status: {job_status}, moving to completed"
@@ -273,7 +274,8 @@ class Orchestrator(DistNode, abc.ABC):
                     task_to_move.add(task)
                 else:
                     logging.info(
-                        f"Waiting for {task.id} to complete, {self.pending_tasks.qsize()} pending, {self._arrival_generator.arrivals.qsize()} arrivals"
+                        f"Waiting for {task.id} to complete, {self.pending_tasks.qsize()} pending, "
+                        f"{self._arrival_generator.arrivals.qsize()} arrivals"
                     )
             self.completed_tasks.update(task_to_move)
             self.deployed_tasks.difference_update(task_to_move)
@@ -286,11 +288,10 @@ class SkyScrapeJob:
     def __init__(self,
                  uuid: uuid.UUID,
                  start: float,
-                 expected_end: float = 0.0):
+                 service_time: float = 0.0):
         self.uuid = uuid
         self.start_time = start
-        self.expected_end_time = expected_end + start
-        self.priority = start
+        self.expected_end_time = service_time + start
 
     def __lt__(self, other):
         # We can sort by expected duration or longest time as well
@@ -316,13 +317,8 @@ class SimulatedOrchestrator(Orchestrator):
                  config: DistributedConfig):
         super().__init__(cluster_mgr, arrival_generator, config)
 
-    AVERAGE_TIME_TO_RESIZE_CLUSTER = 60  # todo change this
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
         self._jobs: "PriorityQueue[SkyScrapeJob]" = PriorityQueue()
-        self._claimed: "PriorityQueue[SkyScrapeJob]" = PriorityQueue()
+        self._claims: "PriorityQueue[SkyScrapeJob]" = PriorityQueue()
 
         self._job_start_times: Dict[uuid.UUID,
                                     float] = dict()  # job_id -> start_time
@@ -335,25 +331,25 @@ class SimulatedOrchestrator(Orchestrator):
         self._average_service_time = None
         self._time_of_last_job_arrival = None
         self._average_resize_time = None
+        self._cluster_mgr = container_v1.ClusterManagerClient()
 
     def can_scale_down(self):
         """
         Returns the amount of nodes that can be removed from cluster
         """
         # I believe we should keep the minimum amount of nodes at 1, in case jobs have a very long inter-arrival time
-        if None in [self._average_interarrival_time, self._time_of_last_job_arrival, self._average_service_time] \
-           or self.nodes_running <= 1:
+        if None in [self._average_interarrival_time, self._average_resize_time, self._average_service_time] \
+                or self.nodes_running <= 1:
             return 0
 
         # We calculate the amount of jobs that may arrive before the cluster can be scaled up again after
         # being scaled down
         # 2 * self.AVERAGE_TIME_TO_RESIZE_CLUSTER because we need to consider the time it takes to scale up and down
-        time_to_resize = 2 * self.AVERAGE_TIME_TO_RESIZE_CLUSTER
+        time_to_resize = 2 * self._average_resize_time
 
-        jobs_before_resize = math.ceil(time_to_resize /
-                                       self._average_interarrival_pods)
+        jobs_before_resize = math.ceil(time_to_resize / self._average_interarrival_time)
 
-        time_per_node = self._config.cluster_config.max_pods_per_node
+        pods_per_node = self._config.cluster_config.max_pods_per_node
 
         # The amount of pods that we can still start on current capacity:
         available_spots = (self.nodes_running * pods_per_node) - len(
@@ -369,7 +365,7 @@ class SimulatedOrchestrator(Orchestrator):
         excessive_jobs = max_jobs_before_resize - jobs_before_resize
 
         # The minimal amount of nodes required to host all the jobs on separate pods
-        required_nodes = exessive_jobs // pods_per_node
+        required_nodes = excessive_jobs // pods_per_node
 
         # We should leave at most one job running
         return max(0, min(self.nodes_running - 1, required_nodes))
@@ -379,11 +375,10 @@ class SimulatedOrchestrator(Orchestrator):
             return None
 
         earliest = self._jobs.get_nowait()
-        self._claimed.put(earliest)
+        self._claims.put(earliest)
         return earliest.uuid
 
-    def resize_cluster(self, count: int) -> int:
-        """resize clusters the cluster to N nodes and returns the time spent"""
+    def resize_cluster(self) -> None:
         # todo: difference between virtual and physical machines
         # self.nodes_running contains new amount of nodes
 
@@ -394,9 +389,11 @@ class SimulatedOrchestrator(Orchestrator):
         # This can be found by:
         # client.list_node_pools(zone=[zone], project_id=[id], parent=/projects/{id}/zone/{location}/cluster/{name}"
 
-        request = container_v1.SetNodePoolSizeRequest(node_count=count)
-
-        reponse = self.cluster_mgr.set_node_pool_size(request=request)
+        response = self._cluster_mgr.set_node_pool_size({"node_count": self.nodes_running,
+                                                         "node_pool_id": "medium-fltk-pool-1", # todo or maybe default-node-pool
+                                                         "zone": "us-central1-c",
+                                                         "project_id": "qpe-k3z6awuymv44",
+                                                         "cluster_id": "fltk-testbed-cluster"})
 
         # Response may return an object without end
         # The response can be updated by running
@@ -426,14 +423,16 @@ class SimulatedOrchestrator(Orchestrator):
                          self._average_service_time))
 
         self._job_start_times[curr_task.id] = time.time()
-        self._client.create(job_to_start,
-                            namespace=self._config.cluster_config.namespace)
+        self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
         self.deployed_tasks.add(curr_task)
 
-    def _update_service_time():
+    def _update_service_time(self, task: _ArrivalTask):
         delta = time.time() - self._job_start_times[task.id]
-        self._average_service_time = _get_running_average(
-            self._average_resize_time, delta)
+        self._average_service_time = _get_running_average(self._average_resize_time, delta)
+
+    def _update_interarrival_time(self):
+        delta = time.time() - self._time_of_last_job_arrival
+        self._average_interarrival_time = _get_running_average(self._average_interarrival_time, delta)
 
     def check_if_jobs_finished(self, experiment_replication):
         task_to_move = set()
@@ -448,7 +447,7 @@ class SimulatedOrchestrator(Orchestrator):
                 f"{task.id} was completed with status: {job_status}, moving to completed"
             )
             task_to_move.add(task)
-            self._update_service_time()
+            self._update_service_time(task)
 
             _remove_from_queue(self._jobs, task.id)
 
@@ -467,7 +466,7 @@ class SimulatedOrchestrator(Orchestrator):
 
     def _scale_up(self, replication):
         self.nodes_running += 1
-        self.resize_cluster(self.nodes_running)
+        self.resize_cluster()
         self.deploy(self.pending_tasks.get(), replication)
 
     def run(self,
@@ -486,14 +485,14 @@ class SimulatedOrchestrator(Orchestrator):
             self._clear_jobs()
 
         while self._alive and (
-            (time.time() - start_time) < self._config.get_duration()):
+                (time.time() - start_time) < self._config.get_duration()):
             # 1. Check arrivals
             # If new arrivals, store them in arrival list
             if not self._arrival_generator.arrivals.empty():
                 if self._time_of_last_job_arrival is not None:
-                    self._update_service_time()
-
+                    self._update_interarrival_time()
                 self._time_of_last_job_arrival = time.time()
+
                 while not self._arrival_generator.arrivals.empty():
                     arrival = self._arrival_generator.arrivals.get()
                     task = _generate_task(arrival)
@@ -509,7 +508,8 @@ class SimulatedOrchestrator(Orchestrator):
                                 experiment_replication)
                     continue
 
-                if self._average_interarrival_time is None or self._average_service_time is None:
+                if None in [self._average_interarrival_time, self._average_service_time,
+                            self._average_resize_time]:
                     # We don't know the inter-arrival time or service time yet, so we cannot make a decision
                     # Scale up
                     self._scale_up(experiment_replication)
@@ -525,7 +525,7 @@ class SimulatedOrchestrator(Orchestrator):
                 expected_remaining_time = self._average_service_time - next_finish
 
                 # Is it faster to scale up or wait for job to finish?
-                if expected_remaining_time > self.AVERAGE_TIME_TO_RESIZE_CLUSTER:
+                if expected_remaining_time > self._average_resize_time:
                     self._scale_up(experiment_replication)
                     continue
 
@@ -538,7 +538,7 @@ class SimulatedOrchestrator(Orchestrator):
                 self._logger.info(
                     f"Scaling down cluster by {remove_nodes} nodes")
                 self.nodes_running -= remove_nodes
-                self.resize()
+                self.resize_cluster()
 
             self._logger.info("Still alive...")
             # Prevent high cpu utilization by sleeping between checks.
@@ -568,66 +568,9 @@ class BatchOrchestrator(Orchestrator):
         pods are created with sufficient resources (depending on resources available on your cluster).
         @param clear: Boolean indicating whether a previous deployment needs to be cleaned up (i.e. lingering jobs that
         were deployed by the previous run).
-        @type clear: bool
+        @param experiment_replication: Number of times the experiment needs to be replicated.
+        @param wait_historical: Boolean indicating whether the orchestrator should wait for historical jobs to complete
         @return: None
         @rtype: None
         """
-        self._logger.info(
-            f"Starting experiment Orchestrator: {experiment_replication}")
-        self._alive = True
-        try:
-            if wait_historical:
-                curr_jobs = self._client.get(namespace="test")
-                jobs = [job['metadata']['name'] for job in curr_jobs['items']]
-                self.wait_for_jobs_to_complete(others=jobs)
-            start_time = time.time()
-
-            if clear:
-                self._clear_jobs()
-        except Exception as e:
-            self._logger.warning(f"Failed during house keeping: {e}")
-
-        duration = self._config.get_duration()
-        # In case client does not generate experiment in-time
-
-        # TODO: Add test suite for batch orchestrator
-        while self._arrival_generator.arrivals.qsize() == 0:
-            self._logger.info("Waiting for first arrival!")
-            time.sleep(self.SLEEP_TIME)
-        # 1. Check arrivals
-        # If new arrivals, store them in arrival PriorityQueue
-        while not self._arrival_generator.arrivals.empty():
-            arrival = self._arrival_generator.arrivals.get()
-            task = _generate_task(arrival)
-            self._logger.debug(f"Arrival of: {task}")
-            self.pending_tasks.put(task)
-        # 2. Schedule all tasks that arrived previously
-        while not self.pending_tasks.empty():
-            # Do blocking request to priority queue
-            curr_task: ArrivalTask = self.pending_tasks.get()
-            self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
-
-            # Create persistent logging information. A these will not be deleted by the Orchestrator, as such
-            # allow you to retrieve information of experiments even after removing the PytorchJob after completion.
-            config_dict, configmap_name_dict = _prepare_experiment_maps(
-                curr_task,
-                config=self._config,
-                u_id=curr_task.id,
-                replication=experiment_replication)
-            self._create_config_maps(config_dict)
-
-            job_to_start = construct_job(self._config, curr_task,
-                                         configmap_name_dict)
-            self._logger.info(f"Deploying on cluster: {curr_task.id}")
-            self._client.create(
-                job_to_start, namespace=self._config.cluster_config.namespace)
-            self.deployed_tasks.add(curr_task)
-            # Either wait to complete, or continue. Note that the orchestrator currently does not support scaling
-            # experiments up or down.
-            if not self._config.cluster_config.orchestrator.parallel_execution:
-                self.wait_for_jobs_to_complete()
-        if self._config.cluster_config.orchestrator.parallel_execution:
-            self.wait_for_jobs_to_complete()
-        logging.info('Experiment completed.')
-        # Stop experiment
-        self.stop()
+        raise NotImplementedError("SkyScraper does not support batch mode")
