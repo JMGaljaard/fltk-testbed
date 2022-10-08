@@ -75,3 +75,4 @@ urllib3==1.26.5
 websocket-client==1.2.0
 Werkzeug==1.0.1
 yarl==1.6.3
+google-cloud-container==2.10.0

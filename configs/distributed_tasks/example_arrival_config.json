@@ -2,7 +2,7 @@
   "trainTasks": [
     {
       "type": "distributed",
-      "lambda": 1.5,
+      "lambda": 0.4,
       "preemptJobs": false,
       "jobClassParameters": [
         {

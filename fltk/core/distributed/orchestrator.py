@@ -7,12 +7,14 @@ import math
 import re
 import time
 import uuid
+from functools import total_ordering
 from queue import PriorityQueue
 from typing import OrderedDict, Dict, Type, Set, Union, Optional, List
 from typing import TYPE_CHECKING
-from functools import total_ordering
 
+import dateutil.parser
 from google.cloud import container_v1
+from google.oauth2 import service_account
 from jinja2 import Environment, FileSystemLoader
 from kubeflow.training import PyTorchJobClient
 from kubeflow.training.constants.constants import PYTORCHJOB_GROUP, PYTORCHJOB_VERSION, PYTORCHJOB_PLURAL
@@ -331,7 +333,15 @@ class SimulatedOrchestrator(Orchestrator):
         self._average_service_time = None
         self._time_of_last_job_arrival = None
         self._average_resize_time = None
-        self._cluster_mgr = container_v1.ClusterManagerClient()
+
+
+        credentials = service_account.Credentials.from_service_account_file(
+            "configs/key.json", scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        self.cluster_manager_client = container_v1.ClusterManagerClient(credentials=credentials)
+
+        # Make sure we start at 0 nodes
+        self.resize_cluster()
 
     def can_scale_down(self):
         """
@@ -388,19 +398,24 @@ class SimulatedOrchestrator(Orchestrator):
 
         # This can be found by:
         # client.list_node_pools(zone=[zone], project_id=[id], parent=/projects/{id}/zone/{location}/cluster/{name}"
-
-        response = self._cluster_mgr.set_node_pool_size({"node_count": self.nodes_running,
-                                                         "node_pool_id": "medium-fltk-pool-1", # todo or maybe default-node-pool
-                                                         "zone": "us-central1-c",
-                                                         "project_id": "qpe-k3z6awuymv44",
-                                                         "cluster_id": "fltk-testbed-cluster"})
+        response = self.cluster_manager_client.set_node_pool_size({"node_count": self.nodes_running,
+                                                                   "node_pool_id": "medium-fltk-pool-1",
+                                                                   # todo or maybe default-node-pool
+                                                                   "zone": "us-central1-c",
+                                                                   "project_id": "qpe-k3z6awuymv44", # todo make this a variable
+                                                                   "cluster_id": "fltk-testbed-cluster"})
 
         # Response may return an object without end
         # The response can be updated by running
         # request = container.GetOperationRequest(name=response.self_link.split("/v1/")[1])
         # response = self.cluster_mgr.get_operation(request=request)
 
-        delta = response.start_time - response.end_time
+        while not response.end_time:
+            request = container_v1.GetOperationRequest(name=response.self_link.split("/v1/")[1])
+            response = self.cluster_manager_client.get_operation(request=request)
+            time.sleep(0.05)
+
+        delta = (dateutil.parser.parse(response.end_time) - dateutil.parser.parse(response.start_time)).total_seconds()
         self._average_resize_time = _get_running_average(
             self._average_resize_time, delta)
 
@@ -484,11 +499,14 @@ class SimulatedOrchestrator(Orchestrator):
         if clear:
             self._clear_jobs()
 
+        self._logger.info("SkyScraper started")
+
         while self._alive and (
                 (time.time() - start_time) < self._config.get_duration()):
             # 1. Check arrivals
             # If new arrivals, store them in arrival list
             if not self._arrival_generator.arrivals.empty():
+                self._logger.info("TASK HAS ARRIVED")
                 if self._time_of_last_job_arrival is not None:
                     self._update_interarrival_time()
                 self._time_of_last_job_arrival = time.time()

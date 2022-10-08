@@ -102,6 +102,7 @@ class ClusterConfig:
     client: ClientConfig
     namespace: str = 'test'
     image: str = 'fltk:latest'
+    max_pods_per_node: int = 8
 
     def load_incluster_namespace(self):
         """Function to retrieve information from teh cluster itself provided by K8s.
