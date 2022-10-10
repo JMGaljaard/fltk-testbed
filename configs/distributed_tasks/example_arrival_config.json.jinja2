@@ -1,0 +1,73 @@
+{
+  "trainTasks": [
+{%- for experiment in experiments -%}
+  {
+    "type": "distributed",
+    "jobClassParameters": [
+      {
+        "classProbability": 0.1,
+        "priorities": [
+            {
+              "priority": 1,
+              "probability": 0.9
+            },
+            {
+              "priority": 0,
+              "probability": 0.1
+            }
+        ],
+        "networkConfiguration": {{ experiment[5] }},
+        "systemParameters": {
+          "dataParallelism": {{ experiment[4] }},
+          "configurations": {
+            "Master": {
+              "cores": "{{ (experiment[0] | safe) }}",
+              "memory": "{{ (experiment[1] | safe) }}"
+            },
+            "Worker": {
+              "cores": "{{ (experiment[0] | safe) }}",
+              "memory": "{{ (experiment[1] | safe) }}"
+            }
+          }
+        },
+        "hyperParameters": {
+          "default": {
+            "batchSize": {{ experiment[2] }},
+            "testBatchSize": {{ experiment[3] }},
+            "learningRateDecay": 0.1,
+            "optimizerConfig": {
+              "type": "SGD",
+              "learningRate": 0.01,
+              "momentum": 0.9
+            },
+            "schedulerConfig": {
+              "schedulerStepSize": 50,
+              "schedulerGamma": 0.5,
+              "minimumLearningRate": 1e-10
+            }
+          },
+          "configurations": {
+            "Master": null,
+            "Worker": null
+          }
+        },
+        "learningParameters": {
+          "totalEpochs": 100,
+          "rounds": 100,
+          "epochsPerRound": 1,
+          "cuda": false,
+          "clientsPerRound": {{ experiment[4] }},
+          "dataSampler": {
+            "type": "uniform",
+            "qValue": 0.07,
+            "seed": {{ 0 }},
+            "shuffle": true
+          },
+          "aggregation": "FedAvg"
+        }
+      }
+    ]
+  }{% if not loop.last %},{% endif %}
+{%- endfor -%}
+  ]
+}
