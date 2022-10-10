@@ -36,7 +36,7 @@ __ENV = Environment(loader=FileSystemLoader(EXPERIMENT_DIR))
 
 
 def _get_running_average(curr, delta):
-    return (curr * 0.9 + 0.1 * delta if curr is not None else delta)
+    return (curr * 0.9 + 0.1 * delta) if curr is not None else delta
 
 
 def _remove_from_queue(pq, item):
@@ -289,11 +289,9 @@ class SkyScrapeJob:
 
     def __init__(self,
                  uuid: uuid.UUID,
-                 start: float,
-                 service_time: float = 0.0):
+                 start: float):
         self.uuid = uuid
         self.start_time = start
-        self.expected_end_time = service_time + start
 
     def __lt__(self, other):
         # We can sort by expected duration or longest time as well
@@ -320,7 +318,6 @@ class SimulatedOrchestrator(Orchestrator):
         super().__init__(cluster_mgr, arrival_generator, config)
 
         self._jobs: "PriorityQueue[SkyScrapeJob]" = PriorityQueue()
-        self._claims: "PriorityQueue[SkyScrapeJob]" = PriorityQueue()
 
         self._job_start_times: Dict[uuid.UUID,
                                     float] = dict()  # job_id -> start_time
@@ -342,6 +339,8 @@ class SimulatedOrchestrator(Orchestrator):
 
         # Make sure we start at 0 nodes
         self.resize_cluster()
+        # Reset average resize time because jobs may have had to be terminated, inducing a longer resize time
+        self._average_resize_time = None
 
     def can_scale_down(self):
         """
@@ -380,13 +379,10 @@ class SimulatedOrchestrator(Orchestrator):
         # We should leave at most one job running
         return max(0, min(self.nodes_running - 1, required_nodes))
 
-    def get_earliest_unclaimed_task(self) -> Union[uuid.UUID, None]:
+    def get_earliest_unclaimed_task(self) -> Union[SkyScrapeJob, None]:
         if self._jobs.empty():
             return None
-
-        earliest = self._jobs.get_nowait()
-        self._claims.put(earliest)
-        return earliest.uuid
+        return self._jobs.get_nowait()
 
     def resize_cluster(self) -> None:
         # todo: difference between virtual and physical machines
@@ -410,14 +406,18 @@ class SimulatedOrchestrator(Orchestrator):
         # request = container.GetOperationRequest(name=response.self_link.split("/v1/")[1])
         # response = self.cluster_mgr.get_operation(request=request)
 
+        self._logger.info("Resizing cluster to %d nodes", self.nodes_running)
         while not response.end_time:
             request = container_v1.GetOperationRequest(name=response.self_link.split("/v1/")[1])
             response = self.cluster_manager_client.get_operation(request=request)
             time.sleep(0.05)
+        self._logger.info("Cluster resized to %d nodes", self.nodes_running)
 
         delta = (dateutil.parser.parse(response.end_time) - dateutil.parser.parse(response.start_time)).total_seconds()
-        self._average_resize_time = _get_running_average(
-            self._average_resize_time, delta)
+        self._logger.info("Delta %d", delta)
+        self._logger.info("average resize time " + str(self._average_resize_time))
+        self._average_resize_time = _get_running_average(self._average_resize_time, delta)
+        self._logger.info("average resize time " + str(self._average_resize_time))
 
     def deploy(self, curr_task: ArrivalTask, replication: int):
         self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
@@ -433,13 +433,12 @@ class SimulatedOrchestrator(Orchestrator):
         job_to_start = construct_job(self._config, curr_task,
                                      configmap_name_dict)
         self._logger.info(f"Deploying on cluster: {curr_task.id}")
-        self._jobs.put(
-            SkyScrapeJob(curr_task.id, time.time(),
-                         self._average_service_time))
+        self._jobs.put(SkyScrapeJob(curr_task.id, time.time()))
 
         self._job_start_times[curr_task.id] = time.time()
         self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
         self.deployed_tasks.add(curr_task)
+        self._logger.info(f"Deployed on cluster: {curr_task.id}")
 
     def _update_service_time(self, task: _ArrivalTask):
         delta = time.time() - self._job_start_times[task.id]
@@ -452,13 +451,18 @@ class SimulatedOrchestrator(Orchestrator):
     def check_if_jobs_finished(self, experiment_replication):
         task_to_move = set()
         for task in self.deployed_tasks:
-            job_status = self._client.get_job_status(
-                name=f"trainjob-{task.id}", namespace='test')
-            if job_status == "Running":
-                logging.info(f"Waiting for {task.id} to complete")
+            self._logger.info(f"Checking if job {task.id} is finished")
+            try:
+                job_status = self._client.get_job_status(name=f"trainjob-{task.id}", namespace='test')
+            except IndexError:
+                self._logger.info(f"Job {task.id} not yet found")
                 continue
 
-            logging.info(
+            if job_status != "Completed":
+                self._logger.info(f"Waiting for {task.id} to complete")
+                continue
+
+            self._logger.info(
                 f"{task.id} was completed with status: {job_status}, moving to completed"
             )
             task_to_move.add(task)
@@ -474,7 +478,6 @@ class SimulatedOrchestrator(Orchestrator):
                 self.deploy(self._resource_claims[task.id],
                             experiment_replication)
                 del self._resource_claims[task.id]
-                _remove_from_queue(self._claims, task.id)
 
         self.completed_tasks.update(task_to_move)
         self.deployed_tasks.difference_update(task_to_move)
@@ -537,9 +540,14 @@ class SimulatedOrchestrator(Orchestrator):
                 #    or: does this happen implicitly?
                 # Get earliest started task, which position has not yet been claimed by a pending job
                 earliest_task = self.get_earliest_unclaimed_task()
+                if earliest_task is None:
+                    # All tasks have been claimed
+                    # Scale up
+                    self._scale_up(experiment_replication)
+                    continue
 
                 # Calculate expected amount of time until that job will be finished
-                next_finish = time.time() - self._jobs.get().start_time
+                next_finish = time.time() - earliest_task.start_time
                 expected_remaining_time = self._average_service_time - next_finish
 
                 # Is it faster to scale up or wait for job to finish?
@@ -548,15 +556,18 @@ class SimulatedOrchestrator(Orchestrator):
                     continue
 
                 # Claim position
-                self._resource_claims[earliest_task] = self.pending_tasks.get()
+                self._resource_claims[earliest_task.uuid] = self.pending_tasks.get()
 
             self.check_if_jobs_finished(experiment_replication)
 
+            self._logger.info("Can we scale down?")
             if (remove_nodes := self.can_scale_down()) > 0:
                 self._logger.info(
                     f"Scaling down cluster by {remove_nodes} nodes")
                 self.nodes_running -= remove_nodes
                 self.resize_cluster()
+            else:
+                self._logger.info("No nodes to remove")
 
             self._logger.info("Still alive...")
             # Prevent high cpu utilization by sleeping between checks.
