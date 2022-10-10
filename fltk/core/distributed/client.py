@@ -275,8 +275,12 @@ class DistClient(DistNode):
                                       epoch_data.accuracy,
                                       epoch)
                                       
-            self.tb_writer.add_scalar('latency per epoch',
+            self.tb_writer.add_scalar('train latency per epoch',
                                       epoch_data.duration_train,
+                                      epoch)
+            
+            self.tb_writer.add_scalar('test latency per epoch',
+                                      epoch_data.duration_test,
                                       epoch)
 
             self.tb_writer.add_scalar('cpu usage per epoch',
