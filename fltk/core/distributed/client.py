@@ -270,8 +270,12 @@ class DistClient(DistNode):
             self.tb_writer.add_scalar('training loss per epoch',
                                       epoch_data.loss_train,
                                       epoch)
+            
+            self.tb_writer.add_scalar('test loss per epoch',
+                                      epoch_data.loss,
+                                      epoch)
 
-            self.tb_writer.add_scalar('accuracy per epoch',
+            self.tb_writer.add_scalar('test accuracy per epoch',
                                       epoch_data.accuracy,
                                       epoch)
                                       
