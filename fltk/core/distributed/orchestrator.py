@@ -420,7 +420,6 @@ class SimulatedOrchestrator(Orchestrator):
         self._logger.info("average resize time " + str(self._average_resize_time))
 
     def deploy(self, curr_task: ArrivalTask, replication: int):
-        self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
         # Create persistent logging information. A these will not be deleted by the Orchestrator, as such, they
         # allow you to retrieve information of experiments after removing the PytorchJob after completion.
         config_dict, configmap_name_dict = _prepare_experiment_maps(
@@ -432,7 +431,6 @@ class SimulatedOrchestrator(Orchestrator):
 
         job_to_start = construct_job(self._config, curr_task,
                                      configmap_name_dict)
-        self._logger.info(f"Deploying on cluster: {curr_task.id}")
         self._jobs.put(SkyScrapeJob(curr_task.id, time.time()))
 
         self._job_start_times[curr_task.id] = time.time()
@@ -450,12 +448,13 @@ class SimulatedOrchestrator(Orchestrator):
 
     def check_if_jobs_finished(self, experiment_replication):
         task_to_move = set()
+        self._logger.info(f"Checking status of {str(len(self.deployed_tasks))} jobs")
         for task in self.deployed_tasks:
             self._logger.info(f"Checking if job {task.id} is finished")
             try:
                 job_status = self._client.get_job_status(name=f"trainjob-{task.id}", namespace='test')
             except IndexError:
-                self._logger.info(f"Job {task.id} not yet found")
+                self._logger.info(f"Job not yet found")
                 continue
 
             if job_status != "Completed":
@@ -490,13 +489,6 @@ class SimulatedOrchestrator(Orchestrator):
     def run(self,
             clear: bool = False,
             experiment_replication: int = -1) -> None:
-        # todo what we still need:
-        #   initial amount of resources: configured → Terraform changes
-        #   check the amount of pods per node: configured/configurable → Known at compile time
-        #   The amount of time required to resize cluster (set in self.AVERAGE_TIME_TO_RESIZE_CLUSTER) ✔
-        #   A way to resize the cluster  ✔
-        #   Priority queue for keeping tracks what jobs should run when to support scaling up when no claims possible ✔
-        #   queueing theory applying to scale down stuff (see formulas in lecture)
         self._alive = True
         start_time = time.time()
         if clear:
@@ -536,8 +528,6 @@ class SimulatedOrchestrator(Orchestrator):
                     self._scale_up(experiment_replication)
                     continue
 
-                # todo should we use self._average_interarrival_time to estimate if we should scale up?
-                #    or: does this happen implicitly?
                 # Get earliest started task, which position has not yet been claimed by a pending job
                 earliest_task = self.get_earliest_unclaimed_task()
                 if earliest_task is None:
@@ -560,14 +550,15 @@ class SimulatedOrchestrator(Orchestrator):
 
             self.check_if_jobs_finished(experiment_replication)
 
-            self._logger.info("Can we scale down?")
-            if (remove_nodes := self.can_scale_down()) > 0:
-                self._logger.info(
-                    f"Scaling down cluster by {remove_nodes} nodes")
-                self.nodes_running -= remove_nodes
-                self.resize_cluster()
-            else:
-                self._logger.info("No nodes to remove")
+            # todo maybe use this
+            # self._logger.info("Can we scale down?")
+            # if (remove_nodes := self.can_scale_down()) > 0:
+            #     self._logger.info(
+            #         f"Scaling down cluster by {remove_nodes} nodes")
+            #     self.nodes_running -= remove_nodes
+            #     self.resize_cluster()
+            # else:
+            #     self._logger.info("No nodes to remove")
 
             self._logger.info("Still alive...")
             # Prevent high cpu utilization by sleeping between checks.

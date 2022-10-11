@@ -21,6 +21,7 @@ module "gke" {
   service_account            = local.terraform_service_account
   create_service_account     = false
   kubernetes_version         = var.kubernetes_version
+  default_max_pods_per_node  = 8
 
 
   node_pools = [
@@ -43,6 +44,7 @@ module "gke" {
       service_account    = local.terraform_service_account
       preemptible        = false
       initial_node_count = 0
+      max_pods_per_node  = 110
     },
     {
       name               = "medium-fltk-pool-1"
@@ -63,6 +65,7 @@ module "gke" {
       service_account    = local.terraform_service_account
       preemptible        = false
       initial_node_count = 0
+      max_pods_per_node  = 16
     },
   ]
   # Allow the pods in the node pool to pull from gcr.io/<project-id>/<container-name>
