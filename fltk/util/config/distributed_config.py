@@ -102,7 +102,7 @@ class ClusterConfig:
     client: ClientConfig
     namespace: str = 'test'
     image: str = 'fltk:latest'
-    max_pods_per_node: int = 8
+    max_pods_per_node: int = 6 # We can only run 6 pods per node when using C2D-highcpu-8
 
     def load_incluster_namespace(self):
         """Function to retrieve information from teh cluster itself provided by K8s.

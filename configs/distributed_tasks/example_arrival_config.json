@@ -33,7 +33,7 @@
           },
           "hyperParameters": {
             "default": {
-              "totalEpochs": 100,
+              "totalEpochs": 1,
               "batchSize": 128,
               "testBatchSize": 128,
               "learningRateDecay": 0.0002,
