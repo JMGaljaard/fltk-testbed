@@ -332,8 +332,8 @@ class SimulatedOrchestrator(Orchestrator):
         )
         self.cluster_manager_client = container_v1.ClusterManagerClient(credentials=credentials)
 
-        # Make sure we start at 0 nodes
-        self.resize_cluster_async()
+        # Make sure we start at 0 or 1 node depending on config
+        self.resize_cluster_async(1 if not self._config.cluster_config.naive else 0)
         # Reset average resize time because jobs may have had to be terminated, inducing a longer resize time
         self._average_resize_time = None
         self.resizing = False
@@ -380,39 +380,23 @@ class SimulatedOrchestrator(Orchestrator):
             return None
         return self._unclaimed_jobs.get_nowait()
 
-    def resize_cluster_async(self) -> None:
-        # todo: difference between virtual and physical machines
-        # self.nodes_running contains new amount of nodes
-
-        # Possibly required depending on how it is configured
-        # name="/projects/{id}/zone/{location}/cluster/{name}/pools/{pool}
-        # It can be hard coded to /projects/test-bed-fltk/zone/us-central-1c/cluster/fltk-testbed-cluster/pools/default-pool
-
-        # This can be found by:
-        # client.list_node_pools(zone=[zone], project_id=[id], parent=/projects/{id}/zone/{location}/cluster/{name}"
+    def resize_cluster_async(self, nodes) -> None:
         response = self.cluster_manager_client.set_node_pool_size(
-            {"node_count": self.nodes_running + (1 if not self._config.cluster_config.naive else 0),
+            {"node_count": nodes,
              "node_pool_id": "medium-fltk-pool-1",
              "zone": "us-central1-c",
              "project_id": "qpe-k3z6awuymv44",  # todo make this a variable
              "cluster_id": "fltk-testbed-cluster"})
 
-        # Response may return an object without end
-        # The response can be updated by running
-        # request = container.GetOperationRequest(name=response.self_link.split("/v1/")[1])
-        # response = self.cluster_mgr.get_operation(request=request)
-
-        self._logger.info("Resizing cluster to %d nodes", self.nodes_running)
+        self._logger.info("Resizing cluster to %d nodes", nodes)
         while not response.end_time:
             request = container_v1.GetOperationRequest(name=response.self_link.split("/v1/")[1])
             response = self.cluster_manager_client.get_operation(request=request)
             time.sleep(0.05)
-        self._logger.info("Cluster resized to %d nodes", self.nodes_running)
+        self._logger.info("Cluster resized to %d nodes", nodes)
 
         delta = (dateutil.parser.parse(response.end_time) - dateutil.parser.parse(response.start_time)).total_seconds()
-        self._logger.info("Delta %d", delta)
         self._average_resize_time = _get_running_average(self._average_resize_time, delta)
-        self._logger.info("average resize time " + str(self._average_resize_time))
         self.resizing = False
 
     def deploy(self, curr_task: ArrivalTask, replication: int):
@@ -484,8 +468,10 @@ class SimulatedOrchestrator(Orchestrator):
         self.resizing = True
 
         self.nodes_running += 1
+        # Ensure that we always have an extra job running
+        nodes = self.nodes_running + (1 if not self._config.cluster_config.naive else 0)
         # Run resize on background
-        threading.Thread(target=self.resize_cluster_async).start()
+        threading.Thread(target=self.resize_cluster_async, args=(nodes,)).start()
         self.deploy(task, replication)
 
     def run(self,
@@ -578,6 +564,7 @@ class SimulatedOrchestrator(Orchestrator):
         self._logger.info(f"Average resize time: {self._average_resize_time}")
         self._logger.info(f"Average response time: {self._average_response_time}")
         self._logger.info(f"Completed jobs: {self._completed_jobs}")
+        self.resize_cluster_async(0)
         self._logger.info('Experiment completed.')
 
 
