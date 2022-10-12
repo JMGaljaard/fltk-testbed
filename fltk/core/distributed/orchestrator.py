@@ -323,9 +323,9 @@ class SimulatedOrchestrator(Orchestrator):
         # We calculate this value ourselves to simulate real arrivals instead of simulated
         self._average_interarrival_time = None
         self._average_service_time = None
+        self._average_response_time = None
         self._time_of_last_job_arrival = None
         self._average_resize_time = None
-
 
         credentials = service_account.Credentials.from_service_account_file(
             "configs/key.json", scopes=["https://www.googleapis.com/auth/cloud-platform"],
@@ -390,11 +390,12 @@ class SimulatedOrchestrator(Orchestrator):
 
         # This can be found by:
         # client.list_node_pools(zone=[zone], project_id=[id], parent=/projects/{id}/zone/{location}/cluster/{name}"
-        response = self.cluster_manager_client.set_node_pool_size({"node_count": self.nodes_running + 1,
-                                                                   "node_pool_id": "medium-fltk-pool-1",
-                                                                   "zone": "us-central1-c",
-                                                                   "project_id": "qpe-k3z6awuymv44", # todo make this a variable
-                                                                   "cluster_id": "fltk-testbed-cluster"})
+        response = self.cluster_manager_client.set_node_pool_size(
+            {"node_count": self.nodes_running + (1 if not self._config.cluster_config.naive else 0),
+             "node_pool_id": "medium-fltk-pool-1",
+             "zone": "us-central1-c",
+             "project_id": "qpe-k3z6awuymv44",  # todo make this a variable
+             "cluster_id": "fltk-testbed-cluster"})
 
         # Response may return an object without end
         # The response can be updated by running
@@ -460,8 +461,9 @@ class SimulatedOrchestrator(Orchestrator):
             task_to_move.append(task)
             self._update_service_time(task)
 
-            # todo use rolling average instead of total average???
             self._completed_jobs[task.uuid] = time.time() - self._arrival_times[task.uuid]
+            self._average_response_time = _get_running_average(self._average_response_time,
+                                                               self._completed_jobs[task.uuid])
             del self._arrival_times[task.uuid]
 
             if task in self._unclaimed_jobs.queue:
@@ -524,7 +526,7 @@ class SimulatedOrchestrator(Orchestrator):
                     continue
 
                 if None in [self._average_interarrival_time, self._average_service_time,
-                            self._average_resize_time]:
+                            self._average_resize_time] or self._config.cluster_config.naive:
                     # We don't know the inter-arrival time or service time yet, so we cannot make a decision
                     # Scale up
                     self._logger.info("Not enough data yet. Resizing and deploying task " + str(task.id))
@@ -546,7 +548,9 @@ class SimulatedOrchestrator(Orchestrator):
 
                 if expected_remaining_time > self._average_resize_time:
                     # It is faster to scale up and deploy the new job than to wait for the earliest job to finish
-                    self._logger.info("Expected remaining time is larger than resize time. Resizing and deploying task " + str(task.id))
+                    self._logger.info(
+                        "Expected remaining time is larger than resize time. Resizing and deploying task " + str(
+                            task.id))
                     self._scale_up_and_deploy(task, experiment_replication)
                     continue
 
@@ -572,6 +576,7 @@ class SimulatedOrchestrator(Orchestrator):
         self._logger.info(f"Average service time: {self._average_service_time}")
         self._logger.info(f"Average interarrival time: {self._average_interarrival_time}")
         self._logger.info(f"Average resize time: {self._average_resize_time}")
+        self._logger.info(f"Average response time: {self._average_response_time}")
         self._logger.info(f"Completed jobs: {self._completed_jobs}")
         self._logger.info('Experiment completed.')
 
