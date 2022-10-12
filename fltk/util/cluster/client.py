@@ -134,7 +134,7 @@ class ResourceWatchDog:
         node: client.V1Node
         new_resource_mapper = {}
 
-        self._logger.info("Fetching pod information of cluster...")
+        # self._logger.info("Fetching pod information of cluster...")
         for node_name, node in self._node_lookup.items():
             try:
 

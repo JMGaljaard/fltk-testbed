@@ -76,6 +76,9 @@ class ExecutionConfig:
     save_model_path = "models"
     data_path = "data"
     log_path = "logging"
+    time_per_job: int = 60 # Short jobs -> 60 seconds. Long jobs -> 600 seconds
+    std_time_per_job: int = 5
+    controlled: bool = True
 
 
 @dataclass_json
