@@ -2,7 +2,7 @@
   "trainTasks": [
     {
       "type": "distributed",
-      "lambda": 1.5,
+      "lambda": 0.6,
       "preemptJobs": false,
       "jobClassParameters": [
         {
@@ -10,11 +10,7 @@
           "priorities": [
             {
               "priority": 1,
-              "probability": 0.9
-            },
-            {
-              "priority": 0,
-              "probability": 0.1
+              "probability": 1
             }
           ],
           "networkConfiguration": {

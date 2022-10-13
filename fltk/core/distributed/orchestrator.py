@@ -281,24 +281,26 @@ class Orchestrator(DistNode, abc.ABC):
 @total_ordering
 class SkyScrapeJob:
 
-    def __init__(self,
-                 uuid: uuid.UUID,
-                 start: float):
+    def __init__(self, uuid: uuid.UUID):
         self.uuid = uuid
-        self.start_time = start
+        self.deploy_time = time.time()
+        self.start_time = -1.0
 
     def __lt__(self, other):
         # We can sort by expected duration or longest time as well
-        return self.start_time < other.start_time
+        return self.deploy_time < other.deploy_time
 
     def __eq__(self, other):
         if type(other) == uuid.UUID:
             return self.uuid == other
 
-        return self.start_time == other.start_time
+        return self.deploy_time == other.deploy_time and self.start_time == other.start_time
 
     def __str__(self):
         return f"{self.uuid}: {self.start_time}"
+
+    def __hash__(self):
+        return id(self)
 
 
 class SimulatedOrchestrator(Orchestrator):
@@ -316,8 +318,6 @@ class SimulatedOrchestrator(Orchestrator):
         self._completed_jobs: Dict[uuid.UUID, float] = dict()
         self._arrival_times: Dict[uuid.UUID, float] = dict()
 
-        # running job -> arrived job that will take its position when running job finishes
-        self._resource_claims: Dict[SkyScrapeJob, ArrivalTask] = dict()
         self.nodes_running = 0
 
         # We calculate this value ourselves to simulate real arrivals instead of simulated
@@ -338,49 +338,14 @@ class SimulatedOrchestrator(Orchestrator):
         self._average_resize_time = None
         self.resizing = False
 
-    # todo maybe use later
-    # def can_scale_down(self):
-    #     """
-    #     Returns the amount of nodes that can be removed from cluster
-    #     """
-    #     # I believe we should keep the minimum amount of nodes at 1, in case jobs have a very long inter-arrival time
-    #     if None in [self._average_interarrival_time, self._average_resize_time, self._average_service_time]:
-    #         return 0
-    #
-    #     # We calculate the amount of jobs that may arrive before the cluster can be scaled up again after
-    #     # being scaled down
-    #     # 2 * self.AVERAGE_TIME_TO_RESIZE_CLUSTER because we need to consider the time it takes to scale up and down
-    #     time_to_resize = 2 * self._average_resize_time
-    #
-    #     jobs_before_resize = math.ceil(time_to_resize / self._average_interarrival_time)
-    #
-    #     pods_per_node = self._config.cluster_config.max_pods_per_node
-    #
-    #     # The amount of pods that we can still start on current capacity:
-    #     available_spots = (self.nodes_running * pods_per_node) - len(
-    #         self.deployed_tasks)
-    #
-    #     # On 1 available spot, we can run 2 * self.AVERAGE_TIME_TO_RESIZE_CLUSTER / self._average_service_time jobs
-    #     max_jobs_before_resize = available_spots * (time_to_resize /
-    #                                                 self._average_service_time)
-    #
-    #     # Let's assume that we all deployed jobs have just started, we need to run
-    #     # amount_of_jobs_before_cluster_resize + len(self.deployed_tasks) jobs
-    #     # We can run amount_of_jobs_we_can_run_before_cluster_resize jobs before the cluster can be scaled up again
-    #     excessive_jobs = max_jobs_before_resize - jobs_before_resize
-    #
-    #     # The minimal amount of nodes required to host all the jobs on separate pods
-    #     required_nodes = excessive_jobs // pods_per_node
-    #
-    #     # We should leave at most one job running
-    #     return max(0, min(self.nodes_running - 1, required_nodes))
-
     def get_earliest_unclaimed_task(self) -> Union[SkyScrapeJob, None]:
         if self._unclaimed_jobs.empty():
             return None
         return self._unclaimed_jobs.get_nowait()
 
     def resize_cluster_async(self, nodes) -> None:
+        time.sleep(self._config.execution_config.additional_resize_time)
+
         response = self.cluster_manager_client.set_node_pool_size(
             {"node_count": nodes,
              "node_pool_id": "medium-fltk-pool-1",
@@ -409,8 +374,7 @@ class SimulatedOrchestrator(Orchestrator):
             replication=replication)
         self._create_config_maps(config_dict)
 
-        sky_scrape_job = SkyScrapeJob(curr_task.id, time.time())
-        self._unclaimed_jobs.put(sky_scrape_job)
+        sky_scrape_job = SkyScrapeJob(curr_task.id)
         self._deployed_jobs.append(sky_scrape_job)
 
         job_to_start = construct_job(self._config, curr_task,
@@ -421,42 +385,47 @@ class SimulatedOrchestrator(Orchestrator):
 
     def _update_service_time(self, task: SkyScrapeJob):
         delta = time.time() - task.start_time
-        self._average_service_time = _get_running_average(self._average_resize_time, delta)
+        self._average_service_time = _get_running_average(self._average_service_time, delta)
 
     def _update_interarrival_time(self):
         delta = time.time() - self._time_of_last_job_arrival
         self._average_interarrival_time = _get_running_average(self._average_interarrival_time, delta)
 
-    def check_if_jobs_finished(self, experiment_replication):
+    def check_if_jobs_finished(self):
         task_to_move = list()
         for task in self._deployed_jobs:
             try:
                 job_status = self._client.get_job_status(name=f"trainjob-{task.uuid}", namespace='test')
             except IndexError:
-                self._logger.info(f"Job {task.uuid} not found, might still be loading; error should disappear soon")
+                # Job not found. This means that it is still loading
                 continue
+
+            if task.start_time == -1.0:
+                self._logger.info(f"Job {task.uuid} started after {time.time() - task.deploy_time} seconds")
+                # Task has started actual execution. Note: this may mean: 'Container creating'
+                task.start_time = time.time()
+                self._unclaimed_jobs.put(task)
 
             if job_status != "Succeeded":
                 continue
-
-            self._logger.info(
-                f"{task.uuid} was completed after {time.time() - task.start_time} seconds"
-            )
             task_to_move.append(task)
             self._update_service_time(task)
 
-            self._completed_jobs[task.uuid] = time.time() - self._arrival_times[task.uuid]
+            # Google has unpredictable scheduling times, so we need to wait for the job to start being detectable
+            # before being able to measure the service time
+            time_google_scheduling = task.start_time - task.deploy_time
+            self._completed_jobs[task.uuid] = time.time() - self._arrival_times[task.uuid] - time_google_scheduling
             self._average_response_time = _get_running_average(self._average_response_time,
                                                                self._completed_jobs[task.uuid])
-            del self._arrival_times[task.uuid]
+
+            self._logger.info(f"{task.uuid} was completed with response time {self._completed_jobs[task.uuid]} seconds."
+                              f" In reality it took {time.time() - self._arrival_times[task.uuid]} seconds, but spent "
+                              f" {time_google_scheduling} seconds to Google scheduling.")
 
             if task in self._unclaimed_jobs.queue:
                 self._unclaimed_jobs.queue.remove(task)
 
-            # remove from resource claims
-            if task.uuid in self._resource_claims:
-                # deploy task if claimed
-                self.deploy(self._resource_claims.pop(task), experiment_replication)
+            # self._client.delete(name=f"trainjob-{task.uuid}", namespace='test')
 
         for task in task_to_move:
             self._deployed_jobs.remove(task)
@@ -510,6 +479,7 @@ class SimulatedOrchestrator(Orchestrator):
                     # We have enough capacity for job: directly deploy
                     self.deploy(task, experiment_replication)
                     continue
+                self._logger.info(f"Not enough capacity. {pods} pod positions, {len(self._deployed_jobs)} jobs running.")
 
                 if None in [self._average_interarrival_time, self._average_service_time,
                             self._average_resize_time] or self._config.cluster_config.naive:
@@ -537,25 +507,21 @@ class SimulatedOrchestrator(Orchestrator):
                     self._logger.info(
                         "Expected remaining time is larger than resize time. Resizing and deploying task " + str(
                             task.id))
+                    # Re-add the task to the PriorityQueue
+                    self._unclaimed_jobs.put(earliest_task)
                     self._scale_up_and_deploy(task, experiment_replication)
                     continue
 
                 # Claim the position of the earliest unclaimed job
-                self._logger.info("Claiming position of task " + str(earliest_task.uuid))
-                self._resource_claims[earliest_task] = task
+                self._logger.info("Claiming position of task " + str(earliest_task.uuid) + " for task " + str(task.id) +
+                                  " because expected time is " + str(expected_remaining_time) + " and resize time is " +
+                                  str(self._average_resize_time))
+                # Directly deploy task that has claimed other task, such that it may start already on the redundant node
+                # (if possible) or will start as soon as the claimed node finishes.
+                self.deploy(task, experiment_replication)
 
-            self.check_if_jobs_finished(experiment_replication)
+            self.check_if_jobs_finished()
 
-            # todo maybe use this
-            # self._logger.info("Can we scale down?")
-            # if (remove_nodes := self.can_scale_down()) > 0:
-            #     self._logger.info(
-            #         f"Scaling down cluster by {remove_nodes} nodes")
-            #     self.nodes_running -= remove_nodes
-            #     self.resize_cluster()
-            # else:
-            #     self._logger.info("No nodes to remove")
-            # Prevent high cpu utilization by sleeping between checks.
             time.sleep(self.SLEEP_TIME)
         self.stop()
         self._logger.info("SkyScraper stopped")

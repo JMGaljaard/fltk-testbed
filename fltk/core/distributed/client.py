@@ -209,10 +209,6 @@ class DistClient(DistNode):
         See also the EpochData dataclass.
         @rtype: List[EpochData]
         """
-        if self.config.execution_config.controlled:
-            time.sleep(np.random.normal(self.config.execution_config.time_per_job,
-                                        self.config.execution_config.std_time_per_job))
-            return []
         max_epoch = self.learning_params.max_epoch + 1
         start_time_train = datetime.datetime.now()
         epoch_results = []
