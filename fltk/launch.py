@@ -34,7 +34,7 @@ launch_signature = Callable[[Path, Path, Optional[Rank], Optional[NIC], Optional
 
 def exec_distributed_client(task_id: str, conf: DistributedConfig = None,
                             learning_params: DistLearnerConfig = None,
-                            namespace: Namespace = None):
+                            namespace: Namespace = None, arrival_time=0.0):
     """
     Helper function to start the execution of the distributed client training loop.
 
@@ -48,18 +48,12 @@ def exec_distributed_client(task_id: str, conf: DistributedConfig = None,
     @rtype: None
     """
     logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
-    rank, world_size = 0, None
-    distributed = should_distribute()
-    if distributed:
-        logging.info(f'Initializing backend for training process: {namespace.backend}')
-        dist.init_process_group(namespace.backend)
-        rank = dist.get_rank()
-        world_size = dist.get_world_size()
+    rank, world_size = 0, 1
 
     logging.info(f'Starting Creating client with {rank}')
 
-    client = DistClient(rank, task_id, world_size, conf, learning_params)
-    client.prepare_learner(distributed)
+    client = DistClient(rank, task_id, world_size, arrival_time, conf, learning_params)
+    client.prepare_learner()
     epoch_data = client.run_epochs()
     print(epoch_data)
 
@@ -188,7 +182,8 @@ def launch_client(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
     # for each repetition that you want to run an experiment with.
     init_learning_reproducibility(learning_params)
     task_id = args.task_id
-    exec_distributed_client(task_id, conf=conf, learning_params=learning_params, namespace=args)
+    exec_distributed_client(task_id, conf=conf, learning_params=learning_params, namespace=args,
+                            arrival_time=args.arrival_time)
     logging.info("Stopping client...")
 
 

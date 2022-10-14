@@ -378,6 +378,7 @@ class SimulatedOrchestrator(Orchestrator):
         self._deployed_jobs.append(sky_scrape_job)
 
         job_to_start = construct_job(self._config, curr_task,
+                                     self._arrival_times[curr_task.id],
                                      configmap_name_dict)
 
         self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
