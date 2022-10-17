@@ -4,3 +4,5 @@ logging/
 # Ignoring all the compressed archives
 **/*.tar.gz
 **/__pycache__
+.git/
+.github/
