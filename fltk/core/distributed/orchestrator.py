@@ -6,18 +6,16 @@ import logging
 import threading
 import time
 import uuid
-import random
 from functools import total_ordering
 from queue import PriorityQueue
 from typing import OrderedDict, Dict, Type, Union, List, Tuple
 from typing import TYPE_CHECKING
 
-import dateutil.parser
+import numpy as np
 from google.cloud import container_v1
 from google.oauth2 import service_account
 from jinja2 import Environment, FileSystemLoader
 from kubeflow.training import PyTorchJobClient
-from kubeflow.training.constants.constants import PYTORCHJOB_GROUP, PYTORCHJOB_VERSION, PYTORCHJOB_PLURAL
 from kubernetes import client
 from kubernetes.client import V1ConfigMap, V1ObjectMeta
 
@@ -151,9 +149,11 @@ def _generate_task(arrival) -> ArrivalTask:
 
 class MockJob:
 
-    def __init__(self, name):
+    def __init__(self, name, epochs):
         self._name = name
-        self._duration = random.randint(1, 120)
+        self._duration = 0
+        for _ in range(epochs):
+            self._duration += max(0, np.random.normal(80, 10))
         self._status = "Pending"
         threading.Thread(target=self._thread_target).start()
 
@@ -175,7 +175,7 @@ class ClientMocker:
 
     def create(self, job, namespace=None):
         name = job.metadata.name
-        self._jobs[name] = MockJob(name)
+        self._jobs[name] = MockJob(name, 1) # todo change amount of epochs here
         self._uuid = name.split("trainjob-")[1]
 
     def get_job_status(self, name="", namespace=None):
@@ -216,7 +216,10 @@ class Orchestrator(DistNode, abc.ABC):
         self._config = config
 
         # API to interact with the cluster.
-        self._client = ClientMocker()
+        if config.execution_config.local:
+            self._client = ClientMocker()
+        else:
+            self._client = PyTorchJobClient()
         self._v1 = client.CoreV1Api()
 
     def stop(self) -> None:
@@ -264,6 +267,7 @@ class Orchestrator(DistNode, abc.ABC):
             self._v1.create_namespaced_config_map(
                 self._config.cluster_config.namespace, config_map)
 
+# Used for naming virtual nodes
 NODE_COUNT = 0
 
 
@@ -272,24 +276,21 @@ class SkyScrapeNode:
     keeps track of the jobs that are running on it."""
     def __init__(self, jobs: List[SkyScrapeJob]):
         global NODE_COUNT
-        self._cpu_utilization = 60
-        self._watt_usage = 15  # baseline watt p/s
-        self._watt_delta = 150_000  # watt per load
+        self._watt_usage = 15  # The amount of watt a node uses when idle
+        self._watt_delta = 150  # The amount of watt a node uses per job
         self._jobs = jobs
         self._type = "baremetal"
         self._node_count = NODE_COUNT
         NODE_COUNT += 1
 
-    def energy_per_job(self):
-        cpu_per_job = self._cpu_utilization / len(self._jobs)
-        return cpu_per_job * self._watt_delta
-
     def get_expected_usage(self, remaining_time):
-        baseline = self._watt_usage * remaining_time
+        """
+        get expected energy usage if a new job gets added to this node
+        """
+        baseline = self._watt_usage
         jobs_length = len(self._jobs)
-        wattage_per_job = self.energy_per_job() * ((jobs_length+1)/jobs_length)
 
-        return (baseline + wattage_per_job) * remaining_time
+        return self._watt_delta * (jobs_length + 1) * remaining_time + baseline * remaining_time
 
     def __str__(self):
         return f"Node {self._node_count}"
@@ -340,16 +341,16 @@ class SimulatedOrchestrator(Orchestrator):
         self._unclaimed_jobs: "PriorityQueue[SkyScrapeJob]" = PriorityQueue()
         self._deployed_jobs: List[SkyScrapeJob] = []
         self._completed_jobs: List[uuid.UUID] = []
+        self._resource_claims: Dict[uuid.UUID, ArrivalTask] = dict()
         self._nodes: List[SkyScrapeNode] = []
-        self.nodes_running = 0
-        self.probability_job_arriving = 0.19
 
         # We calculate this value ourselves to simulate real arrivals
-        # instead of simulated
         self._average_interarrival_time = None
         self._average_service_time = None
         self._time_of_last_job_arrival = None
-        self._average_resize_time = 120
+        self._average_resize_time = None
+        # We use total average, as it is our resulting statistic
+        self.amount_of_nodes = []
 
         credentials = service_account.Credentials.from_service_account_file(
             "configs/key.json",
@@ -359,13 +360,11 @@ class SimulatedOrchestrator(Orchestrator):
             credentials=credentials)
 
         # Make sure we start at 0 or 1 node depending on config
-        self.resize_cluster_async(
-            1 if not self._config.cluster_config.naive else 0)
+        self.resize_cluster()
 
         # Reset average resize time because jobs may have had to be terminated,
         # inducing a longer resize time
         self._average_resize_time = None
-        self.resizing = False
 
     def get_earliest_unclaimed_task(self) -> Union[SkyScrapeJob, None]:
         """Gets the earliest task in the queue or returns None if
@@ -374,10 +373,40 @@ class SimulatedOrchestrator(Orchestrator):
             return None
         return self._unclaimed_jobs.get_nowait()
 
-    def resize_cluster_async(self, nodes: int) -> None:
+    def watch_amount_of_nodes(self):
+        """Watches the amount of nodes in the cluster and logs it"""
+        # Note that we can not use the main orchestrator loop, as it may be hanging on a resize
+        while self._alive:
+            time.sleep(self.SLEEP_TIME)
+            self.amount_of_nodes.append(len(self._nodes))
+
+    def resize_cluster(self) -> None:
         """Resizes the cluster guarded by a semaphore."""
-        time.sleep(self._config.execution_config.additional_resize_time)
-        self.resizing = False
+        start_time = time.time()
+
+        # Resize to len(self._nodes)
+        if self._config.execution_config.local:
+            # Simulate a resize
+            time.sleep(max(0, np.random.normal(self._config.execution_config.additional_resize_time, 10)))
+        else:
+            time.sleep(self._config.execution_config.additional_resize_time)
+
+            response = self.cluster_manager_client.set_node_pool_size(
+                {"node_count": len(self._nodes),
+                 "node_pool_id": "medium-fltk-pool-1",
+                 "zone": "us-central1-c",
+                 "project_id": "qpe-k3z6awuymv44",  # todo make this a variable
+                 "cluster_id": "fltk-testbed-cluster"})
+
+            self._logger.info("Resizing cluster to %d nodes", len(self._nodes))
+            while not response.end_time:
+                request = container_v1.GetOperationRequest(name=response.self_link.split("/v1/")[1])
+                response = self.cluster_manager_client.get_operation(request=request)
+                time.sleep(0.05)
+            self._logger.info("Cluster resized to %d nodes", len(self._nodes))
+
+        end_time = time.time()
+        self._average_resize_time = _get_running_average(self._average_resize_time, end_time - start_time)
 
     def deploy(self, curr_task: ArrivalTask, replication: int, node):
         """Adds a task to the internal queue and deploys it onto Kubernetes"""
@@ -414,40 +443,36 @@ class SimulatedOrchestrator(Orchestrator):
         self._average_interarrival_time = \
             _get_running_average(self._average_interarrival_time, delta)
 
-    def scale_down_if_possible(self, node, nodes_cleared=1):
-        Er = self._get_cost_resize()
+    def scale_down_if_possible(self, node) -> bool:
+        #   - resize costs = resize time * baseline usage * 2
+        #   - costs to keep job running = time until arrival of job that needs the node * baseline
+
+        # If we do not count the current node, how much jobs can we fit?
+        max_amount_of_pods = self._config.cluster_config.max_pods_per_node * (len(self._nodes) - 1)
+        capacity = max_amount_of_pods - len(self._deployed_jobs)
+        assert capacity >= 0
 
         # The cost of scaling
-        p = self._probability_job_arriving
-        np = (1 - self._probability_job_arriving)
-        ait = self._average_interarrival_time
-        nW = node._watt_usage
+        time_to_next_arrival = self._average_interarrival_time - (time.time() - self._time_of_last_job_arrival)
+        time_until_node_is_necessary = time_to_next_arrival + self._average_interarrival_time * capacity
 
-        # We assume job arrives, but it doesn't
-        # Formula: W_{avg node} * T_{arrival} * P_job
-        # Or, the energy required to run the node for the duration
-        # for another job to arrive.
-        false_positive = nW * ait * p
+        costs_to_keep_node_running = node._watt_usage * time_until_node_is_necessary
+
+        self._logger.info(f"Time until node is necessary: {time_until_node_is_necessary}. Time to next arrival {time_to_next_arrival}. Capacity {capacity}. Average interarrival time {self._average_interarrival_time}")
 
         # The cost to resize the system twice in case a job arrives
-        # that we did not expect
-        # Formula: 2 \cdot E_{resize}
-        false_negative = 2 * Er * np
+        resize_costs = 2 * self._get_average_baseline_usage() * self._average_resize_time
 
-        # Scale the false negatives for the amount of nodes actually
-        # get removed since the probability that a job arrives remains
-        # constant.
-        false_negative /= nodes_cleared
+        if resize_costs > costs_to_keep_node_running:
+            # It is cheaper to keep the node
+            self._logger.info(f"Not scaling down, because resize costs are {resize_costs} and costs to keep node running {costs_to_keep_node_running}")
+            return False
 
-        # If it cheaper to resize twice in case we are wrong, we want
-        # to do that.
-        if false_positive > false_negative:
-            return
+        self._logger.info("Scaling down")
+        # It is cheaper to resize
+        return True
 
-        # Since we mock it, this is actually a real operation
-        self._nodes.remove(node)
-
-    def check_if_jobs_finished(self):
+    def check_if_jobs_finished(self, replication: int):
         """Checks each job currently deployed to ensure that the
         internal program state remains consistent"""
         task_to_move = []
@@ -470,54 +495,45 @@ class SimulatedOrchestrator(Orchestrator):
 
             if job_status != "Succeeded":
                 continue
+            self._logger.info(f"Job has completed: {task.uuid}")
             task_to_move.append(task)
             self._update_service_time(task)
 
             self._completed_jobs.append(task.uuid)
 
+            if task in self._resource_claims:
+                self.deploy(self._resource_claims.pop(task.uuid), replication, task.node)
+
             if task in self._unclaimed_jobs.queue:
                 self._unclaimed_jobs.queue.remove(task)
 
-            # self._client.delete(name=f"trainjob-{task.uuid}", namespace='test')
-
-        nodes_cleaned = []
         for task in task_to_move:
             self._deployed_jobs.remove(task)
-            nodes_cleaned.append(task.node)
             task.node._jobs.remove(task)
 
+        nodes_to_remove = []
         for node in self._nodes:
-            node_count = 0
             if len(node._jobs) == 0:
-                node_count += 1
-                self.scale_down_if_possible(node, node_count)
+                if self.scale_down_if_possible(node):
+                    nodes_to_remove.append(node)
 
+        for node in nodes_to_remove:
+            self._nodes.remove(node)
+            self.resize_cluster()
 
-
-    def _scale_up_and_deploy(self, task, replication) -> SkyScrapeNode:
-        # Wait for previous resize to finish
-        while self.resizing:
-            time.sleep(1)
-        self.resizing = True
-
-        self.nodes_running += 1
-        # Ensure that we always have an extra job running
-        nodes = self.nodes_running + \
-            (1 if not self._config.cluster_config.naive else 0)
+    def _scale_up_and_deploy(self, task, replication):
         new_node = SkyScrapeNode([])
         self._nodes.append(new_node)
 
         # Run resize on background
-        threading.Thread(target=self.resize_cluster_async,
-                         args=(nodes, )).start()
+        self.resize_cluster()
         self.deploy(task, replication, new_node)
 
-        return new_node
-
     def _check_arrivals(self):
-        if self._time_of_last_job_arrival is not None:
-            self._update_interarrival_time()
-        self._time_of_last_job_arrival = time.time()
+        if not self._arrival_generator.arrivals.empty():
+            if self._time_of_last_job_arrival is not None:
+                self._update_interarrival_time()
+            self._time_of_last_job_arrival = time.time()
 
         while not self._arrival_generator.arrivals.empty():
             arrival = self._arrival_generator.arrivals.get()
@@ -531,33 +547,32 @@ class SimulatedOrchestrator(Orchestrator):
                 return node
         return None
 
-    def _get_average_usage(self):
-        return sum([node._watt_usage for node in self._nodes]) / \
-            len(self._nodes)
+    def _get_average_baseline_usage(self):
+        return sum([node._watt_usage for node in self._nodes]) / len(self._nodes)
 
-    def _get_cost_resize(self):
-        return self._get_average_usage() * self._average_resize_time
-
-    def _calculate_energy_usage(self, remaining_time, new_job_time, node) -> bool:
-        current_usage = node.get_expected_usage()
-
-        # Calculate based on the other nodes what the expected usage
-        # of the job and the base use of the node will be. This could
-        # be done in the future by using linear regresion or n nearest
-        # neighbors, provided that information on node and task type
-        # is known.
-        average_usage = self._get_average_usage()
-        average_usage_per_job = sum([node.energy_per_job() for node in self._nodes]) / len(self._nodes)
-        resize_energy = (average_usage * (self._average_resize_time + remaining_time)) + \
-            current_usage * (average_usage_per_job + average_usage)
-        no_resize_energy = current_usage * (remaining_time + new_job_time)
-        self._logger.info("energy: %d - %d", resize_energy, no_resize_energy)
-        return resize_energy > no_resize_energy
+    # def _calculate_energy_usage(self, remaining_time, node) -> bool:
+    #     expected_usage_if_job_added_to_node = node.get_expected_usage(remaining_time)
+    #
+    #     # Calculate based on the other nodes what the expected usage
+    #     # of the job and the base use of the node will be. This could
+    #     # be done in the future by using linear regresion or n nearest
+    #     # neighbors, provided that information on node and task type
+    #     # is known.
+    #     average_baseline_usage = self._get_average_baseline_usage()
+    #     average_usage_per_job = sum([node._watt_delta for node in self._nodes]) / len(self._nodes)
+    #     # no need to include running job energy usage because it is consistent if you resize or not
+    #     resize_energy = (average_baseline_usage * self._average_resize_time) + \
+    #         self._average_service_time * (average_usage_per_job + average_baseline_usage)
+    #     no_resize_energy = average_baseline_usage * (remaining_time + self._average_service_time) + \
+    #                        average_usage_per_job * self._average_service_time
+    #
+    #     self._logger.info("energy: %d - %d", resize_energy, no_resize_energy)
+    #     # If true, we should resize
+    #     return self._average_resize_time < no_resize_energy
 
     def _should_we_scale(self, task) -> Tuple[bool, Union[SkyScrapeNode, None]]:
         """Decides whether a node can be reused or whether the cluster is scaled"""
-        pods = self.nodes_running * \
-            self._config.cluster_config.max_pods_per_node
+        pods = len(self._nodes) * self._config.cluster_config.max_pods_per_node
 
         if len(self._deployed_jobs) < pods:
             self._logger.info("Enough capacity. Deploying task %s", task.id)
@@ -577,49 +592,42 @@ class SimulatedOrchestrator(Orchestrator):
            self._config.cluster_config.naive:
             # We don't know the inter-arrival time or service
             # time yet, so we cannot make a decision Scale up
-            self._logger.info("Not enough data yet. Resizing and deploying task %s",
-                              str(task.id))
+            self._logger.info("Not enough data or no task left to claim. Resizing and deploying task %s", str(task.id))
             return True, None
 
         # Calculate expected amount of time until that job
         # will be finished.
         time_since_start = time.time() - earliest_task.start_time
-        expected_remaining_time = self._average_service_time - \
-            time_since_start
+        expected_remaining_time = self._average_service_time - time_since_start
 
-        if self._calculate_energy_usage(expected_remaining_time,
-                                        self._average_service_time,
-                                        earliest_task.node):
-            self._logger.info("Resizing takes longer than reusing the node")
+        if self._average_resize_time < expected_remaining_time:
+            self._logger.info(f"Should resize, because resize time {self._average_resize_time} is less than expected remaining time {expected_remaining_time}")
+            self._unclaimed_jobs.put(earliest_task)
             return True, None
- #        if expected_remaining_time > self._average_resize_time:
- #            # It is faster to scale up and deploy the new job
- #            # than to wait for the earliest job to finish
-
- #            self._logger.info("""Expected remaining time is larger than resize time.
- # Resizing and deploying task %s""", task.id)
-
- #            # Re-add the task to the PriorityQueue
- #            self._unclaimed_jobs.put(earliest_task)
- #            return True, None
 
         # Claim the position of the earliest unclaimed job
         self._logger.info(
             "Claiming position of task %s for task %s because time is %s and resize time is %s",
             earliest_task.uuid, task.id, expected_remaining_time,
             self._average_resize_time)
-        return False, earliest_task.node
+
+        self._resource_claims[earliest_task.uuid] = task
+        return False, None
 
 
     def _deploy_task(self, task, experiment_replication) -> None:
         """Deploys the task to a pre-existing node or scales the cluster up."""
         (scale, node) = self._should_we_scale(task)
         if not scale:
-            # Directly deploy task that has claimed other task,
-            # such that it may start already on the redundant node
-            # (if possible) or will start as soon as the claimed
-            # node finishes.
-            self.deploy(task, experiment_replication, node)
+            if node:
+                # Directly deploy task that has claimed other task,
+                # such that it may start already on the redundant node
+                # (if possible) or will start as soon as the claimed
+                # node finishes.
+                self.deploy(task, experiment_replication, node)
+            else:
+                # Task has claimed the position of other task, will run eventually
+                pass
         else:
             self._scale_up_and_deploy(task, experiment_replication)
 
@@ -631,9 +639,9 @@ class SimulatedOrchestrator(Orchestrator):
         start_time = time.time()
 
         self._logger.info("SkyScraper started")
+        threading.Thread(target=self.watch_amount_of_nodes).start()
 
-        delta = time.time() - start_time
-        while self._alive and (delta < self._config.get_duration()):
+        while self._alive and (time.time() - start_time < self._config.get_duration()):
             # 1. Check arrivals
             # If new arrivals, store them in arrival list
             self._check_arrivals()
@@ -643,7 +651,7 @@ class SimulatedOrchestrator(Orchestrator):
                 self._deploy_task(self.pending_tasks.get(),
                                   experiment_replication)
 
-            self.check_if_jobs_finished()
+            self.check_if_jobs_finished(experiment_replication)
             time.sleep(self.SLEEP_TIME)
 
         self.stop()
@@ -653,8 +661,11 @@ class SimulatedOrchestrator(Orchestrator):
         self._logger.info(
             f"Average interarrival time: {self._average_interarrival_time}")
         self._logger.info(f"Average resize time: {self._average_resize_time}")
-        self._logger.info(f"Completed jobs: {self._completed_jobs}")
-        self.resize_cluster_async(0)
+        self._logger.info(f"Average amount of nodes: {sum(self.amount_of_nodes) / len(self.amount_of_nodes)}")
+        self._logger.info(f"Total amount of jobs: {len(self._completed_jobs)}")
+        # todo result = total_time * baseline_usage * average amount of nodes + total number of jobs * average job usage * service time
+        # self._logger.info(f"result: {}")
+        self.resize_cluster()
         self._logger.info('Experiment completed.')
 
 
