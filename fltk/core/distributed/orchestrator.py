@@ -6,6 +6,8 @@ import logging
 import threading
 import time
 import uuid
+import tomli
+
 from functools import total_ordering
 from queue import PriorityQueue
 from typing import OrderedDict, Dict, Type, Union, List, Tuple
@@ -31,6 +33,8 @@ if TYPE_CHECKING:
 EXPERIMENT_DIR = 'experiments'
 __ENV = Environment(loader=FileSystemLoader(EXPERIMENT_DIR))
 
+with open("configs/experiment.toml", "rb") as f:
+    toml_config = tomli.load(f)
 
 def _get_running_average(curr, delta):
     return (curr * 0.9 + 0.1 * delta) if curr is not None else delta
@@ -152,8 +156,9 @@ class MockJob:
     def __init__(self, name, epochs):
         self._name = name
         self._duration = 0
+        config = toml_config['job']
         for _ in range(epochs):
-            self._duration += max(0, np.random.normal(80, 10))
+            self._duration += max(0, np.random.normal(config['centre'], config['std']))
         self._status = "Pending"
         threading.Thread(target=self._thread_target).start()
 
@@ -175,7 +180,7 @@ class ClientMocker:
 
     def create(self, job, namespace=None):
         name = job.metadata.name
-        self._jobs[name] = MockJob(name, 1) # todo change amount of epochs here
+        self._jobs[name] = MockJob(name, toml_config['job']['epochs'])  # todo change amount of epochs here
         self._uuid = name.split("trainjob-")[1]
 
     def get_job_status(self, name="", namespace=None):
@@ -205,7 +210,7 @@ class Orchestrator(DistNode, abc.ABC):
     pending_tasks: "PriorityQueue[ArrivalTask]" = PriorityQueue()
     # deployed_tasks: Set[_ArrivalTask] = set()
     # completed_tasks: Set[_ArrivalTask] = set()
-    SLEEP_TIME = 5
+    SLEEP_TIME = toml_config['orchestrator']['sleep']
 
     def __init__(self, cluster_mgr: ClusterManager, arv_gen: ArrivalGenerator,
                  config: DistributedConfig):
@@ -276,10 +281,10 @@ class SkyScrapeNode:
     keeps track of the jobs that are running on it."""
     def __init__(self, jobs: List[SkyScrapeJob]):
         global NODE_COUNT
-        self._watt_usage = 15  # The amount of watt a node uses when idle
-        self._watt_delta = 150  # The amount of watt a node uses per job
+        self._watt_usage = toml_config['node']['watt_usage']  # The amount of watt a node uses when idle
+        self._watt_delta = toml_config['node']['watt_delta']  # The amount of watt a node uses per job
         self._jobs = jobs
-        self._type = "baremetal"
+        self._type = toml_config['node']['type']
         self._node_count = NODE_COUNT
         NODE_COUNT += 1
 
@@ -337,7 +342,7 @@ class SimulatedOrchestrator(Orchestrator):
                  arrival_generator: ArrivalGenerator,
                  config: DistributedConfig):
         super().__init__(cluster_mgr, arrival_generator, config)
-
+        
         self._unclaimed_jobs: "PriorityQueue[SkyScrapeJob]" = PriorityQueue()
         self._deployed_jobs: List[SkyScrapeJob] = []
         self._completed_jobs: List[uuid.UUID] = []
@@ -352,16 +357,17 @@ class SimulatedOrchestrator(Orchestrator):
         # We use total average, as it is our resulting statistic
         self.amount_of_nodes = []
 
-        credentials = service_account.Credentials.from_service_account_file(
-            "configs/key.json",
-            scopes=["https://www.googleapis.com/auth/cloud-platform"],
-        )
-        self.cluster_manager_client = container_v1.ClusterManagerClient(
-            credentials=credentials)
+        if self._config.execution_config.local:
+            credentials = service_account.Credentials.from_service_account_file(
+                "configs/key.json",
+                scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            )
+            self.cluster_manager_client = container_v1.ClusterManagerClient(
+                credentials=credentials)
 
         # Make sure we start at 0 or 1 node depending on config
         self.resize_cluster()
-
+        
         # Reset average resize time because jobs may have had to be terminated,
         # inducing a longer resize time
         self._average_resize_time = None
@@ -387,7 +393,8 @@ class SimulatedOrchestrator(Orchestrator):
         # Resize to len(self._nodes)
         if self._config.execution_config.local:
             # Simulate a resize
-            time.sleep(max(0, np.random.normal(self._config.execution_config.additional_resize_time, 10)))
+            config = toml_config['resize']
+            time.sleep(max(0, np.random.normal(config['centre'], config['std'])))
         else:
             time.sleep(self._config.execution_config.additional_resize_time)
 
@@ -448,7 +455,7 @@ class SimulatedOrchestrator(Orchestrator):
         #   - costs to keep job running = time until arrival of job that needs the node * baseline
 
         # If we do not count the current node, how much jobs can we fit?
-        max_amount_of_pods = self._config.cluster_config.max_pods_per_node * (len(self._nodes) - 1)
+        max_amount_of_pods = toml_config['orchestrator']['max_pods_per_node'] * (len(self._nodes) - 1)
         capacity = max_amount_of_pods - len(self._deployed_jobs)
         assert capacity >= 0
 
@@ -543,7 +550,7 @@ class SimulatedOrchestrator(Orchestrator):
 
     def _get_node_with_space(self) -> Union[SkyScrapeNode, None]:
         for node in self._nodes:
-            if len(node._jobs) <= self._config.cluster_config.max_pods_per_node:
+            if len(node._jobs) <= toml_config['orchestrator']['max_pods_per_node']:
                 return node
         return None
 
@@ -572,7 +579,7 @@ class SimulatedOrchestrator(Orchestrator):
 
     def _should_we_scale(self, task) -> Tuple[bool, Union[SkyScrapeNode, None]]:
         """Decides whether a node can be reused or whether the cluster is scaled"""
-        pods = len(self._nodes) * self._config.cluster_config.max_pods_per_node
+        pods = len(self._nodes) * toml_config['orchestrator']['max_pods_per_node']
 
         if len(self._deployed_jobs) < pods:
             self._logger.info("Enough capacity. Deploying task %s", task.id)
@@ -602,6 +609,7 @@ class SimulatedOrchestrator(Orchestrator):
 
         if self._average_resize_time < expected_remaining_time:
             self._logger.info(f"Should resize, because resize time {self._average_resize_time} is less than expected remaining time {expected_remaining_time}")
+            
             self._unclaimed_jobs.put(earliest_task)
             return True, None
 
@@ -630,7 +638,6 @@ class SimulatedOrchestrator(Orchestrator):
                 pass
         else:
             self._scale_up_and_deploy(task, experiment_replication)
-
 
     def run(self,
             clear: bool = False,
