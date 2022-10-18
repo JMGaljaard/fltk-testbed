@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 class DistClient(DistNode):
 
-    def __init__(self, rank: int, task_id: str, world_size: int, arrival_time: float, config: DistributedConfig = None,
+    def __init__(self, rank: int, task_id: str, world_size: int, config: DistributedConfig = None,
                  learning_params: DistLearnerConfig = None):
         """
         @param rank: PyTorch rank provided by KubeFlow setup.
@@ -43,7 +43,6 @@ class DistClient(DistNode):
         self._id = rank
         self._world_size = world_size
         self._task_id = task_id
-        self._arrival_time = arrival_time
 
         self.config = config
         self.learning_params = learning_params
@@ -244,10 +243,6 @@ class DistClient(DistNode):
             if self._id == 0:
                 self.log_progress(data, epoch)
 
-        if self.config.execution_config.tensorboard.active and self._id == 0:
-            self._logger.info(f"response time {time.time() - self._arrival_time} and scheduling time {start_time - self._arrival_time}")
-            self.tb_writer.add_scalar('response time', time.time() - self._arrival_time)
-            self.tb_writer.add_scalar('scheduling time', start_time - self._arrival_time)
         return epoch_results
 
     def save_model(self, epoch):

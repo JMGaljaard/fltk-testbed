@@ -211,7 +211,7 @@ class ClusterManager(abc.ABC):
 
 
 
-def _generate_command(config: DistributedConfig, task: ArrivalTask, arrival_time: float) -> List[str]:
+def _generate_command(config: DistributedConfig, task: ArrivalTask) -> List[str]:
     """
     Function to generate commands for containers to start working with. Either a federated learnign command
     will be realized, or a distributed learning command. Note that distributed learning commands will be revised
@@ -228,7 +228,7 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask, arrival_time
         command = 'python3 -m fltk remote experiments/node.config.yaml'
     else:
         command = (f'python3 -m fltk client experiments/node.config.yaml {task.id} '
-                   f'{config.config_path} --backend gloo {arrival_time}')
+                   f'{config.config_path} --backend gloo')
     return command.split(' ')
 
 
@@ -326,7 +326,7 @@ class DeploymentBuilder:
             self._build_description.resources[tpe] = client.V1ResourceRequirements(requests=typed_req_dict,
                                                                                    limits=typed_req_dict)
 
-    def build_container(self, task: ArrivalTask, conf: DistributedConfig, arrival_time: float,
+    def build_container(self, task: ArrivalTask, conf: DistributedConfig,
                         configmap_name_dict: Optional[Dict[str, str]]):
         """
         Function to build container descriptions for deploying from within an Orchestrator pod.
@@ -341,7 +341,7 @@ class DeploymentBuilder:
         """
         # TODO: Implement cmd / config reference.
         for indx, (tpe, curr_resource) in enumerate(self._build_description.resources.items()):
-            cmd = _generate_command(conf, task, arrival_time)
+            cmd = _generate_command(conf, task)
             container = _build_typed_container(conf, cmd, curr_resource,
                                                requires_mount=not indx,
                                                experiment_name=configmap_name_dict[tpe])
@@ -460,7 +460,7 @@ class DeploymentBuilder:
         self._build_description.id = task.id
 
 
-def construct_job(conf: DistributedConfig, task: ArrivalTask, arrival_time: float,
+def construct_job(conf: DistributedConfig, task: ArrivalTask,
                   configmap_name_dict: Optional[Dict[str, str]] = None) -> KubeflowOrgV1PyTorchJob:
     """
     Function to build a Job, based on the specifications of an ArrivalTask, and the general configuration of the
@@ -477,7 +477,7 @@ def construct_job(conf: DistributedConfig, task: ArrivalTask, arrival_time: floa
     dp_builder = DeploymentBuilder()
     dp_builder.create_identifier(task)
     dp_builder.build_resources(task)
-    dp_builder.build_container(task, conf, arrival_time, configmap_name_dict)
+    dp_builder.build_container(task, conf, configmap_name_dict)
     dp_builder.build_tolerations()
     dp_builder.build_template(configmap_name_dict)
     dp_builder.build_spec(task)

@@ -9,7 +9,7 @@ import uuid
 import random
 from functools import total_ordering
 from queue import PriorityQueue
-from typing import OrderedDict, Dict, Type, Union, List
+from typing import OrderedDict, Dict, Type, Union, List, Tuple
 from typing import TYPE_CHECKING
 
 import dateutil.parser
@@ -99,8 +99,7 @@ def render_template(task: ArrivalTask, tpe: str, replication: int,
 
 def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig,
                              u_id: uuid.UUID, replication: int = 1) -> \
-                             (OrderedDict[str, V1ConfigMap],
-                              OrderedDict[str, str]):
+        Tuple[OrderedDict[str, V1ConfigMap], OrderedDict[str, str]]:
     """Helper private function to create ConfigMap descriptions for a
     deployment of learners.
 
@@ -255,30 +254,6 @@ class Orchestrator(DistNode, abc.ABC):
         @rtype: None
         """
 
-    def _clear_jobs(self):
-        """
-        Function to clear existing jobs in the environment
-        (i.e. old experiments/tests). This will will, currently, not
-        remove configuration map objects. A later version will allow
-        for removing these autmatically as well.
-
-        @return: None
-        @rtype: None
-        """
-        namespace = self._config.cluster_config.namespace
-        self._logger.info(
-            f'Clearing old jobs in current namespace: {namespace}')
-
-        for job in self._client.get(
-                namespace=self._config.cluster_config.namespace)['items']:
-            job_name = job['metadata']['name']
-            self._logger.info(f'Deleting: {job_name}')
-            try:
-                self._client.delete_job(job_name)
-            except Exception as excp:
-                self._logger.warning(
-                    f'Could not delete: {job_name}. Reason: {excp}')
-
     def _create_config_maps(self, config_maps: Dict[str, V1ConfigMap]) -> None:
         """
         Private helper function to generate V1ConfigMap resources that
@@ -288,51 +263,6 @@ class Orchestrator(DistNode, abc.ABC):
         for _, config_map in config_maps.items():
             self._v1.create_namespaced_config_map(
                 self._config.cluster_config.namespace, config_map)
-
-    # def wait_for_jobs_to_complete(self, others: Optional[List[str]] = None):
-    #     """
-    #     Function to wait for all tasks to complete. This allows to wait for all the resources to free-up after running
-    #     an experiment. Thereby allowing for running multiple experiments on a single cluster, without letting
-    #     experiments interfere with each other.
-    #     """
-    #     if others:
-    #         uuid_regex = re.compile(
-    #             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
-    #         )
-    #
-    #         ids = {
-    #             uuid_regex.search(task).group()
-    #             for task in others if uuid_regex.search(task) is not None
-    #         }
-    #         historical_tasks = map(HistoricalArrivalTask, ids)
-    #         self.deployed_tasks.update(historical_tasks)
-    #     while len(self.deployed_tasks) > 0:
-    #         task_to_move = set()
-    #         for task in self.deployed_tasks:
-    #             try:
-    #                 job_status = self._client.get_job_status(
-    #                     name=f"trainjob-{task.id}", namespace='test')
-    #             except Exception:
-    #                 logging.debug(
-    #                     msg=f"Could not retrieve job_status for {task.id}")
-    #                 job_status = None
-    #
-    #             if job_status and job_status in {
-    #                 'Completed', 'Failed', 'Succeeded'
-    #             }:
-    #                 logging.info(
-    #                     f"{task.id} was completed with status: {job_status}, moving to completed"
-    #                 )
-    #                 task_to_move.add(task)
-    #             else:
-    #                 logging.info(
-    #                     f"Waiting for {task.id} to complete, {self.pending_tasks.qsize()} pending, "
-    #                     f"{self._arrival_generator.arrivals.qsize()} arrivals"
-    #                 )
-    #         self.completed_tasks.update(task_to_move)
-    #         self.deployed_tasks.difference_update(task_to_move)
-    #         time.sleep(self.SLEEP_TIME)
-
 
 NODE_COUNT = 0
 
@@ -352,12 +282,12 @@ class SkyScrapeNode:
 
     def energy_per_job(self):
         cpu_per_job = self._cpu_utilization / len(self._jobs)
-        return cpu_per_job * wattage_delta
+        return cpu_per_job * self._watt_delta
 
     def get_expected_usage(self, remaining_time):
         baseline = self._watt_usage * remaining_time
         jobs_length = len(self._jobs)
-        wattage_per_job = self._energy_per_job() * ((jobs_length+1)/jobs_length)
+        wattage_per_job = self.energy_per_job() * ((jobs_length+1)/jobs_length)
 
         return (baseline + wattage_per_job) * remaining_time
 
@@ -409,8 +339,7 @@ class SimulatedOrchestrator(Orchestrator):
 
         self._unclaimed_jobs: "PriorityQueue[SkyScrapeJob]" = PriorityQueue()
         self._deployed_jobs: List[SkyScrapeJob] = []
-        self._completed_jobs: Dict[uuid.UUID, float] = {}
-        self._arrival_times: Dict[uuid.UUID, float] = {}
+        self._completed_jobs: List[uuid.UUID] = []
         self._nodes: List[SkyScrapeNode] = []
         self.nodes_running = 0
         self.probability_job_arriving = 0.19
@@ -419,7 +348,6 @@ class SimulatedOrchestrator(Orchestrator):
         # instead of simulated
         self._average_interarrival_time = None
         self._average_service_time = None
-        self._average_response_time = None
         self._time_of_last_job_arrival = None
         self._average_resize_time = 120
 
@@ -469,7 +397,6 @@ class SimulatedOrchestrator(Orchestrator):
         node.add_job(sky_scrape_job)
 
         job_to_start = construct_job(self._config, curr_task,
-                                     self._arrival_times[curr_task.id],
                                      configmap_name_dict)
         self._client.create(job_to_start,
                             namespace=self._config.cluster_config.namespace)
@@ -546,22 +473,7 @@ class SimulatedOrchestrator(Orchestrator):
             task_to_move.append(task)
             self._update_service_time(task)
 
-            # Google has unpredictable scheduling times, so we need to
-            # wait for the job to start being detectable before being
-            # able to measure the service time
-
-            time_google_scheduling = task.start_time - task.deploy_time
-            self._completed_jobs[task.uuid] = \
-                time.time() - self._arrival_times[task.uuid] \
-                - time_google_scheduling
-            self._average_response_time = _get_running_average(
-                self._average_response_time, self._completed_jobs[task.uuid])
-
-            self._logger.info("""%s was completed with response time %d seconds.
-In reality it took %d seconds, but spent %s seconds to Google scheduling""",
-                              task.uuid, self._completed_jobs[task.uuid],
-                              time.time() - self._arrival_times[task.uuid],
-                              time_google_scheduling)
+            self._completed_jobs.append(task.uuid)
 
             if task in self._unclaimed_jobs.queue:
                 self._unclaimed_jobs.queue.remove(task)
@@ -605,16 +517,15 @@ In reality it took %d seconds, but spent %s seconds to Google scheduling""",
     def _check_arrivals(self):
         if self._time_of_last_job_arrival is not None:
             self._update_interarrival_time()
-            self._time_of_last_job_arrival = time.time()
+        self._time_of_last_job_arrival = time.time()
 
         while not self._arrival_generator.arrivals.empty():
             arrival = self._arrival_generator.arrivals.get()
             task = _generate_task(arrival)
-            self._arrival_times[task.id] = time.time()
             self._logger.debug(f"Arrival of: {task.id}")
             self.pending_tasks.put(task)
 
-    def _get_node_with_space(self) -> SkyScrapeNode:
+    def _get_node_with_space(self) -> Union[SkyScrapeNode, None]:
         for node in self._nodes:
             if len(node._jobs) <= self._config.cluster_config.max_pods_per_node:
                 return node
@@ -643,7 +554,7 @@ In reality it took %d seconds, but spent %s seconds to Google scheduling""",
         self._logger.info("energy: %d - %d", resize_energy, no_resize_energy)
         return resize_energy > no_resize_energy
 
-    def _should_we_scale(self, task):
+    def _should_we_scale(self, task) -> Tuple[bool, Union[SkyScrapeNode, None]]:
         """Decides whether a node can be reused or whether the cluster is scaled"""
         pods = self.nodes_running * \
             self._config.cluster_config.max_pods_per_node
@@ -718,8 +629,6 @@ In reality it took %d seconds, but spent %s seconds to Google scheduling""",
             experiment_replication: int = -1) -> None:
         self._alive = True
         start_time = time.time()
-        if clear:
-            self._clear_jobs()
 
         self._logger.info("SkyScraper started")
 
@@ -744,8 +653,6 @@ In reality it took %d seconds, but spent %s seconds to Google scheduling""",
         self._logger.info(
             f"Average interarrival time: {self._average_interarrival_time}")
         self._logger.info(f"Average resize time: {self._average_resize_time}")
-        self._logger.info(
-            f"Average response time: {self._average_response_time}")
         self._logger.info(f"Completed jobs: {self._completed_jobs}")
         self.resize_cluster_async(0)
         self._logger.info('Experiment completed.')

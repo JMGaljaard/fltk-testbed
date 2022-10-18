@@ -36,7 +36,6 @@ def _create_client_parser(subparsers) -> None:
     client_parser.add_argument('--backend', type=str, help='Distributed backend',
                                choices=[dist.Backend.GLOO, dist.Backend.NCCL, dist.Backend.MPI],
                                default=dist.Backend.GLOO)
-    client_parser.add_argument('arrival_time', type=float, help='Arrival time.')
 
 
 def _create_cluster_parser(subparsers) -> None:
