@@ -9,14 +9,14 @@ import os
 def gen_job_config():
     epochs = [1, 5]
     std = [10]
-    centre = [80]
+    centre = [40]
     values = product(epochs, std, centre)
     names = ["epochs", "std", "centre"]
     return [dict(zip(names, value)) for value in values]
 
 
 def gen_orch_config():
-    sleep = [5]
+    sleep = [2.5]
     max_pods_per_node = [3, 10]
     values = product(sleep, max_pods_per_node)
     names = ["sleep", "max_pods_per_node"]
@@ -32,7 +32,7 @@ def gen_node_config():
 
 def gen_resize_config():
     std = [10]
-    centre = [40, 80]
+    centre = [30, 60]
     values = product(std, centre)
     names = ["std", "centre"]
     return [dict(zip(names, value)) for value in values]
@@ -47,9 +47,14 @@ def gen_configs():
     return [dict(zip(names, option)) for option in options]
 
 
-ITERATIONS = 1
-DURATION = 80  # Time that the experiment is set to
+ITERATIONS = 5
+DURATION = 1800 + 120  # Time that the experiment is set to + 2 minutes to ensure clean up and other things are finished
 INSTALL_CMD = """install flearner charts/orchestrator --namespace test -f charts/fltk-values.yaml --set-file orchestrator.experiment=./configs/distributed_tasks/example_arrival_config.json,orchestrator.configuration=./configs/example_cloud_experiment.json""".split(" ")
+
+# FYI:
+# THIS EXPERIMENT WILL RUN FOR 5 * 32 * 8 MINUTES = 640 MINUTES = 10.6 HOURS
+# Thomas: run experiment with lambda set to 0.15
+# Valentijn: run experiments with lambda set to 0.3
 
 REGISTRY = "registry.gitlab.com/valentijn/fltk-testbed-qpe"
 
@@ -60,7 +65,7 @@ if __name__ == "__main__":
     print(minikube("start", "--driver=podman", "--container-runtime=cri-o"))
 
     import random
-    for config in random.sample(configs, 10):
+    for config in configs:
         for _ in range(ITERATIONS):
             toml_config = tomli_w.dumps(config)
             print("Running the following iteration:\n===========")
