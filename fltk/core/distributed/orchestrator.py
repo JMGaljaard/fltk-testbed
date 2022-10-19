@@ -345,7 +345,7 @@ class SimulatedOrchestrator(Orchestrator):
         self._nodes: List[SkyScrapeNode] = []
 
         # We calculate this value ourselves to simulate real arrivals
-        self._average_interarrival_time = None
+        self._interarrival_times = []
         self._average_service_time = None
         self._time_of_last_job_arrival = None
         self._average_resize_time = None
@@ -440,8 +440,13 @@ class SimulatedOrchestrator(Orchestrator):
 
     def _update_interarrival_time(self):
         delta = time.time() - self._time_of_last_job_arrival
-        self._average_interarrival_time = \
-            _get_running_average(self._average_interarrival_time, delta)
+        self._interarrival_times.append(delta)
+
+    def _get_average_interarrival_time(self):
+        if len(self._interarrival_times) == 0:
+            return None
+        else:
+            return sum(self._interarrival_times) / len(self._interarrival_times)
 
     def scale_down_if_possible(self, node) -> bool:
         #   - resize costs = resize time * baseline usage * 2
@@ -453,12 +458,12 @@ class SimulatedOrchestrator(Orchestrator):
         assert capacity >= 0
 
         # The cost of scaling
-        time_to_next_arrival = self._average_interarrival_time - (time.time() - self._time_of_last_job_arrival)
-        time_until_node_is_necessary = time_to_next_arrival + self._average_interarrival_time * capacity
+        time_to_next_arrival = self._get_average_interarrival_time() - (time.time() - self._time_of_last_job_arrival)
+        time_until_node_is_necessary = time_to_next_arrival + self._get_average_interarrival_time() * capacity
 
         costs_to_keep_node_running = node._watt_usage * time_until_node_is_necessary
 
-        self._logger.info(f"Time until node is necessary: {time_until_node_is_necessary}. Time to next arrival {time_to_next_arrival}. Capacity {capacity}. Average interarrival time {self._average_interarrival_time}")
+        self._logger.info(f"Time until node is necessary: {time_until_node_is_necessary}. Time to next arrival {time_to_next_arrival}. Capacity {capacity}. Average interarrival time {self._get_average_interarrival_time()}")
 
         # The cost to resize the system twice in case a job arrives
         resize_costs = 2 * self._get_average_baseline_usage() * self._average_resize_time
@@ -511,15 +516,16 @@ class SimulatedOrchestrator(Orchestrator):
             self._deployed_jobs.remove(task)
             task.node._jobs.remove(task)
 
-        nodes_to_remove = []
-        for node in self._nodes:
-            if len(node._jobs) == 0:
-                if self.scale_down_if_possible(node):
-                    nodes_to_remove.append(node)
+        if self._get_average_interarrival_time() is not None:
+            nodes_to_remove = []
+            for node in self._nodes:
+                if len(node._jobs) == 0:
+                    if self.scale_down_if_possible(node):
+                        nodes_to_remove.append(node)
 
-        for node in nodes_to_remove:
-            self._nodes.remove(node)
-            self.resize_cluster()
+            for node in nodes_to_remove:
+                self._nodes.remove(node)
+                self.resize_cluster()
 
     def _scale_up_and_deploy(self, task, replication):
         new_node = SkyScrapeNode([])
@@ -584,14 +590,13 @@ class SimulatedOrchestrator(Orchestrator):
         # Get earliest started task, which position has not
         # yet been claimed by a pending job.
         earliest_task = self.get_earliest_unclaimed_task()
-        averages = [self._average_interarrival_time,
-                    self._average_service_time,
+        averages = [self._average_service_time,
                     self._average_resize_time]
 
         if None in averages or earliest_task is None or \
            self._config.cluster_config.naive:
-            # We don't know the inter-arrival time or service
-            # time yet, so we cannot make a decision Scale up
+            # We don't know the resize time or service
+            # time yet, so we cannot make a decision -> Scale up
             self._logger.info("Not enough data or no task left to claim. Resizing and deploying task %s", str(task.id))
             return True, None
 
@@ -659,7 +664,7 @@ class SimulatedOrchestrator(Orchestrator):
         self._logger.info(
             f"Average service time: {self._average_service_time}")
         self._logger.info(
-            f"Average interarrival time: {self._average_interarrival_time}")
+            f"Average interarrival time: {self._get_average_interarrival_time()}")
         self._logger.info(f"Average resize time: {self._average_resize_time}")
         self._logger.info(f"Average amount of nodes: {sum(self.amount_of_nodes) / len(self.amount_of_nodes)}")
         self._logger.info(f"Total amount of jobs: {len(self._completed_jobs)}")
