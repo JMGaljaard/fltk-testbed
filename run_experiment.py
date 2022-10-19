@@ -8,31 +8,31 @@ import os
 
 def gen_job_config():
     epochs = [1, 5]
-    std = [10, 50]
-    centre = [50, 100]
+    std = [10]
+    centre = [80]
     values = product(epochs, std, centre)
     names = ["epochs", "std", "centre"]
     return [dict(zip(names, value)) for value in values]
 
 
 def gen_orch_config():
-    sleep = [0.1, 1.5]
+    sleep = [5]
     max_pods_per_node = [3, 10]
     values = product(sleep, max_pods_per_node)
     names = ["sleep", "max_pods_per_node"]
     return [dict(zip(names, value)) for value in values]
 
 def gen_node_config():
-    watt_usage = [40, 80, 100, 120]
-    watt_delta = [10, 50, 100, 150]
+    watt_usage = [40]
+    watt_delta = [15]
     type_ = ["baremetal"]
     names = ["watt_usage", "watt_delta", "type"]
     values = product(watt_usage, watt_delta, type_)
     return [dict(zip(names, value)) for value in values]
 
 def gen_resize_config():
-    std = [1, 5]
-    centre = [0.5, 2]
+    std = [10]
+    centre = [40, 80]
     values = product(std, centre)
     names = ["std", "centre"]
     return [dict(zip(names, value)) for value in values]
@@ -42,7 +42,6 @@ def gen_configs():
     orchs = gen_orch_config()
     nodes = gen_node_config()
     resizes = gen_resize_config()
-
     options = product(jobs, orchs, nodes, resizes)
     names = ["job", "orchestrator", "node", "resize"]
     return [dict(zip(names, option)) for option in options]
