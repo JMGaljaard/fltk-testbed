@@ -357,7 +357,7 @@ class SimulatedOrchestrator(Orchestrator):
         # We use total average, as it is our resulting statistic
         self.amount_of_nodes = []
 
-        if self._config.execution_config.local:
+        if not self._config.execution_config.local:
             credentials = service_account.Credentials.from_service_account_file(
                 "configs/key.json",
                 scopes=["https://www.googleapis.com/auth/cloud-platform"],
