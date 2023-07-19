@@ -1,15 +1,42 @@
-
 data "google_client_config" "default" {}
 
-# Retrieve kustomize templates
-data "kustomization_build" "training_operator" {
-  path = "github.com/kubeflow/manifests.git/apps/training-operator/upstream/overlays/standalone?ref=${var.kubeflow_version}"
+# Add Vulcano Gang scheduler plugin using all default values.
+resource "helm_release" "vulcano_scheduler" {
+
+  name       = var.vulcano_scheduler_information.release_name
+  repository = var.vulcano_scheduler_repo_url
+  chart      = var.vulcano_scheduler_information.chart_name
+  version    = var.vulcano_scheduler_information.version
+
+  namespace        = var.vulcano_scheduler_information.namespace
+  create_namespace = true
+}
+
+# Treat training-operator as overlay and apply a patch to add support for gang scheduling.
+# Creates an overlay (patched version) of the original training operator to deploy.
+data "kustomization_overlay" "training_operator" {
+  resources = [
+    "github.com/kubeflow/manifests.git/apps/training-operator/upstream/overlays/standalone?ref=${var.kubeflow_version}"
+  ]
+
+  # Apply vulcano patch in overlay.
+  patches {
+    path = "patches/training-operator-patch.yaml"
+    target {
+      kind      = "Deployment"
+      namespace = "kubeflow"
+      name      = "training-operator"
+    }
+  }
 }
 
 # Deploy resources one-by-one.
 resource "kustomization_resource" "training_operator" {
-  for_each = data.kustomization_build.training_operator.ids
-  manifest = data.kustomization_build.training_operator.manifests[each.value]
+  # Before we can install the training operator, we need to have the vulcano_scheduler up and running.
+  # See also the patch that we apply to the training operator through kustomize.
+  depends_on = [helm_release.vulcano_scheduler]
+  for_each   = data.kustomization_overlay.training_operator.ids
+  manifest   = data.kustomization_overlay.training_operator.manifests[each.value]
 }
 
 # Create NFS resource

@@ -29,7 +29,7 @@ variable "project_zone" {
 
 variable "description" {
   type    = string
-  default = "Managed by terraform FLTK testbed deployment"
+  default = "Managed by terraform FLTK testbed deployment."
 }
 
 variable "account_id" {
@@ -72,3 +72,25 @@ variable "nfs_provisioner_repo_url" {
   type        = string
   default     = "https://charts.helm.sh/stable"
 }
+
+variable "vulcano_scheduler_information" {
+  type = object({
+    release_name     = string
+    chart_name       = string
+    namespace        = string
+    version          = string
+  })
+  default = {
+    release_name     = "vulcano"
+    chart_name       = "vulcano"
+    namespace        = "vulcano-system"
+    version          = "v1.7.0"
+  }
+}
+
+variable "vulcano_scheduler_repo_url" {
+  description = "Repository URL to locate the utilized helm charts for Vulcano Scheduler Plugin."
+  type        = string
+  default     = "https://github.com/volcano-sh/helm-charts"
+}
+
