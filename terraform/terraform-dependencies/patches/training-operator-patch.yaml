@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: training-operator
+spec:
+  template:
+    spec:
+      containers:
+        - name: training-operator
+          command:
+            - /manager
+            - --gang-scheduler-name=scheduler-plugins
+
