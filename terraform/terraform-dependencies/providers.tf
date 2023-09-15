@@ -3,7 +3,7 @@ locals {
 }
 
 provider "google" {
-  alias = "impersonation"
+  alias  = "impersonation"
   scopes = [
     "https://www.googleapis.com/auth/cloud-platform",
     "https://www.googleapis.com/auth/userinfo.email",
@@ -40,8 +40,8 @@ data "google_container_cluster" "testbed_cluster" {
 }
 
 provider "kubernetes" {
-  host  = "https://${data.google_container_cluster.testbed_cluster.endpoint}"
-  token = data.google_client_config.default.access_token # Provided by Google data object
+  host                   = "https://${data.google_container_cluster.testbed_cluster.endpoint}"
+  token                  = data.google_client_config.default.access_token # Provided by Google data object
   cluster_ca_certificate = base64decode(
     data.google_container_cluster.testbed_cluster.master_auth[0].cluster_ca_certificate,
   )
@@ -52,5 +52,4 @@ provider "helm" {
   kubernetes {
     config_path = var.kubernetes_config_path
   }
-
 }
