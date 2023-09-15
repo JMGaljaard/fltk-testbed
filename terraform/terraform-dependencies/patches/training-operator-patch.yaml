@@ -9,5 +9,5 @@ spec:
         - name: training-operator
           command:
             - /manager
-            - --gang-scheduler-name=vulcano
+            - --gang-scheduler-name=volcano
 
