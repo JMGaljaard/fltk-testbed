@@ -1,8 +1,7 @@
 data "google_client_config" "default" {}
 
 # Add Vulcano Gang scheduler plugin using all default values.
-resource "helm_release" "vulcano_scheduler" {
-
+resource "helm_release" "volcano_scheduler" {
   name       = var.vulcano_scheduler_information.release_name
   repository = var.vulcano_scheduler_repo_url
   chart      = var.vulcano_scheduler_information.chart_name
@@ -34,7 +33,7 @@ data "kustomization_overlay" "training_operator" {
 resource "kustomization_resource" "training_operator" {
   # Before we can install the training operator, we need to have the vulcano_scheduler up and running.
   # See also the patch that we apply to the training operator through kustomize.
-  depends_on = [helm_release.vulcano_scheduler]
+  depends_on = [helm_release.volcano_scheduler]
   for_each   = data.kustomization_overlay.training_operator.ids
   manifest   = data.kustomization_overlay.training_operator.manifests[each.value]
 }

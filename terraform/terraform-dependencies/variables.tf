@@ -1,3 +1,9 @@
+variable "minikube" {
+  description = "Boolean indicating whether or not we are going to deploy on minikube (or other local deployment)"
+  default = true
+  type = bool
+}
+
 variable "kubernetes_config_path" {
   description = "Path of Kubernetes configuration file (change for non-default kubectl setup)"
   default     = "~/.kube/config"
@@ -81,16 +87,16 @@ variable "vulcano_scheduler_information" {
     version          = string
   })
   default = {
-    release_name     = "vulcano"
-    chart_name       = "vulcano"
-    namespace        = "vulcano-system"
-    version          = "v1.7.0"
+    release_name     = "volcano"
+    chart_name       = "volcano"
+    namespace        = "volcano-system"
+    version          = "v1.8.0"
   }
 }
 
 variable "vulcano_scheduler_repo_url" {
   description = "Repository URL to locate the utilized helm charts for Vulcano Scheduler Plugin."
   type        = string
-  default     = "https://github.com/volcano-sh/helm-charts"
+  default     = "https://volcano-sh.github.io/helm-charts"
 }
 
