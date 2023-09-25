@@ -10,9 +10,10 @@ from pathlib import Path
 import torch.distributed as dist
 from kubernetes import config
 from torch.distributed import rpc
+
+from fltk.core import FedFederatorConstructor, FedClientConstructor, Federator
 from fltk.core.distributed import DistClient, download_datasets
 from fltk.util.config.definitions.orchestrator import get_orchestrator, get_arrival_generator, OrchestratorType
-from fltk.core import Client, Federator
 from fltk.nets.util.reproducability import init_reproducibility, init_learning_reproducibility
 from fltk.util.cluster.client import ClusterManager
 
@@ -30,6 +31,8 @@ Host = NewType('Host', int)
 Prefix = NewType('Prefix', str)
 launch_signature = Callable[[Path, Path, Optional[Rank], Optional[NIC], Optional[Host], Optional[Prefix],
                              Optional[Namespace], Optional[DistributedConfig]], None]
+
+LEADER_RANK = 0
 
 
 def exec_distributed_client(task_id: str, conf: DistributedConfig = None,
@@ -196,7 +199,7 @@ def launch_single(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
                   prefix: Optional[Prefix] = None, args: Optional[Namespace] = None,
                   conf: Optional[DistributedConfig] = None):
     """
-    Single runner launch function.
+    Example launch method to start with simple experiment with a simple single runner.
 
     @param arg_path: Base argument path for Local/Federated execution.
     @type arg_path: Path
@@ -273,12 +276,12 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
     logging.log(logging.INFO, msg)
     # fixme: Move to async implementation to prevent CPP memory leak
     options = rpc.TensorPipeRpcBackendOptions(
-            num_worker_threads=16 if rank == 0 else 4,
+            num_worker_threads=16 if rank == LEADER_RANK else 4,
             rpc_timeout=0,  # infinite timeout
             init_method='env://',
             _transports=["uv"]  # Use LibUV backend for async/IO interaction
     )
-    if rank != 0:
+    if rank != LEADER_RANK:
         print(f'Starting worker-{rank} with world size={r_conf.world_size}')
         rpc.init_rpc(
                 f"client{rank}",
@@ -286,7 +289,8 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
                 world_size=r_conf.world_size,
                 rpc_backend_options=options,
         )
-        client_node = Client(f'client{rank}', rank, r_conf.world_size, r_conf)
+        fed_client_constructor = FedClientConstructor()
+        client_node = fed_client_constructor.construct(r_conf, f'client{rank}', rank, r_conf.world_size)
         client_node.remote_registration()
         client_node.run()
     else:
@@ -297,8 +301,8 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
                 world_size=r_conf.world_size,
                 rpc_backend_options=options
         )
-
-        federator_node = Federator('federator', 0, r_conf.world_size, r_conf)
+        fed_federator_constructor = FedFederatorConstructor()
+        federator_node = fed_federator_constructor.construct('federator', LEADER_RANK, r_conf.world_size, r_conf)
         try:
             federator_node.run()
         except Exception as e:
