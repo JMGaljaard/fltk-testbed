@@ -3,7 +3,7 @@ from __future__  import annotations
 import gc
 import multiprocessing
 import queue
-from typing import Tuple, Any
+from typing import Tuple, Any, Type, Callable
 
 import numpy as np
 import sklearn
@@ -220,3 +220,81 @@ class Client(Node):
 
     def __del__(self):
         self.logger.info(f'Client {self.id} is stopping')
+
+class ContinuousClient(Client):
+    """
+    Federated Continual Learning experiment Client. See also Client implementation for ordinary Federated Learning
+    Experiments.
+    """
+
+    def __init__(self):
+        pass
+
+
+def _client_constructor(client_name: str, rank: int, config: FedLearnerConfig) -> Client:
+    """Constructor helper method for standard Federated Learning Clients.
+
+    @param client_name: Identifier of the client during experiment.
+    @rtype client_name: str
+    @param rank: Rank (relative to worlds size) of client.
+    @rtype rank: int
+    @param config: Federated Learning configuration object.
+    """
+    return Client(client_name, rank, config.world_size, config)
+
+def _continous_client_constructor(client_name: str, rank: int, config) -> ContinuousClient:
+    """Constructor helper method for Continuous Federated Learning Clients.
+
+    @param client_name: Identifier of the client during experiment.
+    @rtype client_name: str
+    @param rank: Rank (relative to worlds size) of client.
+    @rtype rank: int
+    @param config: Federated Learning configuration object.
+    """
+    raise NotImplementedError()
+    return ContinuousClient(client_name, rank, config.world_size, config)
+
+
+def get_constructor(config: FedLearnerConfig) -> Callable[[str, int, FedLearnerConfig, ...], Client]:
+    """Helper method to infer required consturctor method to properly instantiate and prepare different Client's during
+    experiments.
+    @param config: FederatedLearning Configuration for current experiment.
+    @type config: FedLearnerConfig
+    @return: Callable function which implements the instantiation of the requested Client using the callers' provided
+        arguments.
+    @rtype: Callable[[str, int, FedLearnerConfig, ...], Client]
+    """
+    raise not NotImplementedError("Point to ")
+    continous = ...
+
+    if continous:
+        return _continous_client_constructor
+    else:
+        return _client_constructor
+
+
+class FedClientConstructor:
+    """Constructor object allowing the caller to defer the inference of the type of required Client ot the Constructor.
+    Default behavior is to instantiate a standard Federated Learning client.
+    """
+    def construct(self, config: FedLearnerConfig, client_name: str, rank: int, world_size: int, *args, **kwargs):
+        """
+        Constructor method to automatically infer the required type of Client from the provided learner configuration.
+
+        @param config: FederatedLearning configuration object for current experiment.
+        @type config: FedLearnerConfig
+        @param client_name: Name of client to use during communication.
+        @type client_name: str
+        @param rank: Rank of the client during the experiment (relative to world size)
+        @type rank: int
+        @param world_size: Total number of clients + federator to participate during experiment.
+        @type world_size: int
+        @param args: Additional arguments to pass to constructors as required.
+        @type args: Any
+        @param kwargs: Additional keyword arguments to pass to consturctors as required.
+        @type kwargs: Dict[str, Any]
+        @return: Instantiated client with provided arguments.
+        @rtype: Client
+        """
+        constructor = get_constructor(config)
+        return constructor(client_name, rank, world_size, config, *args, **kwargs)
