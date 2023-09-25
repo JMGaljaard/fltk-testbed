@@ -1,4 +1,4 @@
-# Kubernetes - Federation Learning Toolkit ((K)FLTK)
+# Kubernetes - Federation and Distributed Machine Learning Toolkit (Freddie)
 [![License](https://img.shields.io/badge/license-BSD-blue.svg)](LICENSE)
 [![Python 3.7](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
 [![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
@@ -15,6 +15,12 @@ Docker Compose ([repo](https://github.com/bacox/fltk))
 
 
 This project is tested with Ubuntu 20.04, Arch Linux, MacOS, with Python {3.7, 3.8, 3.9}. Python 3.9 is recommended.
+
+For an example to use Freddie for Resource Heterogeneous deployment, see also https://github.com/bacox/fltk.
+
+## Future work
+ - [ ] Extend Kubeflow to implement Resource Heterogeneous Deployment.
+ - [ ] Extend to Feature non-IIDness.
 
 ## Global idea
 Pytorch Distributed works based on a `world_size` and `rank`s. The ranks should be between `0` and `world_size-1`.
@@ -167,7 +173,16 @@ To download the models, execute the following command from the [project root](.)
 python3 -m fltk extractor ./configs/example_cloud_experiment.json  
 ```
 
-## Deployment (Terraform)
+## Deployment (MiniKube + Terraform)
+To setup the test-bed on a singel machine using Terraform, the following setup needs to be done. This can be achieved through following
+the steps described in [`jupyter/terraform_notebook_local.ipynb`](jupyter/terraform_local_notebook.ipynb).
+
+> This deployment is mainly intended for quick local debugging, or rapid testing with minimal cost and setup.
+> Make sure to follow the instructions carefully, and update references in charts to original values if needed.
+> In case you want to work parallely on a real cluster and locally, we recommend updating the notebook to reflect
+> your real system, and using Minikubes' docker environment to re-build your developed containers to.
+
+## Deployment (Terraform + GKE)
 To setup the test-bed using Terraform, the following setup needs to be done. This can be achieved through following
 the steps described in [`jupyter/terraform_notebook.ipynb`](jupyter/terraform_notebook.ipynb).
 
