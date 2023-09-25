@@ -8,7 +8,7 @@ import sklearn
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Callable
 
 import torch
 
@@ -329,3 +329,83 @@ class Federator(Node):
                                  confusion_matrix=conf_mat)
         self.exp_data.append(record)
         self.logger.info(f'[Round {com_round_id:>3}] Round duration is {duration} seconds')
+
+class ContinousFederator(Federator):
+    """
+    Federator implementation that provides functionality for Continous Learning. Learning is initiated by the
+    Federator and performed by the Clients. The Federator also performs centralized logging for easier execution.
+    """
+
+    def __init__(self):
+        pass
+
+
+def _federator_constructor(client_name: str, rank: int, config: FedLearnerConfig) -> Federator:
+    """Constructor helper method for standard Federated Learning Clients.
+
+    @param client_name: Identifier of the federator during experiment.
+    @rtype client_name: str
+    @param rank: Rank (relative to worlds size) of client.
+    @rtype rank: int
+    @param config: Federated Learning configuration object.
+    """
+    return Federator(client_name, rank, config.world_size, config)
+
+
+def _continous_federator_constructor(federator_name: str, rank: int, config) -> ContinousFederator:
+    """Constructor helper method for Continuous Federated Learning Federator.
+
+    @param federator_name: Identifier of the client during experiment.
+    @rtype client_name: str
+    @param rank: Rank (relative to worlds size) of Federator. N.B. this rank should always be 0, by design of Freddie.
+    @rtype rank: int
+    @param config: Federated Learning configuration object.
+    """
+    raise NotImplementedError()
+    return ContinousFederator(federator_name, rank, config.world_size, config)
+
+
+def get_constructor(config: FedLearnerConfig) -> Callable[[str, int, FedLearnerConfig, ...], Client]:
+    """Helper method to infer required constructor method to properly instantiate and prepare different Federators's
+    during experiments.
+    @param config: FederatedLearning Configuration for current experiment.
+    @type config: FedLearnerConfig
+    @return: Callable function which implements the instantiation of the requested Federator using the callers' provided
+        arguments.
+    @rtype: Callable[[str, int, FedLearnerConfig, ...], Federator]
+    """
+    raise not NotImplementedError("Point to ")
+    continous = ...
+
+    if continous:
+        return _continous_federator_constructor
+    else:
+        return _federator_constructor
+
+
+class FedFederatorConstructor:
+    """Constructor object allowing the caller to defer the inference of the type of required Client ot the Constructor.
+    Default behavior is to instantiate a standard Federated Learning client.
+    """
+
+    def construct(self, config: FedLearnerConfig, client_name: str, rank: int, world_size: int, *args, **kwargs):
+        """
+        Constructor method to automatically infer the required type of Client from the provided learner configuration.
+
+        @param config: FederatedLearning configuration object for current experiment.
+        @type config: FedLearnerConfig
+        @param client_name: Name of client to use during communication.
+        @type client_name: str
+        @param rank: Rank of the client during the experiment (relative to world size)
+        @type rank: int
+        @param world_size: Total number of clients + federator to participate during experiment.
+        @type world_size: int
+        @param args: Additional arguments to pass to constructors as required.
+        @type args: Any
+        @param kwargs: Additional keyword arguments to pass to consturctors as required.
+        @type kwargs: Dict[str, Any]
+        @return: Instantiated client with provided arguments.
+        @rtype: Client
+        """
+        constructor = get_constructor(config)
+        return constructor(client_name, rank, world_size, config, *args, **kwargs)
