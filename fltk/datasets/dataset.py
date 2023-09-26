@@ -46,6 +46,7 @@ class Dataset(abc.ABC):
 
     def get_train_loader(self, **kwargs):
         """
+        # FIXME: Implement / extend to ensure that epochID is used during get_train_loader for continuous.
         Return the data loader for the train dataset.
 
         :param batch_size: batch size of data loader.
