@@ -37,6 +37,9 @@ class LocalClient:
     exp_data: DataContainer
 
 
+def all_futures_done(futures: List[torch.Future]) -> bool:  # pylint: disable=no-member
+    return all(map(lambda x: x.done(), futures))
+
 def cb_factory(future: torch.Future, method, *args, **kwargs):  # pylint: disable=no-member
     """
     Callback factory function to attach callbacks to a future.
@@ -264,7 +267,8 @@ class Federator(Node):
 
         # Client selection
         selected_clients: List[LocalClient]
-        selected_clients = random_selection(self.clients, self.config.clients_per_round)
+        # Currently support all clients only.
+        selected_clients = self.clients
 
         last_model = self.get_nn_parameters()
         for client in selected_clients:
@@ -273,13 +277,11 @@ class Federator(Node):
         # Actual training calls
         client_weights = {}
         client_sizes = {}
-        # pbar = tqdm(selected_clients)
-        # for client in pbar:
 
         # Client training
         training_futures: List[torch.Future] = []  # pylint: disable=no-member
 
-        def training_cb(fut: torch.Future, client_ref: LocalClient, client_weights, client_sizes, num_epochs):  # pylint: disable=no-member
+        def training_cb(fut: torch.Future, client_ref: LocalClient, client_weights, client_sizes, num_epochs):
             train_loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration, c_mat = fut.wait()
             self.logger.info(f'Training callback for client {client_ref.name} with accuracy={accuracy}')
             client_weights[client_ref.name] = weights
@@ -294,9 +296,6 @@ class Federator(Node):
             cb_factory(future, training_cb, client, client_weights, client_sizes, num_epochs)
             self.logger.info(f'Request sent to client {client.name}')
             training_futures.append(future)
-
-        def all_futures_done(futures: List[torch.Future]) -> bool:  # pylint: disable=no-member
-            return all(map(lambda x: x.done(), futures))
 
         while not all_futures_done(training_futures):
             time.sleep(0.1)
@@ -330,14 +329,86 @@ class Federator(Node):
         self.exp_data.append(record)
         self.logger.info(f'[Round {com_round_id:>3}] Round duration is {duration} seconds')
 
+
 class ContinousFederator(Federator):
     """
     Federator implementation that provides functionality for Continous Learning. Learning is initiated by the
     Federator and performed by the Clients. The Federator also performs centralized logging for easier execution.
     """
 
-    def __init__(self):
-        pass
+    def exec_round(self, com_round_id: int):
+        """
+        Helper method to call a remote Client to perform a training round during the training loop.
+        @param com_round_id: Identifier of the communication round.
+        @type com_round_id: int
+        @return: None
+        @rtype: None
+        """
+        start_time = time.time()
+        num_epochs = self.config.epochs
+
+        # Client selection
+        selected_clients: List[LocalClient]
+        selected_clients = random_selection(self.clients, self.config.clients_per_round)
+
+        last_model = self.get_nn_parameters()
+        for client in selected_clients:
+            self.message(client.ref, Client.update_nn_parameters, last_model)
+
+        # Actual training calls
+        client_weights = {}
+        client_sizes = {}
+
+        # Client training
+        training_futures: List[torch.Future] = []  # pylint: disable=no-member
+
+        def training_cb(fut: torch.Future, client_ref: LocalClient, client_weights, client_sizes, num_epochs):  # pylint: disable=no-member
+            train_loss, weights, accuracy, test_loss, round_duration, train_duration, test_duration, c_mat = fut.wait()
+            self.logger.info(f'Training callback for client {client_ref.name} with accuracy={accuracy}')
+            client_weights[client_ref.name] = weights
+            client_data_size = self.message(client_ref.ref, Client.get_client_datasize)
+            client_sizes[client_ref.name] = client_data_size
+            c_record = ClientRecord(com_round_id, train_duration, test_duration, round_duration, num_epochs, 0,
+                                    accuracy, train_loss, test_loss, confusion_matrix=c_mat)
+            client_ref.exp_data.append(c_record)
+
+        for client in selected_clients:
+            future = self.message_async(client.ref, Client.request_round, num_epochs, com_round_id)
+            cb_factory(future, training_cb, client, client_weights, client_sizes, num_epochs)
+            self.logger.info(f'Request sent to client {client.name}')
+            training_futures.append(future)
+
+        while not all_futures_done(training_futures):
+            time.sleep(0.1)
+            # self.logger.info('')
+            # self.logger.info(f'Waiting for other clients')
+        send_receive_duration = time.time() - start_time
+        self.logger.info('Continue with rest [1]')
+        time.sleep(3)
+        self.logger.info(f"Aggregrating: {len(client_weights)} updates, using {self.config.aggregation}")
+        updated_model = self.aggregation_method(client_weights, client_sizes)
+        self.logger.info(f"Updating global model.")
+
+        self.update_nn_parameters(updated_model)
+        del client_weights
+        gc.collect()
+        self.logger.info(f"Testing global model.")
+
+        test_accuracy, test_loss, conf_mat, test_duration = self.test(self.net)
+        self.logger.info(f'[Round {com_round_id:>3}] Federator has a accuracy of {test_accuracy} and loss={test_loss}')
+
+        end_time = time.time()
+        duration = end_time - start_time
+        record = FederatorRecord(num_selected_clients=len(selected_clients),
+                                 round_id=com_round_id,
+                                 round_duration=duration,
+                                 test_duration=test_duration,
+                                 send_receive_duration=send_receive_duration,
+                                 test_loss=test_loss,
+                                 test_accuracy=test_accuracy,
+                                 confusion_matrix=conf_mat)
+        self.exp_data.append(record)
+        self.logger.info(f'[Round {com_round_id:>3}] Round duration is {duration} seconds')
 
 
 def _federator_constructor(client_name: str, rank: int, config: FedLearnerConfig) -> Federator:
