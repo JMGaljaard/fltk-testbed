@@ -1,7 +1,13 @@
+import abc
 import random
+from typing import Dict, List
 
+import torch
 import numpy as np
+from torch.utils.data import Sampler
 
+from fltk.datasets.federated.dataset import Dataset
+from fltk.samplers.distributed_sampler import DistributedSamplerWrapper
 from fltk.samplers import DistributedSamplerWrapper
 
 
@@ -23,6 +29,94 @@ def sparse2coarse(targets: np.ndarray):
                               16, 19,  2,  4,  6, 19,  5,  5,  8, 19, 
                               18,  1,  2, 15,  6,  0, 17,  8, 14, 13])
     return coarse_labels[targets]
+
+
+class TaskIndexSampler(abc.ABC):
+
+    def __init__(self, task_order):
+        self.task_order = task_order
+
+    @abc.abstractmethod
+    def task_indices(self, task_index):
+        pass
+class ExpandingWindowSampler(TaskIndexSampler):
+
+    def task_indices(self, task_index):
+        return self.task_order[:task_index+1]
+
+class SlidingWindowSampler(TaskIndexSampler):
+
+    def __init__(self, window_size=1):
+        """Sliding or Jumping window TaskIndexSampler, to allow for the selection of different types of...
+
+        @param window_size:
+        @type window_size:
+        """
+        self.window_size = window_size
+    def task_indices(self, task_index):
+        """Returns a sliding (/jumping) window of tasks, depending on the window size that has been provided to the
+        learner.
+        @param task_index:
+        @type task_index:
+        @return:
+        @rtype:
+        """
+        return self.task_order[max(0, task_index-self.window_size+1):task_index+1]
+
+
+class ContinualSampler(abc.ABC):
+    """Provides Wrapper abstraction around (optional) label non-IID sampler for Federated Learning"""
+
+    def __init__(self,
+                 dataset: Dataset,
+                 sampler: DistributedSamplerWrapper,
+                 task_indices_sampler: TaskIndexSampler,
+                 task_to_label: Dict[int, List[int]],
+                 args=(5, 42),):
+        """
+        @param dataset: Underlying dataset object (required for labels).
+        @type dataset:
+        @param sampler: Distributed sampler wrapper for (potential) non-IID datasets during training.
+        @type sampler:
+        @param task_indices_sampler: Sampler for task indices, to allow for different types of task availability over
+            time.
+        @type task_indices_sampler:
+        @param task_to_label: Mapping from task to label (indices) for a specificied task.
+        @type task_to_label:
+        """
+        self.limit, self.seed = args
+
+        self.dataset = dataset
+        self.subsampler = sampler
+        self.task_indices_sampler = task_indices_sampler
+        self.labels_to_indices = dict()
+        self.task_to_labels = dict()
+
+        self.build_indices()
+        self.indices = []
+
+    def build_indices(self):
+        random = np.random.RandomState(self.seed)
+        label_list = np.array(self.dataset.train_dataset.target)
+        unique_labels = label_list.unique()
+        for target in unique_labels:
+            self.labels_to_indices[target] = np.where(label_list == target)
+
+        random.shuffle(unique_labels)
+
+
+    def set_task(self, task_idx):
+        tasks_till_task_idx = self.task_indices_sampler.task_indices(task_idx)
+        for task in tasks_till_task_idx:
+            task_labels = self.task_to_labels[task]
+            self.task_indices = np.concatenate([
+                self.labels_to_indices[target] for target in task_labels
+            ])
+            # Get fast intersection leveraging
+            subsample_intersection = np.in1d(self.task_indices, np.array(self.subsampler.indices), assume_unique=True)
+            self.indices.append(subsample_intersection)
+
+
 
 
 
@@ -144,9 +238,9 @@ class ContinuousSampler(DistributedSamplerWrapper):
 
         # Currently the wrong implementation but it works in essence.
         indices = list(range(len(self.dataset)))
-        chunk_size = self.total_size // args.tasks
-        task_indices = indices[self.task_idx*chunk_size: (self.task_idx+1)* chunk_size]
+        # Calculate the size of each task, assuming uniform distribution of (underlying) dataset.
         total_task_size = self.total_size // args.tasks
+        task_indices = indices[self.task_idx * total_task_size:(self.task_idx+1) * total_task_size]
         self.indices = task_indices[self.rank:total_task_size:self.n_clients]
 
     def next_task(self):

@@ -5,16 +5,17 @@ from fltk.util.log import getLogger
 
 
 class FedDataset:
-    train_sampler = None
-    test_sampler = None
-    train_dataset = None
-    test_dataset = None
-    train_loader = None
-    test_loader = None
-    logger = getLogger(__name__)
+
 
     def __init__(self, args: FedLearnerConfig):
         self.args = args
+        self.train_sampler = None
+        self.test_sampler = None
+        self.train_dataset = None
+        self.test_dataset = None
+        self.train_loader = None
+        self.test_loader = None
+        self.logger = getLogger(__name__)
 
     def get_args(self):
         """
