@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import abc
+import collections
 import copy
 import gc
 import os
 from collections import OrderedDict
-from typing import Callable, Any, Union
+from typing import Callable, Any, Union, List, Optional
 
 import torch
 from torch.distributed import rpc
@@ -13,6 +14,7 @@ from fltk.datasets.federated import get_fed_dataset
 from fltk.nets import get_net
 from typing import TYPE_CHECKING
 
+from fltk.nets.util import drop_local_weights
 from fltk.util.log import getLogger
 
 if TYPE_CHECKING:
@@ -156,19 +158,25 @@ class Node(abc.ABC):
             self.logger.warning(f"Could not find model: {model_file_path}")
         return model
 
-    def update_nn_parameters(self, new_params: OrderedDict):
+    def update_nn_parameters(self, new_params: OrderedDict, exclude: Optional[Union[str, List[str]]] = None):
         """
         Update the NN's parameters by parameters provided by Federator.
 
         :param new_params: New global weights of the Federated Model. In  case the new parameters are a partial match
             to the current model, only those weights will be added by the client.
         :type new_params: dict
+        :param exclude: (Sub)string or List of named parameters to exclude during updating client parameters from a new
+            global set of parameters.
+        :type exclude: String|List[str]
+
         """
         self.logger.info("Updating parameters received from Federator.")
 
         if len(new_params) != len(self.net.get_state_dict()):
             self.logger.info("Updating parameters with partial update.")
 
+        if exclude is not None:
+            new_params = drop_local_weights(new_params, self.net.named_parameters(), exclude)
         self.net.load_state_dict(copy.deepcopy(new_params), strict=False)
         del new_params
         gc.collect()
