@@ -4,6 +4,7 @@ import abc
 import copy
 import gc
 import os
+from collections import OrderedDict
 from typing import Callable, Any, Union
 
 import torch
@@ -132,6 +133,7 @@ class Node(abc.ABC):
         """
         Return the DNN parameters.
         """
+        # FIXME: COL. filter/share parameters in case of continual learning.
         return self.net.state_dict()
 
 
@@ -154,15 +156,20 @@ class Node(abc.ABC):
             self.logger.warning(f"Could not find model: {model_file_path}")
         return model
 
-    def update_nn_parameters(self, new_params):
+    def update_nn_parameters(self, new_params: OrderedDict):
         """
         Update the NN's parameters by parameters provided by Federator.
 
-        :param new_params: New weights for the neural network
+        :param new_params: New global weights of the Federated Model. In  case the new parameters are a partial match
+            to the current model, only those weights will be added by the client.
         :type new_params: dict
         """
-        self.logger.info("Updating parameters")
-        self.net.load_state_dict(copy.deepcopy(new_params), strict=True)
+        self.logger.info("Updating parameters received from Federator.")
+
+        if len(new_params) != len(self.net.get_state_dict()):
+            self.logger.info("Updating parameters with partial update.")
+
+        self.net.load_state_dict(copy.deepcopy(new_params), strict=False)
         del new_params
         gc.collect()
 
