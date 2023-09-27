@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import abc
-import collections
 import copy
 import gc
 import os
@@ -10,12 +9,13 @@ from typing import Callable, Any, Union, List, Optional
 
 import torch
 from torch.distributed import rpc
-from fltk.datasets.federated import get_fed_dataset
+import fltk.datasets.federated as federated
 from fltk.nets import get_net
 from typing import TYPE_CHECKING
 
 from fltk.nets.util import drop_local_weights
-from fltk.util.log import getLogger
+import fltk.util as util
+from fltk.util import getLogger
 
 if TYPE_CHECKING:
     from fltk.util.config import FedLearnerConfig
@@ -73,7 +73,7 @@ class Node(abc.ABC):
         if world_size:
             config.world_size = world_size
         self.logger.info(f'world size = {config.world_size} with rank={config.rank}')
-        self.dataset = get_fed_dataset(config.dataset_name)(config)
+        self.dataset = federated.get_fed_dataset(config.dataset_name)(config)
         self.finished_init = True
         self.logger.info('Done with init')
 

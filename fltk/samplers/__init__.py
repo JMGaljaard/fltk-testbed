@@ -5,9 +5,9 @@ from .q_sampler import Probability_q_Sampler
 from .dirichlet import DirichletSampler
 from .limit_labels import LimitLabelsSampler
 from .limit_labels_flex import LimitLabelsSamplerFlex
-from ..util.config.definitions import DataSampler
-from ..util.log import getLogger
+from fltk.util.log import getLogger
 
+import fltk.util.config.definitions as defs
 
 def get_sampler(dataset, args):
     """
@@ -27,21 +27,21 @@ def get_sampler(dataset, args):
         msg = f"Using {method} sampler method, with args: {args.get_sampler_args()}"
         logger.debug(msg)
 
-        if method == DataSampler.uniform:
+        if method == defs.DataSampler.uniform:
             sampler = UniformSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank())
-        elif method == DataSampler.q_sampler:
+        elif method == defs.DataSampler.q_sampler:
             sampler = Probability_q_Sampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                             args=args.get_sampler_args())
-        elif method == DataSampler.limit_labels:
+        elif method == defs.DataSampler.limit_labels:
             sampler = LimitLabelsSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                          args=args.get_sampler_args())
-        elif method == DataSampler.limit_labels_flex:
+        elif method == defs.DataSampler.limit_labels_flex:
             sampler = LimitLabelsSamplerFlex(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                              args=args.get_sampler_args())
-        elif method == DataSampler.n_labels:
+        elif method == defs.DataSampler.n_labels:
             sampler = N_Labels(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                args=args.get_sampler_args())
-        elif method == DataSampler.dirichlet:
+        elif method == defs.DataSampler.dirichlet:
             sampler = DirichletSampler(dataset, num_replicas=args.get_world_size(), rank=args.get_rank(),
                                        args=args.get_sampler_args())
         else:  # default

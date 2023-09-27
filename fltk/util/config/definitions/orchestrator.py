@@ -3,14 +3,13 @@ from __future__ import annotations
 from enum import unique, Enum
 from pathlib import Path
 
-from fltk.core.distributed import Orchestrator, BatchOrchestrator, SimulatedOrchestrator
-from fltk.util.task.generator import SequentialArrivalGenerator, SimulatedArrivalGenerator
+import fltk.core.distributed as distributed
+import fltk.util.task as tasks
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from fltk.util.config import DistributedConfig
     from fltk.util.cluster import ClusterManager
-    from fltk.util.task.generator import ArrivalGenerator
 
 
 @unique
@@ -20,7 +19,7 @@ class OrchestratorType(Enum):
     SIMULATED = 'simulated'
 
 
-def get_orchestrator(config: DistributedConfig, cluster_manager: ClusterManager, arrival_generator: ArrivalGenerator) -> Orchestrator:
+def get_orchestrator(config: DistributedConfig, cluster_manager: ClusterManager, arrival_generator: tasks.ArrivalGenerator) -> distributed.Orchestrator:
     """Retrieve Orchestrator type given a Distributed (experiment) configuration. This allows for defining the
     type of experiment (Batch or Simulated arrivals) once, and letting the Orchestrator implementation
     make sure that the tasks are scheduled correctly.
@@ -35,8 +34,8 @@ def get_orchestrator(config: DistributedConfig, cluster_manager: ClusterManager,
 
     """
     __lookup = {
-        OrchestratorType.BATCH: BatchOrchestrator,
-        OrchestratorType.SIMULATED: SimulatedOrchestrator
+        OrchestratorType.BATCH: distributed.BatchOrchestrator,
+        OrchestratorType.SIMULATED: distributed.SimulatedOrchestrator
     }
 
     orchestrator_type = __lookup.get(config.cluster_config.orchestrator.orchestrator_type, None)

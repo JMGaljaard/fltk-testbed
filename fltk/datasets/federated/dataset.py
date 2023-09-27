@@ -1,11 +1,15 @@
+from __future__ import annotations
 from abc import abstractmethod
 
-from fltk.util.config import FedLearnerConfig
-from fltk.util.log import getLogger
+import typing
+
+from fltk.util import getLogger
+
+if typing.TYPE_CHECKING:
+    from fltk.util.config import FedLearnerConfig
 
 
 class FedDataset:
-
 
     def __init__(self, args: FedLearnerConfig):
         self.args = args

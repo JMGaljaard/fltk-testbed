@@ -16,9 +16,8 @@ import numpy as np
 
 from fltk.datasets.dataset import Dataset
 from fltk.util.config.definitions.net import Nets
-from fltk.util.config.experiment_config import (HyperParameters, SystemParameters, LearningParameters, JobDescription,
-                                                ExperimentParser)
-from fltk.util.task.train_task import TrainTask
+import fltk.util.config.experiment_config as exp_config
+import fltk.util.task as tasks
 
 
 @dataclass
@@ -28,7 +27,7 @@ class ArrivalGenerator(abc.ABC):  # pylint: disable=too-many-instance-attributes
     """
 
     configuration_path: Path
-    job_dict: OrderedDict[str, JobDescription] = None
+    job_dict: OrderedDict[str, exp_config.JobDescription] = None
     logger: logging.Logger = None
     arrivals: "Queue[Arrival]" = Queue()
 
@@ -42,7 +41,7 @@ class ArrivalGenerator(abc.ABC):  # pylint: disable=too-many-instance-attributes
         @return: None
         @rtype: None
         """
-        parser = ExperimentParser(config_path=self.configuration_path)
+        parser = exp_config.ExperimentParser(config_path=self.configuration_path)
         experiment_descriptions = parser.parse()
         self.job_dict = collections.OrderedDict(
                 {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions.train_tasks)})
@@ -105,7 +104,7 @@ class Arrival:
     Uses a single timer to allow for generation of tasks with lower overhead.
     """
     ticks: Optional[int]
-    task: TrainTask
+    task: tasks.TrainTask
     task_id: str
 
     def get_priority(self):  # pylint: disable=missing-function-docstring
@@ -117,13 +116,13 @@ class Arrival:
     def get_dataset(self) -> Dataset:  # pylint: disable=missing-function-docstring
         return self.task.network_configuration.dataset
 
-    def get_system_config(self) -> SystemParameters:  # pylint: disable=missing-function-docstring
+    def get_system_config(self) -> exp_config.SystemParameters:  # pylint: disable=missing-function-docstring
         return self.task.system_parameters
 
-    def get_parameter_config(self) -> HyperParameters:  # pylint: disable=missing-function-docstring
+    def get_parameter_config(self) -> exp_config.HyperParameters:  # pylint: disable=missing-function-docstring
         return self.task.hyper_parameters
 
-    def get_learning_config(self) -> LearningParameters:  # pylint: disable=missing-function-docstring
+    def get_learning_config(self) -> exp_config.LearningParameters:  # pylint: disable=missing-function-docstring
         return self.task.learning_parameters
 
 
@@ -137,7 +136,7 @@ class SimulatedArrivalGenerator(ArrivalGenerator):
     Allowing to schedule different configuration of experiments, to see how a scheduling algorithm behaves. For example
     simulating users/systems deploying training pipelines with regular intervals.
     """
-    job_dict: Dict[str, JobDescription] = None
+    job_dict: Dict[str, exp_config.JobDescription] = None
 
     _tick_list: List[Arrival] = []
     _decrement = 10
@@ -168,7 +167,7 @@ class SimulatedArrivalGenerator(ArrivalGenerator):
         """
         msg = f"Creating task for {task_id}"
         self.logger.info(msg)
-        job: JobDescription = self.job_dict[task_id]
+        job: exp_config.JobDescription = self.job_dict[task_id]
 
         # Select job configuration according to the weight of the `classProbability` (limit 1)
         parameters, *_ = choices(job.job_class_parameters,
@@ -177,7 +176,7 @@ class SimulatedArrivalGenerator(ArrivalGenerator):
         priority, *_ = choices(parameters.priorities, [prio.probability for prio in parameters.priorities], k=1)
 
         inter_arrival_ticks = np.random.poisson(lam=job.arrival_statistic) * inter_arrival_unit.seconds
-        train_task = TrainTask(identity=task_id,
+        train_task = tasks.TrainTask(identity=task_id,
                                job_parameters=parameters,
                                priority=priority,
                                experiment_type=job.experiment_type)
@@ -263,7 +262,7 @@ class SequentialArrivalGenerator(ArrivalGenerator):
         @rtype: None
         """
         self.start_time = time.time()
-        description: JobDescription
+        description: exp_config.JobDescription
         if not seed:
             replace_seed = random.randint(0, (2 ** 32) - 2)
             logging.warning(f"Cannot generate repeatable experiments without seed, will set: {replace_seed}")
@@ -271,7 +270,7 @@ class SequentialArrivalGenerator(ArrivalGenerator):
         for job_name, description in self.job_dict.items():
             for repl, job_class_param in enumerate(description.job_class_parameters):
                 replication_name = f"{job_name}_{repl}_{seed}"
-                train_task = TrainTask(identity=replication_name,
+                train_task = tasks.TrainTask(identity=replication_name,
                                        job_parameters=job_class_param,
                                        priority=None,
                                        replication=repl,

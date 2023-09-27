@@ -11,17 +11,14 @@ from typing import OrderedDict, Dict, Type, Set, Union, Optional, List
 from typing import TYPE_CHECKING
 
 from jinja2 import Environment, FileSystemLoader
-from kubeflow.training import PyTorchJobClient
-from kubeflow.training.constants.constants import PYTORCHJOB_GROUP, PYTORCHJOB_VERSION, PYTORCHJOB_PLURAL
+from kubeflow.training import TrainingClient
+from kubeflow.training.constants.constants import KUBEFLOW_GROUP, OPERATOR_VERSION, PYTORCHJOB_PLURAL
 from kubernetes import client
 from kubernetes.client import V1ConfigMap, V1ObjectMeta
 
 from fltk.core.distributed.dist_node import DistNode
-from fltk.util.cluster.client import construct_job, ClusterManager
-from fltk.util.task import get_job_arrival_class, DistributedArrivalTask, FederatedArrivalTask, ArrivalTask
-from fltk.util.task.arrival_task import HistoricalArrivalTask, _ArrivalTask
-from fltk.util.task.generator import ArrivalGenerator
-
+import fltk.util.cluster.client as client_manager
+import fltk.util.task as tasks
 if TYPE_CHECKING:
     from fltk.util.config import DistributedConfig
 
@@ -31,7 +28,7 @@ EXPERIMENT_DIR = 'experiments'
 __ENV = Environment(loader=FileSystemLoader(EXPERIMENT_DIR))
 
 
-def _generate_experiment_path_name(task: ArrivalTask, u_id: Union[uuid.UUID, str], config: DistributedConfig):
+def _generate_experiment_path_name(task: tasks.ArrivalTask, u_id: Union[uuid.UUID, str], config: DistributedConfig):
     """
     Helper function to generate experiment name for logging without conflicts
     @param task: Arrival task for Task related information.
@@ -50,7 +47,7 @@ def _generate_experiment_path_name(task: ArrivalTask, u_id: Union[uuid.UUID, str
     return full_path
 
 
-def render_template(task: ArrivalTask, tpe: str, replication: int, experiment_path: str) -> str:
+def render_template(task: tasks.ArrivalTask, tpe: str, replication: int, experiment_path: str) -> str:
     """
     Helper function to render jinja templates with necessary arguments for experiment (types). These templates are
     used for generating ConfigMaps used by the Pods that perform the learning experiments.
@@ -65,9 +62,9 @@ def render_template(task: ArrivalTask, tpe: str, replication: int, experiment_pa
     @return: Rendered template containing the content of a ConfigMap for a learner of `tpe` for the provided task.
     @rtype: str
     """
-    if isinstance(task, FederatedArrivalTask):
+    if isinstance(task, tasks.FederatedArrivalTask):
         template = __ENV.get_template('node.jinja.yaml')
-    elif isinstance(task, DistributedArrivalTask):
+    elif isinstance(task, tasks.DistributedArrivalTask):
         template = __ENV.get_template('dist_node.jinja.yaml')
     else:
         raise Exception(f"Cannot handle type of task: {task}")
@@ -75,7 +72,7 @@ def render_template(task: ArrivalTask, tpe: str, replication: int, experiment_pa
     return filled_template
 
 
-def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig, u_id: uuid.UUID, replication: int = 1) -> \
+def _prepare_experiment_maps(task: tasks.ArrivalTask, config: DistributedConfig, u_id: uuid.UUID, replication: int = 1) -> \
         (OrderedDict[str, V1ConfigMap], OrderedDict[str, str]):
     """
     Helper private function to create ConfigMap descriptions for a deployment of learners.
@@ -103,7 +100,7 @@ def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig, u_id:
     return type_dict, name_dict
 
 
-def _generate_task(arrival) -> ArrivalTask:
+def _generate_task(arrival) -> tasks.ArrivalTask:
     """
     Function to generate a task from an Arrival.
     @param arrival: Arrival to create a (runnable) Task from.
@@ -112,7 +109,7 @@ def _generate_task(arrival) -> ArrivalTask:
     @rtype: ArrivalTask
     """
     unique_identifier: uuid.UUID = uuid.uuid4()
-    task_type: Type[ArrivalTask] = get_job_arrival_class(arrival.task.experiment_type)
+    task_type: Type[tasks.ArrivalTask] = tasks.get_job_arrival_class(arrival.task.experiment_type)
     task = task_type.build(arrival=arrival,
                            u_id=unique_identifier,
                            replication=arrival.task.replication)
@@ -137,12 +134,12 @@ class Orchestrator(DistNode, abc.ABC):
     """
     _alive = False
     # Priority queue, requires an orderable object, otherwise a Tuple[int, Any] can be used to insert.
-    pending_tasks: "PriorityQueue[ArrivalTask]" = PriorityQueue()
-    deployed_tasks: Set[_ArrivalTask] = set()
-    completed_tasks: Set[_ArrivalTask] = set()
+    pending_tasks: "PriorityQueue[tasks.ArrivalTask]" = PriorityQueue()
+    deployed_tasks: Set[tasks.arrival_task._ArrivalTask] = set()
+    completed_tasks: Set[tasks.arrival_task._ArrivalTask] = set()
     SLEEP_TIME = 5
 
-    def __init__(self, cluster_mgr: ClusterManager, arv_gen: ArrivalGenerator, config: DistributedConfig):
+    def __init__(self, cluster_mgr: client_manager.ClusterManager, arv_gen: tasks.ArrivalGenerator, config: DistributedConfig):
         self._logger = logging.getLogger('Orchestrator')
         self._logger.debug("Loading in-cluster configuration")
         self._cluster_mgr = cluster_mgr
@@ -150,7 +147,7 @@ class Orchestrator(DistNode, abc.ABC):
         self._config = config
 
         # API to interact with the cluster.
-        self._client = PyTorchJobClient()
+        self._client = TrainingClient()
         self._v1 = client.CoreV1Api()
 
     def stop(self) -> None:
@@ -195,8 +192,8 @@ class Orchestrator(DistNode, abc.ABC):
             self._logger.info(f'Deleting: {job_name}')
             try:
                 self._client.custom_api.delete_namespaced_custom_object(
-                        PYTORCHJOB_GROUP,
-                        PYTORCHJOB_VERSION,
+                        KUBEFLOW_GROUP,
+                        OPERATOR_VERSION,
                         namespace,
                         PYTORCHJOB_PLURAL,
                         job_name)
@@ -222,7 +219,7 @@ class Orchestrator(DistNode, abc.ABC):
             uuid_regex = re.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
             ids = {uuid_regex.search(task).group() for task in others if uuid_regex.search(task) is not None}
-            historical_tasks = map(HistoricalArrivalTask, ids)
+            historical_tasks = map(tasks.HistoricalArrivalTask, ids)
             self.deployed_tasks.update(historical_tasks)
         while len(self.deployed_tasks) > 0:
             task_to_move = set()
@@ -250,7 +247,7 @@ class SimulatedOrchestrator(Orchestrator):
     are supported.
     """
 
-    def __init__(self, cluster_mgr: ClusterManager, arrival_generator: ArrivalGenerator, config: DistributedConfig):
+    def __init__(self, cluster_mgr: client_manager.ClusterManager, arrival_generator: ArrivalGenerator, config: DistributedConfig):
         super().__init__(cluster_mgr, arrival_generator, config)
 
     def run(self, clear: bool = False, experiment_replication: int = -1) -> None:
@@ -279,7 +276,7 @@ class SimulatedOrchestrator(Orchestrator):
                                                                             replication=experiment_replication)
                 self._create_config_maps(config_dict)
 
-                job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
+                job_to_start = client_manager.construct_job(self._config, curr_task, configmap_name_dict)
                 self._logger.info(f"Deploying on cluster: {curr_task.id}")
                 self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
                 self.deployed_tasks.add(curr_task)
@@ -300,7 +297,7 @@ class BatchOrchestrator(Orchestrator):
     Orchestrator implementation to allow for running all experiments that were defined in one go.
     """
 
-    def __init__(self, cluster_mgr: ClusterManager, arrival_generator: ArrivalGenerator, config: DistributedConfig):
+    def __init__(self, cluster_mgr: client_manager.ClusterManager, arrival_generator: ArrivalGenerator, config: DistributedConfig):
         super().__init__(cluster_mgr, arrival_generator, config)
 
     def run(self, clear: bool = False,
@@ -358,7 +355,7 @@ class BatchOrchestrator(Orchestrator):
                                                                         replication=experiment_replication)
             self._create_config_maps(config_dict)
 
-            job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
+            job_to_start = client_manager.construct_job(self._config, curr_task, configmap_name_dict)
             self._logger.info(f"Deploying on cluster: {curr_task.id}")
             self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
             self.deployed_tasks.add(curr_task)

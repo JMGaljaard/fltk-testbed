@@ -1,18 +1,22 @@
+from __future__ import annotations
 from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision import transforms
 
-from fltk.datasets.federated.dataset import FedDataset
-from fltk.samplers import get_sampler
-from fltk.util.config import FedLearnerConfig
+import fltk.datasets.federated.dataset as dataset
+import fltk.samplers as samplers
+import typing
+if typing.TYPE_CHECKING:
+
+    import fltk.util.config as learn_config
 
 
-class FedCIFAR10Dataset(FedDataset):
+class FedCIFAR10Dataset(dataset.FedDataset):
     """
     CIFAR10 Dataset implementation for Distributed learning experiments.
     """
 
-    def __init__(self, args: FedLearnerConfig):
+    def __init__(self, args: learn_config.FedLearnerConfig):
         super(FedCIFAR10Dataset, self).__init__(args)
         self.init_train_dataset()
         self.init_test_dataset()
@@ -30,7 +34,7 @@ class FedCIFAR10Dataset(FedDataset):
         ])
         self.train_dataset = datasets.CIFAR10(root=self.get_args().get_data_path(), train=True, download=True,
                                               transform=transform)
-        self.train_sampler = get_sampler(self.train_dataset, self.args)
+        self.train_sampler = samplers.get_sampler(self.train_dataset, self.args)
         self.train_loader = DataLoader(self.train_dataset, batch_size=self.args.batch_size, sampler=self.train_sampler)
         self.logger.info(f"this client gets {len(self.train_sampler)} samples")
         # logging.info("this client gets {} samples".format(len(self.train_sampler)))
@@ -46,5 +50,5 @@ class FedCIFAR10Dataset(FedDataset):
         ])
         self.test_dataset = datasets.CIFAR10(root=self.get_args().get_data_path(), train=False, download=True,
                                              transform=transform)
-        self.test_sampler = get_sampler(self.test_dataset, self.args)
+        self.test_sampler = samplers.get_sampler(self.test_dataset, self.args)
         self.test_loader = DataLoader(self.test_dataset, batch_size=self.args.test_batch_size, sampler=self.test_sampler)

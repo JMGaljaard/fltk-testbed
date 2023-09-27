@@ -1,4 +1,6 @@
+from __future__ import annotations
 import logging
+import typing
 from dataclasses import dataclass, field
 from pathlib import Path
 # noinspection PyUnresolvedReferences
@@ -6,7 +8,8 @@ from typing import Optional, Union, Tuple, Dict, Any, MutableMapping, Type, Orde
 
 from dataclasses_json import dataclass_json, LetterCase, config
 
-from fltk.util.config.definitions import Optimizations, Nets, Dataset, DataSampler, Aggregations, ExperimentType, Loss
+if typing.TYPE_CHECKING:
+    import fltk.util.config.definitions as defs
 
 
 def _none_factory() -> None:
@@ -25,7 +28,7 @@ def _none_factory() -> None:
 @dataclass(frozen=True)
 class OptimizerConfig:
     """Dataclass containing learning Optimizer parameters for learning tasks."""
-    type: Optional[Optimizations] = None
+    type: Optional[defs.Optimizations] = None
     momentum: Optional[Union[float, Tuple[float]]] = None
     betas: Optional[Union[float, Tuple[float]]] = None
     lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory)
@@ -205,16 +208,16 @@ class SystemParameters:
 @dataclass(frozen=True)
 class NetworkConfiguration:
     """Dataclass describing the network and dataset that is 'trained' for a task."""
-    network: Nets
-    dataset: Dataset
-    loss_function: Optional[Loss]
+    network: defs.Nets
+    dataset: defs.Dataset
+    loss_function: Optional[defs.Loss]
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class SamplerConfiguration:
     """Dataclass containing configuration for datasampler to be used by learners."""
-    type: DataSampler
+    type: defs.DataSampler
     q_value: str
     seed: int
     shuffle: bool
@@ -228,7 +231,7 @@ class LearningParameters:
     rounds: Optional[int] = None
     epochs_per_round: Optional[int] = None
     clients_per_round: Optional[int] = None
-    aggregation: Optional[Aggregations] = None
+    aggregation: Optional[defs.Aggregations] = None
     data_sampler: Optional[SamplerConfiguration] = None
 
 
@@ -253,7 +256,7 @@ class JobDescription:
     preemtible_jobs: indicates whether the jobs can be pre-emptively rescheduled by the scheduler. This is currently
     not implemented in FLTK, but could be added as a project (advanced).
     """
-    experiment_type: ExperimentType = field(metadata=config(field_name='type'))
+    experiment_type: defs.ExperimentType = field(metadata=config(field_name='type'))
     job_class_parameters: List[JobClassParameter]
     preemtible_jobs: Optional[bool] = field(metadata=config(field_name='preemptJobs'), default_factory=_none_factory)
     arrival_statistic: Optional[float] = field(metadata=config(field_name='lambda'), default_factory=_none_factory)

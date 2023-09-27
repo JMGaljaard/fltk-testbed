@@ -1,6 +1,8 @@
+from __future__ import annotations
 import abc
 import collections
 import random
+import typing
 import uuid
 from dataclasses import field, dataclass
 # noinspection PyUnresolvedReferences
@@ -9,13 +11,13 @@ from uuid import UUID
 
 from frozendict import FrozenOrderedDict
 
-from fltk.datasets.dataset import Dataset
-from fltk.util.config.definitions import Nets
-from fltk.util.config.experiment_config import (OptimizerConfig, HyperParameters, SystemResources, SystemParameters,
-                                                SamplerConfiguration, LearningParameters)
-from fltk.util.task.generator.arrival_generator import Arrival
+import fltk.util.config.definitions as defs
+from fltk.util.config import experiment_config as exp_config
 
 MASTER_REPLICATION: int = 1  # Static master replication value, dictated by PytorchTrainingJobs
+
+if typing.TYPE_CHECKING:
+    import fltk.util.task as tasks
 
 
 @dataclass(frozen=True)
@@ -39,20 +41,20 @@ class ArrivalTask(_ArrivalTask):
     DataClass representation of an ArrivalTask, representing all the information needed to spawn a new learning task.
     Allows for sorting by priority (integer) in case priority queues are needed.
     """
-    network: Nets = field(compare=False)
-    dataset: Dataset = field(compare=False)
+    network: defs.Nets = field(compare=False)
+    dataset: defs.Dataset = field(compare=False)
     loss_function: str = field(compare=False)
     seed: int = field(compare=False)
     replication: int = field(compare=False)
     type_map: "Optional[FrozenOrderedDict[str, int]]" = field(compare=False)
-    system_parameters: SystemParameters = field(compare=False)
-    hyper_parameters: HyperParameters = field(compare=False)
-    learning_parameters: LearningParameters = field(compare=False)
+    system_parameters: exp_config.SystemParameters = field(compare=False)
+    hyper_parameters: exp_config.HyperParameters = field(compare=False)
+    learning_parameters: exp_config.LearningParameters = field(compare=False)
     priority: Optional[int] = None
 
     @staticmethod
     @abc.abstractmethod
-    def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> T:
+    def build(arrival: tasks.Arrival, u_id: uuid.UUID, replication: int) -> T:
         """
         Function to build a specific type of ArrivalTask.
         @param arrival: Arrival object with configuration for an experiment (or Arrival).
@@ -65,7 +67,7 @@ class ArrivalTask(_ArrivalTask):
         @rtype: T
         """
 
-    def named_system_params(self) -> OrderedDict[str, SystemResources]:
+    def named_system_params(self) -> OrderedDict[str, exp_config.SystemResources]:
         """
         Helper function to get system parameters by name.
         @return: Dictionary corresponding to System resources per learner type.
@@ -130,7 +132,7 @@ class ArrivalTask(_ArrivalTask):
         @return: Arguments for the sampler function.
         @rtype: List[str]
         """
-        sampler_conf: SamplerConfiguration = self.learning_parameters.data_sampler
+        sampler_conf: exp_config.SamplerConfiguration = self.learning_parameters.data_sampler
         args = [sampler_conf.q_value, sampler_conf.seed]
         return args
 
@@ -157,7 +159,7 @@ class ArrivalTask(_ArrivalTask):
         @return: Kwarg dict populated with optimizer configuration.
         @rtype: Dict[str, Any]
         """
-        optimizer_conf: OptimizerConfig = self.hyper_parameters.configurations[tpe].optimizer_config
+        optimizer_conf: exp_config.OptimizerConfig = self.hyper_parameters.configurations[tpe].optimizer_config
         kwargs = {
             'lr': optimizer_conf.lr,
         }
@@ -205,7 +207,7 @@ class DistributedArrivalTask(ArrivalTask):
     """
 
     @staticmethod
-    def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> T:
+    def build(arrival: tasks.Arrival, u_id: uuid.UUID, replication: int) -> T:
         """
         Construct a DistributedArrivalTask from an Arrival object.
 
@@ -246,7 +248,7 @@ class FederatedArrivalTask(ArrivalTask):
     """
 
     @staticmethod
-    def build(arrival: Arrival, u_id: uuid.UUID, replication: int) -> "FederatedArrivalTask":
+    def build(arrival: tasks.Arrival, u_id: uuid.UUID, replication: int) -> "FederatedArrivalTask":
         """
         Create FederatedArrivalTask from Arrival, with pre-defined seed of Task (assuming replicable experiments),
         replication, and number of workers equal to data parallelism.

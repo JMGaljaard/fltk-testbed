@@ -1,11 +1,8 @@
 import logging
 
-from fltk.util.config.definitions import LogLevel
-
-
-def getLogger(module_name, level: LogLevel = LogLevel.INFO):
+def getLogger(module_name, level = logging.INFO):
     logging.basicConfig(
-        level=level.value,
+        level=level,
         format='%(asctime)s %(levelname)s %(module)s - %(funcName)s: %(message)s',
     )
     return logging.getLogger(module_name)

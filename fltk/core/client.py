@@ -3,8 +3,7 @@ from __future__  import annotations
 import gc
 import multiprocessing
 import queue
-from collections import OrderedDict
-from typing import Tuple, Any, Type, Callable
+from typing import Tuple, Any, Callable
 
 import numpy as np
 import sklearn

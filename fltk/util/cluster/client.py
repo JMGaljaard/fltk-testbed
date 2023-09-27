@@ -11,13 +11,13 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 import schedule
-from kubeflow.training import V1ReplicaSpec, KubeflowOrgV1PyTorchJob, KubeflowOrgV1PyTorchJobSpec, V1RunPolicy
+from kubeflow.training import KubeflowOrgV1ReplicaSpec, KubeflowOrgV1PyTorchJob, KubeflowOrgV1PyTorchJobSpec, KubeflowOrgV1RunPolicy
 from kubernetes import client
 from kubernetes.client import V1ObjectMeta, V1ResourceRequirements, V1Container, V1PodTemplateSpec, \
     V1VolumeMount, V1Toleration, V1Volume, V1PersistentVolumeClaimVolumeSource, V1ConfigMapVolumeSource
 
 from fltk.util.cluster.conversion import Convert
-from fltk.util.task.arrival_task import DistributedArrivalTask, ArrivalTask, FederatedArrivalTask
+import fltk.util.task as tasks
 
 if TYPE_CHECKING:
     from fltk.util.config.experiment_config import SystemResources
@@ -211,7 +211,7 @@ class ClusterManager(abc.ABC):
 
 
 
-def _generate_command(config: DistributedConfig, task: ArrivalTask) -> List[str]:
+def _generate_command(config: DistributedConfig, task: tasks.ArrivalTask) -> List[str]:
     """
     Function to generate commands for containers to start working with. Either a federated learnign command
     will be realized, or a distributed learning command. Note that distributed learning commands will be revised
@@ -223,7 +223,7 @@ def _generate_command(config: DistributedConfig, task: ArrivalTask) -> List[str]
     @return:
     @rtype:
     """
-    federated = isinstance(task, FederatedArrivalTask)
+    federated = isinstance(task, tasks.FederatedArrivalTask)
     if federated:
         command = 'python3 -m fltk remote experiments/node.config.yaml'
     else:
@@ -309,7 +309,7 @@ class DeploymentBuilder:
         del self._build_description
         self._build_description = BuildDescription()
 
-    def build_resources(self, arrival_task: ArrivalTask) -> None:
+    def build_resources(self, arrival_task: tasks.ArrivalTask) -> None:
         """
         Build resources for a V1PytorchJob, specificing the amount of RAM and CPU (cores) for the Pods to be spawned
         in the training job deployment.
@@ -326,7 +326,7 @@ class DeploymentBuilder:
             self._build_description.resources[tpe] = client.V1ResourceRequirements(requests=typed_req_dict,
                                                                                    limits=typed_req_dict)
 
-    def build_container(self, task: ArrivalTask, conf: DistributedConfig,
+    def build_container(self, task: tasks.ArrivalTask, conf: DistributedConfig,
                         configmap_name_dict: Optional[Dict[str, str]]):
         """
         Function to build container descriptions for deploying from within an Orchestrator pod.
@@ -408,7 +408,7 @@ class DeploymentBuilder:
                                               volumes=volumes,
                                               tolerations=self._build_description.tolerations))
 
-    def build_spec(self, task: ArrivalTask, restart_policy: str = 'Never', clean_policy:  Optional[str] = None) -> None:
+    def build_spec(self, task: tasks.ArrivalTask, restart_policy: str = 'Never', clean_policy:  Optional[str] = None) -> None:
         """
         Function to build V1JobSpec object that contains the specifications of the Pods to be spawned in Kubernetes.
         Effectively this function creates the replica counts for the `Master` and `Worker` nodes in the train job
@@ -421,9 +421,9 @@ class DeploymentBuilder:
         @return: None
         @rtype: None
         """
-        pt_rep_spec = OrderedDict[str, V1ReplicaSpec]()
+        pt_rep_spec = OrderedDict[str, KubeflowOrgV1ReplicaSpec]()
         for tpe, tpe_template in self._build_description.typed_templates.items():
-            typed_replica_spec = V1ReplicaSpec(
+            typed_replica_spec = KubeflowOrgV1ReplicaSpec(
                     replicas=task.typed_replica_count(tpe),
                     restart_policy=restart_policy,
                     template=tpe_template)
@@ -431,7 +431,7 @@ class DeploymentBuilder:
 
         # N.B. This will not result in deleting pods.
         job_spec = KubeflowOrgV1PyTorchJobSpec(pytorch_replica_specs=pt_rep_spec,
-                                               run_policy=V1RunPolicy(clean_pod_policy=clean_policy))
+                                               run_policy=KubeflowOrgV1RunPolicy(clean_pod_policy=clean_policy))
         self._build_description.spec = job_spec
 
     def construct(self) -> KubeflowOrgV1PyTorchJob:
@@ -449,7 +449,7 @@ class DeploymentBuilder:
                 spec=self._build_description.spec)
         return job
 
-    def create_identifier(self, task: ArrivalTask):
+    def create_identifier(self, task: tasks.ArrivalTask):
         """
         Function to set the task identifier.
         @param task: Learning task for which a job description must be made.
@@ -460,7 +460,7 @@ class DeploymentBuilder:
         self._build_description.id = task.id
 
 
-def construct_job(conf: DistributedConfig, task: ArrivalTask,
+def construct_job(conf: DistributedConfig, task: tasks.ArrivalTask,
                   configmap_name_dict: Optional[Dict[str, str]] = None) -> KubeflowOrgV1PyTorchJob:
     """
     Function to build a Job, based on the specifications of an ArrivalTask, and the general configuration of the

@@ -1,14 +1,15 @@
+from __future__ import annotations
 import abc
-import random
 from typing import Dict, List
 
-import torch
 import numpy as np
-from torch.utils.data import Sampler
 
-from fltk.datasets.federated.dataset import Dataset
-from fltk.samplers.distributed_sampler import DistributedSamplerWrapper
+
+import typing
 from fltk.samplers import DistributedSamplerWrapper
+
+if typing.TYPE_CHECKING:
+    from fltk.datasets.federated import FedDataset
 
 
 def sparse2coarse(targets: np.ndarray):
@@ -39,6 +40,7 @@ class TaskIndexSampler(abc.ABC):
     @abc.abstractmethod
     def task_indices(self, task_index):
         pass
+
 class ExpandingWindowSampler(TaskIndexSampler):
 
     def task_indices(self, task_index):
@@ -68,11 +70,15 @@ class ContinualSampler(abc.ABC):
     """Provides Wrapper abstraction around (optional) label non-IID sampler for Federated Learning"""
 
     def __init__(self,
-                 dataset: Dataset,
+                 dataset: FedDataset,
                  sampler: DistributedSamplerWrapper,
                  task_indices_sampler: TaskIndexSampler,
                  task_to_label: Dict[int, List[int]],
-                 args=(5, 42),):
+                 args=(5, 42),
+                 indices = None,
+                 labels_to_indices = None,
+                 task_to_indices = None
+                 ):
         """
         @param dataset: Underlying dataset object (required for labels).
         @type dataset:
@@ -81,7 +87,8 @@ class ContinualSampler(abc.ABC):
         @param task_indices_sampler: Sampler for task indices, to allow for different types of task availability over
             time.
         @type task_indices_sampler:
-        @param task_to_label: Mapping from task to label (indices) for a specificied task.
+        @param task_to_label: Mapping from task to a list of labels corresponding to a class. Depending on coarse or
+            fine labels, this will eighter be a list of length 1, or of length #classes in a task.
         @type task_to_label:
         """
         self.limit, self.seed = args
@@ -89,24 +96,45 @@ class ContinualSampler(abc.ABC):
         self.dataset = dataset
         self.subsampler = sampler
         self.task_indices_sampler = task_indices_sampler
-        self.labels_to_indices = dict()
-        self.task_to_labels = dict()
+        self.task_to_labels = task_to_label
 
-        self.build_indices()
-        self.indices = []
+        self.labels_to_indices = dict() if labels_to_indices is None else labels_to_indices
+        self.task_to_indices = dict() if task_to_indices is None else task_to_indices
+        self.indices = [] if indices is None else indices
+        if labels_to_indices is None and task_to_indices is None:
+            self.build_indices()
 
     def build_indices(self):
-        random = np.random.RandomState(self.seed)
+        """Helper function to pre-compute indices to construct tasks given a task index provided a mapping of tasks to
+        labels for a supervised FedDataset.
+        @return: None
+        @rtype: None
+        """
+        # random = np.random.RandomState(self.seed)
         label_list = np.array(self.dataset.train_dataset.target)
         unique_labels = label_list.unique()
         for target in unique_labels:
             self.labels_to_indices[target] = np.where(label_list == target)
 
-        random.shuffle(unique_labels)
+        for task, task_labels in self.task_to_labels:
+            task_sample_indices = np.concatenate([
+                self.labels_to_indices[target] for target in task_labels
+            ])
+            task_sub_samples = np.in1d(task_sample_indices, np.array(self.subsampler.indices), assume_unique=True)
+            self.task_to_indices[task] = task_sub_samples
 
 
-    def set_task(self, task_idx):
+    def set_task_(self, task_idx):
+        """Inplace method to set the task_index of a client. This will leverage the provided Task Indices subsampler
+        to ensure that all the corresponding labels of a task are loaded. Note that this function will change the
+        indicises in-place, and must thus be used *before* passing to a DataLoader.
+        @param task_idx:
+        @type task_idx:
+        @return:
+        @rtype:
+        """
         tasks_till_task_idx = self.task_indices_sampler.task_indices(task_idx)
+        self.indices = []
         for task in tasks_till_task_idx:
             task_labels = self.task_to_labels[task]
             self.task_indices = np.concatenate([
@@ -116,8 +144,22 @@ class ContinualSampler(abc.ABC):
             subsample_intersection = np.in1d(self.task_indices, np.array(self.subsampler.indices), assume_unique=True)
             self.indices.append(subsample_intersection)
 
-
-
+    def copy(self):
+        return ContinualSampler(
+            self.dataset, self.subsampler, self.task_indices_sampler, self.task_to_labels, args=(self.limit, self.seed),
+            indices=[], labels_to_indices=self.labels_to_indices, task_to_indices=self.task_to_indices)
+    def set_task(self, task_idx):
+        """Method to set the task_index of a client. This will leverage the provided Task Indices subsampler to ensure
+        that all the corresponding labels of a task are loaded. Note that this returns a new instance with the same
+        pre-computed lookup directories. However, with different task_index.
+        @param task_idx:
+        @type task_idx:
+        @return:
+        @rtype:
+        """
+        new_continual_sampler = self.copy()
+        new_continual_sampler.set_task_(task_idx)
+        return new_continual_sampler
 
 
 class ContinuousSampler(DistributedSamplerWrapper):
@@ -126,12 +168,19 @@ class ContinuousSampler(DistributedSamplerWrapper):
     The number of clients must <= than number of labels
     """
 
-    def __init__(self, dataset, num_replicas: int, rank: int, partitioning: str, num_tasks: int, args=(5, 42)):
+    def __init__(
+            self,
+            dataset: FedDataset,
+            num_replicas: int,
+            rank: int,
+            partitioning: str,
+            num_tasks: int,
+            args=(5, 42)):
         limit, seed = args
         self.num_tasks = num_tasks
         self.partition = partitioning
         self.task_idx = 0
-        super().__init__(dataset, num_replicas, rank, seed)
+        super(ContinuousSampler, self).__init__(dataset, num_replicas, rank, seed)
 
         # Column based sampling
         # We assume that the dataset has labels
@@ -248,4 +297,3 @@ class ContinuousSampler(DistributedSamplerWrapper):
 
     def set_task(self, idx: int):
         self.task_idx = idx
-        

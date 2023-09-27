@@ -6,11 +6,11 @@ from typing import Optional, List
 
 from dataclasses_json import config, dataclass_json
 
-from fltk.util.config.definitions import OrchestratorType
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from fltk.util.config.definitions import OrchestratorType
     from fltk.util.config import DistLearnerConfig
 
 

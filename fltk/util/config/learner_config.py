@@ -119,7 +119,8 @@ class FedLearnerConfig(LearnerConfig):
 
     # Set by Node upon argument
     rank: int = 0
-    world_size: int = 0
+    # Minimum world size for federated learning is 2
+    world_size: int = 2
 
     replication_id: int = None
     experiment_prefix: str = ''
