@@ -33,6 +33,9 @@ def sparse2coarse(targets: np.ndarray):
 
 
 class TaskIndexSampler(abc.ABC):
+    """Abstract base class for Continous task sampling, which stores the pre-computed ordering of tasks over time
+    within a sampler object. Concrete instances implement the availability of tasks over time.
+    """
 
     def __init__(self, task_order):
         self.task_order = task_order
@@ -42,19 +45,27 @@ class TaskIndexSampler(abc.ABC):
         pass
 
 class ExpandingWindowSampler(TaskIndexSampler):
+    """Continual Learning Task sampler for an expanding window of the data without providing feedback out of *which*
+    task a sample came. I.e., returns the list of task identifiers that were seen up until a requested task_index.
+    """
 
     def task_indices(self, task_index):
         return self.task_order[:task_index+1]
 
-class SlidingWindowSampler(TaskIndexSampler):
 
-    def __init__(self, window_size=1):
+class SlidingWindowSampler(TaskIndexSampler):
+    """Continual Learning Task sampler for a Sliding window of the data without providing feedback out of *which*
+    task a sample came. I.e., returns the list of length 1 of task identifiers that were seen up until a requested task_index.
+    """
+    def __init__(self, task_order, window_size=1):
         """Sliding or Jumping window TaskIndexSampler, to allow for the selection of different types of...
 
         @param window_size:
         @type window_size:
         """
+        super().__init__(task_order)
         self.window_size = window_size
+
     def task_indices(self, task_index):
         """Returns a sliding (/jumping) window of tasks, depending on the window size that has been provided to the
         learner.
@@ -66,19 +77,27 @@ class SlidingWindowSampler(TaskIndexSampler):
         return self.task_order[max(0, task_index-self.window_size+1):task_index+1]
 
 
-class ContinualSampler(abc.ABC):
-    """Provides Wrapper abstraction around (optional) label non-IID sampler for Federated Learning"""
+class ContinuousSampler(DistributedSamplerWrapper):
+    """Wrapper class to wrap as abstraction around (optional) label non-IID sampler for Federated Learning. Thereby,
+    allowing for FederatedDataset implementations to be 'mapped' into continual learning datasets while still
+    benefiting form non-IID data loading through separate abstractions."""
 
-    def __init__(self,
-                 dataset: FedDataset,
-                 sampler: DistributedSamplerWrapper,
-                 task_indices_sampler: TaskIndexSampler,
-                 task_to_label: Dict[int, List[int]],
-                 args=(5, 42),
-                 indices = None,
-                 labels_to_indices = None,
-                 task_to_indices = None
-                 ):
+    def __init__(
+            self,
+            dataset: FedDataset,
+            num_replicas,
+            rank,
+            sampler: DistributedSamplerWrapper,
+            task_indices_sampler: TaskIndexSampler,
+            task_to_label: Dict[int, List[int]],
+            args=(5, 42),
+            indices: List[int] = None,
+            labels_to_indices: List[int, List[int]] = None,
+            task_to_indices: List[int, List[int]] = None,
+            train: bool = False,
+            test: bool = False,
+            valid: bool = False,
+        ):
         """
         @param dataset: Underlying dataset object (required for labels).
         @type dataset:
@@ -91,6 +110,14 @@ class ContinualSampler(abc.ABC):
             fine labels, this will eighter be a list of length 1, or of length #classes in a task.
         @type task_to_label:
         """
+        if train:
+            super_dataset = dataset.train_dataset
+        elif test:
+            super_dataset = dataset.test_dataset
+        elif valid:
+            raise Exception('Validation splits are WIP in Freddie.')
+
+        super().__init__(super_dataset, num_replicas=num_replicas, rank=rank)
         self.limit, self.seed = args
 
         self.dataset = dataset
@@ -101,36 +128,47 @@ class ContinualSampler(abc.ABC):
         self.labels_to_indices = dict() if labels_to_indices is None else labels_to_indices
         self.task_to_indices = dict() if task_to_indices is None else task_to_indices
         self.indices = [] if indices is None else indices
+        self.train, self.validation, self.test = train, valid, test
         if labels_to_indices is None and task_to_indices is None:
             self.build_indices()
 
-    def build_indices(self):
+    def build_indices(self) -> None:
         """Helper function to pre-compute indices to construct tasks given a task index provided a mapping of tasks to
         labels for a supervised FedDataset.
         @return: None
         @rtype: None
         """
         # random = np.random.RandomState(self.seed)
-        label_list = np.array(self.dataset.train_dataset.target)
-        unique_labels = label_list.unique()
+        if self.train:
+            dataset = self.dataset.train_dataset
+        elif self.test:
+            dataset = self.dataset.test_dataset
+        else:
+            raise NotImplementedError("Validation datasets are WIP.")
+
+        label_list = np.array(dataset.targets)
+        unique_labels = np.unique(label_list)
         for target in unique_labels:
             self.labels_to_indices[target] = np.where(label_list == target)
 
-        for task, task_labels in self.task_to_labels:
+        for task, task_labels in self.task_to_labels.items():
             task_sample_indices = np.concatenate([
                 self.labels_to_indices[target] for target in task_labels
             ])
+            # Get the intersection between the labels of the task and those 'available' to the client (following the
+            # clients (potential) non-IID sampler).
             task_sub_samples = np.in1d(task_sample_indices, np.array(self.subsampler.indices), assume_unique=True)
+            # Store build indices.
             self.task_to_indices[task] = task_sub_samples
 
 
-    def set_task_(self, task_idx):
+    def set_task_(self, task_idx: int) -> None:
         """Inplace method to set the task_index of a client. This will leverage the provided Task Indices subsampler
         to ensure that all the corresponding labels of a task are loaded. Note that this function will change the
         indicises in-place, and must thus be used *before* passing to a DataLoader.
-        @param task_idx:
-        @type task_idx:
-        @return:
+        @param task_idx: Current task to be 'masked' out by the sampler.
+        @type task_idx: int
+        @return: None
         @rtype:
         """
         tasks_till_task_idx = self.task_indices_sampler.task_indices(task_idx)
@@ -141,159 +179,25 @@ class ContinualSampler(abc.ABC):
                 self.labels_to_indices[target] for target in task_labels
             ])
             # Get fast intersection leveraging
-            subsample_intersection = np.in1d(self.task_indices, np.array(self.subsampler.indices), assume_unique=True)
-            self.indices.append(subsample_intersection)
+            subsample_intersection = self.task_indices[np.in1d(self.task_indices, np.array(self.subsampler.indices), assume_unique=True)[None,:]]
+            self.indices.extend(subsample_intersection)
 
-    def copy(self):
-        return ContinualSampler(
-            self.dataset, self.subsampler, self.task_indices_sampler, self.task_to_labels, args=(self.limit, self.seed),
-            indices=[], labels_to_indices=self.labels_to_indices, task_to_indices=self.task_to_indices)
-    def set_task(self, task_idx):
+    def copy(self) -> ContinuousSampler:
+        """Helper method to create copy to prevent the need to re-compute indices for a dataset."""
+        return ContinuousSampler(
+            self.dataset, self.num_replicas, self.rank, self.subsampler, self.task_indices_sampler, self.task_to_labels,
+            args=(self.limit, self.seed), indices=[], labels_to_indices=self.labels_to_indices,
+            task_to_indices=self.task_to_indices)
+
+    def set_task(self, task_idx) -> ContinuousSampler:
         """Method to set the task_index of a client. This will leverage the provided Task Indices subsampler to ensure
         that all the corresponding labels of a task are loaded. Note that this returns a new instance with the same
         pre-computed lookup directories. However, with different task_index.
-        @param task_idx:
-        @type task_idx:
-        @return:
-        @rtype:
+        @param task_idx: Task index that is requested by the callee.
+        @type task_idx: int
+        @return: Copy of the current sampler, with updated indices for the next set of
+        @rtype: ContinuousSampler
         """
         new_continual_sampler = self.copy()
         new_continual_sampler.set_task_(task_idx)
         return new_continual_sampler
-
-
-class ContinuousSampler(DistributedSamplerWrapper):
-    """
-    A sampler that limits the number of labels per client
-    The number of clients must <= than number of labels
-    """
-
-    def __init__(
-            self,
-            dataset: FedDataset,
-            num_replicas: int,
-            rank: int,
-            partitioning: str,
-            num_tasks: int,
-            args=(5, 42)):
-        limit, seed = args
-        self.num_tasks = num_tasks
-        self.partition = partitioning
-        self.task_idx = 0
-        super(ContinuousSampler, self).__init__(dataset, num_replicas, rank, seed)
-
-        # Column based sampling
-        # We assume that the dataset has labels
-
-
-        tasks = np.random.permutation(20)[:args.task]
-
-
-        # Coarse labels:
-        coarse_labels = sparse2coarse(self.dataset.targets)
-
-
-        
-        # if(self.labelType == "finecoarse"):
-        #     zipped = zip(self.ldata, self.targets, self.extra_targets)
-        # else:
-        #     zipped = zip(self.ldata, self.targets) #ldata contains the images, targets contains the corresponding fine label (label from 0-99 for cifar-100)
-
-
-        # self.sort_zipped = sorted(zipped, key=lambda x: x[1]) #sorts the zipped data and labels based on the label number
-        # self.task_datasets = []
-        # samples = len(self.data) // task_num
-        # for i in range(task_num):
-        #     task_dataset = []
-        #     for j in range(samples):
-        #         if(self.labelType == "finecoarse"):
-        #             fine_label_orig = self.sort_zipped[i * samples + j][2]
-        #             # fine_label_fixed = labelMapper(fine_label_orig, i)
-        #             # task_dataset.append((self.sort_zipped[i * samples + j][0], fine_label_fixed))
-        #             task_dataset.append((self.sort_zipped[i * samples + j][0], self.sort_zipped[i * samples + j][2]))
-        #         else:
-        #             task_dataset.append(self.sort_zipped[i * samples + j])
-        #     self.task_datasets.append(task_dataset)
-
-        # if(self.labelType == "coarse"):
-        #     self.targets.extend(entry['coarse_labels'])
-        # elif self.labelType == "finecoarse": #case where we want to group based on coarse labels but use fine labels for training
-        #     self.targets.extend(entry["coarse_labels"])
-        #     self.extra_targets.extend(entry['fine_labels'])
-        # else:
-        #     self.targets.extend(entry['fine_labels'])
-
-
-
-
-        # # This is the code block for the column partitioning
-        # for task in tasks:
-        #     task_dataset = dataset[task].data
-        #     chunk_size = len(task_dataset)//num_users
-        #     # remainder = len(task_dataset)%num_users #discard the remainder
-        #     client_id = 0
-        #     for i in range(0, len(task_dataset), chunk_size):
-        #         dict_users[client_id].append(task_dataset[i:i + chunk_size])
-        #         client_id = (client_id + 1)%num_users
-        #     # if(remainder != 0):
-        #     #     dict_users[0].append(task_dataset[-remainder:])
-
-
-
-        # labels_per_client = int(np.floor(self.n_labels / self.n_clients))
-        # remaining_labels = self.n_labels - labels_per_client
-        # labels = list(range(self.n_labels))  # list of labels to distribute
-        # clients = list(range(self.n_clients))  # keeps track of which clients should still be given a label
-        # client_labels = [set() for n in range(self.n_clients)]  # set of labels given to each client
-        # random.seed(seed)  # seed, such that the same result can be obtained multiple times
-        # print(client_labels)
-
-        # label_order = random.sample(labels, len(labels))
-        # client_label_dict = {}
-        # for client_id in clients:
-        #     client_label_dict[client_id] = []
-        #     for _ in range(labels_per_client):
-        #         chosen_label = label_order.pop()
-        #         client_label_dict[client_id].append(chosen_label)
-        #         client_labels[client_id].add(chosen_label)
-        # client_label_dict['rest'] = label_order
-
-        # indices = []
-        # ordered_by_label = self.order_by_label(dataset)
-        # labels = client_label_dict[self.client_id]
-        # for label in labels:
-        #     n_samples = int(len(ordered_by_label[label]))
-        #     clients = [c for c, s in enumerate(client_labels) if label in s]  # find out which clients have this label
-        #     index = clients.index(self.client_id)  # find the position of this client
-        #     start_index = index * n_samples  # inclusive
-        #     if rank == self.n_clients:
-        #         end_index = len(ordered_by_label[label])  # exclusive
-        #     else:
-        #         end_index = start_index + n_samples  # exclusive
-
-        #     indices += ordered_by_label[label][start_index:end_index]
-
-        # # Last part is uniform sampler
-        # rest_indices = []
-        # for l in client_label_dict['rest']:
-        #     rest_indices += ordered_by_label[l]
-        # filtered_rest_indices = rest_indices[self.rank:self.total_size:self.num_replicas]
-        # indices += filtered_rest_indices
-        # random.seed(seed + self.client_id)  # give each client a unique shuffle
-        # random.shuffle(indices)  # shuffle indices to spread the labels
-
-        # self.indices = indices
-
-
-        # Currently the wrong implementation but it works in essence.
-        indices = list(range(len(self.dataset)))
-        # Calculate the size of each task, assuming uniform distribution of (underlying) dataset.
-        total_task_size = self.total_size // args.tasks
-        task_indices = indices[self.task_idx * total_task_size:(self.task_idx+1) * total_task_size]
-        self.indices = task_indices[self.rank:total_task_size:self.n_clients]
-
-    def next_task(self):
-        self.task_idx += 1
-
-    def set_task(self, idx: int):
-        self.task_idx = idx

@@ -270,6 +270,9 @@ class ContinuousClient(Client):
         running_loss = 0.0
         final_running_loss = 0.0
         self.logger.info(f"[RD-{round_id}] kicking of local continuous training for {num_epochs} local epochs")
+        # FIXME: Add means to compute task_id given round ID.
+        task_id = ...
+        train_loader = self.dataset.get_train_loader(task_id=task_id)
         for local_epoch in range(num_epochs):
             effective_epoch = round_id * num_epochs + local_epoch
             progress = f'[RD-{round_id}][LE-{local_epoch}][EE-{effective_epoch}]'
@@ -278,7 +281,6 @@ class ContinuousClient(Client):
                 # an order or data to re-occur during training.
                 self.dataset.train_sampler.set_epoch(effective_epoch)
 
-            train_loader = self.dataset.get_train_loader(round_id=round_id)
             training_cardinality = len(train_loader)
             self.logger.info(f'{progress}{self.id}: Number of training samples: {training_cardinality}')
             for i, (inputs, labels) in enumerate(train_loader, 0):
@@ -314,6 +316,7 @@ class ContinuousClient(Client):
         @rtype: Tuple[float, float, np.array]
         """
         start_time = time.time()
+        # FIXME: Add means to calculate task_id given current
         task_id = ...
         accuracies = []
         counts = []
@@ -321,10 +324,9 @@ class ContinuousClient(Client):
         with torch.no_grad():
             # Currently this is evaluating the Average accuracy for client i by looping over the tasks with size T
             for task in range(task_id + 1):
-                test_loader = self.dataset.get_test_loader(task_id=task)
                 correct, total = 0, 0
                 test_loss = 0
-                for (images, labels) in test_loader:
+                for (images, labels) in self.dataset.get_test_loader(task_id=task):
                     images, labels = images.to(self.device), labels.to(self.device)
                     # FIXME: Add shared/local weights to the model.
                     outputs = self.net(images)
@@ -353,7 +355,6 @@ class ContinuousClient(Client):
         return mean_lss, mean_acc, total
 
 
-
 def _client_constructor(client_name: str, rank: int, config: FedLearnerConfig) -> Client:
     """Constructor helper method for standard Federated Learning Clients.
 
@@ -364,6 +365,7 @@ def _client_constructor(client_name: str, rank: int, config: FedLearnerConfig) -
     @param config: Federated Learning configuration object.
     """
     return Client(client_name, rank, config.world_size, config)
+
 
 def _continous_client_constructor(client_name: str, rank: int, config) -> ContinuousClient:
     """Constructor helper method for Continuous Federated Learning Clients.
@@ -379,7 +381,7 @@ def _continous_client_constructor(client_name: str, rank: int, config) -> Contin
 
 
 def get_constructor(config: FedLearnerConfig) -> Callable[[str, int, FedLearnerConfig, ...], Client]:
-    """Helper method to infer required consturctor method to properly instantiate and prepare different Client's during
+    """Helper method to infer required constructor method to instantiate and prepare different Client's during
     experiments.
     @param config: FederatedLearning Configuration for current experiment.
     @type config: FedLearnerConfig
@@ -388,7 +390,8 @@ def get_constructor(config: FedLearnerConfig) -> Callable[[str, int, FedLearnerC
     @rtype: Callable[[str, int, FedLearnerConfig, ...], Client]
     """
     raise not NotImplementedError("Point to ")
-    continous = ...
+    # FIXME: Implement way to discern between continous and ordinary federated learning.
+    continous = False
 
     if continous:
         return _continous_client_constructor

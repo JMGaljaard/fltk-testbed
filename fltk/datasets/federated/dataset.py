@@ -1,9 +1,13 @@
 from __future__ import annotations
 from abc import abstractmethod
 
+from torch.utils.data.dataloader import DataLoader
+from torch.utils.data.dataset import Dataset
 import typing
 
+from fltk.samplers.continuous_sampler import ContinuousSampler
 from fltk.util import getLogger
+
 
 if typing.TYPE_CHECKING:
     from fltk.util.config import FedLearnerConfig
@@ -49,48 +53,77 @@ class FedDataset:
     def init_test_dataset(self):
         pass
 
-class ContinualFedDataset(FedDataset):
-    """FIXME: Implement advancing of rounds (either at ConintualLearning dataset, or concrete instances).
-    Training round aware dataset allowing to simulate continual learning during the experiment as round_id's advance
-    during training.
+
+class ContinousFedDataset(FedDataset):
+    """Wrapper Dataset for Federeated Learning Dataset, to allow to arbitrary Federated datasets to be mapped to
+     the Continuous Learning domain. Leveraging a Wrapper around non-IID data sampling and a Task sampler for the
+     continuous domain, allows for the clients to retrieve the correct data, without having to do bookkeeping
+     of which samples correspond to which class.
     """
-    def get_train_loader(self, round_id: int = -1):
+
+    def __init__(self, federated_dataset: FedDataset, train_task_sampler: ContinuousSampler,
+                 test_task_sampler: ContinuousSampler, args: FedLearnerConfig):
+        super().__init__(args)
+        self.wrapped_dataset = federated_dataset
+        self.train_task_sampler = train_task_sampler
+        self.test_task_sampler = test_task_sampler
+        self.train_task_to_loader = dict()
+        self.test_task_to_loader = dict()
+
+    def _get_loader(self, task_id, dataset: Dataset, sampler: ContinuousSampler):
+        """Private shared logic for updating a task specific loader and instantiating the loader.
+        """
+        sampler = sampler.set_task(task_id)
+        task_train_loader = DataLoader(
+            dataset,
+            batch_size=self.args.batch_size,
+            sampler=sampler
+        )
+        return task_train_loader
+
+    def get_train_loader(self, task_id: int = -1):
         """Retrieve training data loader for task(s) that are available during the federated round round_id.
-        @param round_id: Round identifier passed by the Federator, used as proxy for passing of time.
-        @type round_id: int
+        @param task_id: Task identifier passed computed by the Client, used as proxy for passing of time.
+        @type task_id: int
         @return: Train data loader with shifted task if requested.
         @rtype: DataLoader
         """
-        assert round_id > -1
-        return self.train_loader
 
-    def get_test_loader(self, round_id: int = -1):
+        if task_id in self.train_task_to_loader:
+            return self.train_task_to_loader[task_id]
+        loader = self._get_loader(task_id, self.wrapped_dataset.train_dataset, self.train_task_sampler)
+        self.train_task_to_loader[task_id] = loader
+        return loader
+
+    def get_test_loader(self, task_id: int = -1):
         """Retrieve test data loader for task(s) that are available during the federated round round_id.
-        @param round_id: Round identifier passed by the Federator, used as proxy for passing of time.
-        @type round_id: int
+        @param task_id: Task identifier computed by the Client, used as proxy for passing of time.
+        @type task_id: int
         @return: Test data loader with shifted task if requested.
         @rtype: DataLoader
         """
-        assert round_id > -1
-        return self.test_loader
+        task_id = task_id
+        if task_id in self.test_task_to_loader:
+            return self.test_task_to_loader[task_id]
+        loader = self._get_loader(task_id, self.wrapped_dataset.test_dataset, self.test_task_sampler)
+        self.test_task_to_loader[task_id] = loader
+        return loader
 
-    def get_train_sampler(self, round_id: int = -1):
+    def get_train_sampler(self, task_id: int = -1):
         """Retrieve training data (sub)sampler for training data during the indicated round `round_id`.
-        @param round_id: Round identifier passed by the Federator, used as proxy for passing of time.
-        @type round_id: int
+        @param task_id: Task identifier computed by the Client, used as proxy for passing of time.
+        @type task_id: int
         @return: Data subsampler for data subsampling by the testing dataloader.
         @rtype: Sampler
         """
-        assert round_id > -1
-        return self.train_sampler
+        return self.train_task_sampler
 
-    def get_test_sampler(self, round_id: int = -1):
+    def get_test_sampler(self, task_id: int = -1):
         """Retrieve testing data (sub)sampler for training data during the indicated round `round_id`.
-        @param round_id: Round identifier passed by the Federator, used as proxy for passing of time.
-        @type round_id: int
+        @param task_id: Task identifier computed by the Client, used as proxy for passing of time.
+        @type task_id: int
         @return: Data subsampler for data subsampling by the training dataloader.
         @rtype: Sampler
         """
-        assert round_id > -1
-        return self.test_sampler
+        return self.test_task_sampler
 
