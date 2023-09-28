@@ -187,7 +187,7 @@ class ContinuousSampler(DistributedSamplerWrapper):
         return ContinuousSampler(
             self.dataset, self.num_replicas, self.rank, self.subsampler, self.task_indices_sampler, self.task_to_labels,
             args=(self.limit, self.seed), indices=[], labels_to_indices=self.labels_to_indices,
-            task_to_indices=self.task_to_indices)
+            task_to_indices=self.task_to_indices, train=self.train, valid=self.validation, test=self.test)
 
     def set_task(self, task_idx) -> ContinuousSampler:
         """Method to set the task_index of a client. This will leverage the provided Task Indices subsampler to ensure
