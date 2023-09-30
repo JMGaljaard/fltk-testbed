@@ -4,8 +4,7 @@ from typing import Optional
 import numpy as np
 import torch
 
-from fltk.util.config.distributed_config import ExecutionConfig
-from fltk.util.config import DistLearnerConfig
+from fltk.util.config import learner_config, dist_config
 
 
 # noinspection PyUnresolvedReferences
@@ -26,7 +25,7 @@ def cuda_reproducible_backend(cuda: bool) -> None:
         torch.backends.cudnn.deterministic = False
 
 
-def init_reproducibility(config: Optional[ExecutionConfig] = None, seed: Optional[int] = None) -> None:
+def init_reproducibility(config: Optional[dist_config.ExecutionConfig] = None, seed: Optional[int] = None) -> None:
     """
     Function to pre-set all seeds for libraries used during training. Allows for re-producible network initialization,
     and non-deterministic number generation. Allows to prevent 'lucky' draws in network initialization.
@@ -49,7 +48,7 @@ def init_reproducibility(config: Optional[ExecutionConfig] = None, seed: Optiona
 
 
 
-def init_learning_reproducibility(params: DistLearnerConfig) -> None:
+def init_learning_reproducibility(params: learner_config.DistLearnerConfig) -> None:
     """
     Function to pre-set all seeds for libraries used during training. Allows for re-producible network initialization,
     and non-deterministic number generation. Allows to prevent 'lucky' draws in network initialization.

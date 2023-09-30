@@ -1,16 +1,16 @@
 from __future__ import annotations
+
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, List
+from typing import TYPE_CHECKING
 
 from dataclasses_json import config, dataclass_json
 
-
-from typing import TYPE_CHECKING
+from fltk.util.config.definitions import OrchestratorType
 
 if TYPE_CHECKING:
-    from fltk.util.config.definitions import OrchestratorType
     from fltk.util.config import DistLearnerConfig
 
 

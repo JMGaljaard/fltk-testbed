@@ -4,8 +4,10 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import fltk.util.config.distributed_config as dist_config
 import fltk.util.config.experiment_config as exp_config
 import fltk.util.config.learner_config as learn_config
+from fltk.util.config.distributed_config import DistributedConfig
 
 
 def retrieve_config_network_params(conf: learn_config.FedLearnerConfig, nic=None, host=None):

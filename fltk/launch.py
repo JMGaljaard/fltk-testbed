@@ -1,11 +1,10 @@
 # pylint: disable=unused-argument
 import logging
 import os
-from typing import Callable, Optional, NewType, Any, List, Tuple, Dict
-
 from argparse import Namespace
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
+from typing import Callable, Optional, NewType, Any, List, Tuple, Dict
 
 import torch.distributed as dist
 from kubernetes import config
@@ -13,14 +12,13 @@ from torch.distributed import rpc
 
 from fltk.core import FedFederatorConstructor, FedClientConstructor, Federator
 from fltk.core.distributed import DistClient, download_datasets
-from fltk.util.config.definitions.orchestrator import get_orchestrator, get_arrival_generator, OrchestratorType
 from fltk.nets.util.reproducability import init_reproducibility, init_learning_reproducibility
 from fltk.util.cluster.client import ClusterManager
-
 from fltk.util.cluster.worker import should_distribute
-from fltk.util.config import DistributedConfig, FedLearnerConfig, retrieve_config_network_params, get_learning_param_config, \
-    DistLearnerConfig
-
+from fltk.util.config import retrieve_config_network_params, get_learning_param_config
+from fltk.util.config.definitions.orchestrator import get_orchestrator, get_arrival_generator, OrchestratorType
+from fltk.util.config.distributed_config import DistributedConfig
+from fltk.util.config.learner_config import FedLearnerConfig, DistLearnerConfig
 from fltk.util.environment import retrieve_or_init_env, retrieve_env_config
 
 # Define types for clarity in execution
