@@ -275,7 +275,6 @@ class SimulatedOrchestrator(Orchestrator):
                                                                             u_id=curr_task.id,
                                                                             replication=experiment_replication)
                 self._create_config_maps(config_dict)
-
                 job_to_start = client_manager.construct_job(self._config, curr_task, configmap_name_dict)
                 self._logger.info(f"Deploying on cluster: {curr_task.id}")
                 self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)

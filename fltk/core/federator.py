@@ -411,7 +411,7 @@ class ContinousFederator(Federator):
         self.logger.info(f'[Round {com_round_id:>3}] Round duration is {duration} seconds')
 
 
-def _federator_constructor(client_name: str, rank: int, config: FedLearnerConfig) -> Federator:
+def _federator_constructor(client_name: str, rank: int, config: FedLearnerConfig, *args, **kwargs) -> Federator:
     """Constructor helper method for standard Federated Learning Clients.
 
     @param client_name: Identifier of the federator during experiment.
@@ -445,8 +445,7 @@ def get_constructor(config: FedLearnerConfig) -> Callable[[str, int, FedLearnerC
         arguments.
     @rtype: Callable[[str, int, FedLearnerConfig, ...], Federator]
     """
-    raise not NotImplementedError("Point to ")
-    continous = ...
+    continous = False
 
     if continous:
         return _continous_federator_constructor
@@ -459,7 +458,7 @@ class FedFederatorConstructor:
     Default behavior is to instantiate a standard Federated Learning client.
     """
 
-    def construct(self, config: FedLearnerConfig, client_name: str, rank: int, world_size: int, *args, **kwargs):
+    def construct(self, config: FedLearnerConfig, client_name: str, rank: int, *args, **kwargs):
         """
         Constructor method to automatically infer the required type of Client from the provided learner configuration.
 
@@ -479,4 +478,4 @@ class FedFederatorConstructor:
         @rtype: Client
         """
         constructor = get_constructor(config)
-        return constructor(client_name, rank, world_size, config, *args, **kwargs)
+        return constructor(client_name, rank, config, *args, **kwargs)

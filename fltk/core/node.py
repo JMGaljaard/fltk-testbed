@@ -172,7 +172,7 @@ class Node(abc.ABC):
         """
         self.logger.info("Updating parameters received from Federator.")
 
-        if len(new_params) != len(self.net.get_state_dict()):
+        if len(new_params) != len(self.net.state_dict()):
             self.logger.info("Updating parameters with partial update.")
 
         if exclude is not None:

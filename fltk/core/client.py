@@ -355,7 +355,7 @@ class ContinuousClient(Client):
         return mean_lss, mean_acc, total
 
 
-def _client_constructor(client_name: str, rank: int, config: FedLearnerConfig) -> Client:
+def _client_constructor(client_name: str, rank: int, config: FedLearnerConfig, *args, **kwargs) -> Client:
     """Constructor helper method for standard Federated Learning Clients.
 
     @param client_name: Identifier of the client during experiment.
@@ -367,7 +367,7 @@ def _client_constructor(client_name: str, rank: int, config: FedLearnerConfig) -
     return Client(client_name, rank, config.world_size, config)
 
 
-def _continous_client_constructor(client_name: str, rank: int, config) -> ContinuousClient:
+def _continous_client_constructor(client_name: str, rank: int, config: FedLearnerConfig, *args, **kwargs) -> ContinuousClient:
     """Constructor helper method for Continuous Federated Learning Clients.
 
     @param client_name: Identifier of the client during experiment.
@@ -389,7 +389,6 @@ def get_constructor(config: FedLearnerConfig) -> Callable[[str, int, FedLearnerC
         arguments.
     @rtype: Callable[[str, int, FedLearnerConfig, ...], Client]
     """
-    raise not NotImplementedError("Point to ")
     # FIXME: Implement way to discern between continous and ordinary federated learning.
     continous = False
 
@@ -403,7 +402,7 @@ class FedClientConstructor:
     """Constructor object allowing the caller to defer the inference of the type of required Client ot the Constructor.
     Default behavior is to instantiate a standard Federated Learning client.
     """
-    def construct(self, config: FedLearnerConfig, client_name: str, rank: int, world_size: int, *args, **kwargs):
+    def construct(self, config: FedLearnerConfig, client_name: str, rank: int, *args, **kwargs):
         """
         Constructor method to automatically infer the required type of Client from the provided learner configuration.
 
@@ -423,4 +422,4 @@ class FedClientConstructor:
         @rtype: Client
         """
         constructor = get_constructor(config)
-        return constructor(client_name, rank, world_size, config, *args, **kwargs)
+        return constructor(client_name, rank, config, *args, **kwargs)

@@ -109,7 +109,7 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, re
     # TODO: Move ClusterManager one level up, to allow for re-use
     cluster_manager = ClusterManager()
     arrival_generator = get_arrival_generator(conf, args.experiment)
-    orchestrator = get_orchestrator(conf, cluster_manager, arrival_generator)
+    orchestrator = get_orchestrator(conf, cluster_manager, arrival_generator, )
 
     pool = ThreadPool(3)
 
@@ -288,7 +288,7 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
                 rpc_backend_options=options,
         )
         fed_client_constructor = FedClientConstructor()
-        client_node = fed_client_constructor.construct(r_conf, f'client{rank}', rank, r_conf.world_size)
+        client_node = fed_client_constructor.construct(config=r_conf, client_name=f'client{rank}', rank=rank)
         client_node.remote_registration()
         client_node.run()
     else:
@@ -300,13 +300,15 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
                 rpc_backend_options=options
         )
         fed_federator_constructor = FedFederatorConstructor()
-        federator_node = fed_federator_constructor.construct('federator', LEADER_RANK, r_conf.world_size, r_conf)
+
+        federator_node = fed_federator_constructor.construct(config=r_conf, client_name='federator', rank=LEADER_RANK)
         try:
             federator_node.run()
         except Exception as e:
-            logging.critical(f"Federator failed execution with reason: {e}."
-                             f"{e.with_traceback()}")
+            logging.critical(f"Federator failed execution with reason: {e}.")
+            raise e
         federator_node.stop_all_clients()
+
     print('Ending program')
     exit(0)
 
