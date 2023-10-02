@@ -18,6 +18,7 @@ spec:
     spec:
       containers:
         - name: federation-lab-server
+          imagePullPolicy: {{ .Values.fltk.pullPolicy }}
           command:
             - tensorboard
           args:

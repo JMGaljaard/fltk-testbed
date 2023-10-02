@@ -2,6 +2,8 @@ fltk:
     outputDir: output
     configDir: config
     workDir: /opt/federation-lab
+    pullPolicy: Always # SET TO NEVER IN CASE OF LOCAL DEPLOYMENT
+
 provider:
     domain: gcr.io
     projectName: test-bed-fltk

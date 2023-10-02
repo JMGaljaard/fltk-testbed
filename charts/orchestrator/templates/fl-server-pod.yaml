@@ -23,6 +23,7 @@ spec:
         - name: IMAGE_NAME
           value: {{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName }}
       image: {{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName }}
+      pullPolicy: {{ .Values.fltk.pullPolicy }}
       name: federation-lab-server
       resources:
         limits:
