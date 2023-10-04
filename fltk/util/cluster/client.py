@@ -234,14 +234,18 @@ def _generate_command(config: DistributedConfig, task: tasks.ArrivalTask) -> Lis
 
 def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V1ResourceRequirements,
                            name: str = "pytorch", requires_mount: bool = False,
-                           experiment_name: str = None) -> V1Container:
+                           experiment_name: str = None,
+                           pull_policy: str = 'Always') -> V1Container:
     """
     Function to build the Master worker container. This requires the LOG PV to be mounted on the expected
     logging directory. Make sure that any changes in the Helm charts are also reflected here.
     @param conf: configuration object that contains specifics to properly start a client.
     @type conf: DistributedConfig
     @param name: Required name for deployment. Don't change unless you really need to.
-    @type name: str
+    @param pull_policy: Which pull policy to use for the Pods' containers. If the experiment is running locally on a
+        MiniKube instance for testing, this parameter should be set to 'Never', or the container name should be changed
+        during deployment (see helm charts).
+    @type pull_policy: str
     @return: Unique experiment name, this will not be checked during deployment for uniqueness.
     @rtype: str
     """
@@ -268,7 +272,7 @@ def _build_typed_container(conf: DistributedConfig, cmd: List[str], resources: V
     container = V1Container(name=name,
                             image=conf.cluster_config.image,
                             command=cmd,
-                            image_pull_policy='Always',
+                            image_pull_policy=pull_policy,
                             # Set the resources to the pre-generated resources
                             resources=resources,
                             volume_mounts=volume_mounts)
@@ -327,7 +331,7 @@ class DeploymentBuilder:
                                                                                    limits=typed_req_dict)
 
     def build_container(self, task: tasks.ArrivalTask, conf: DistributedConfig,
-                        configmap_name_dict: Optional[Dict[str, str]]):
+                        configmap_name_dict: Optional[Dict[str, str]], pull_policy: str = 'Always'):
         """
         Function to build container descriptions for deploying from within an Orchestrator pod.
         @param conf: configuration object that contains specifics to properly start a client.
@@ -336,6 +340,10 @@ class DeploymentBuilder:
         @type task: DistributedArrivalTask
         @param configmap_name_dict: Mapping of pod names to their respective K8s configMap names.
         @type configmap_name_dict: Optional[Dict[str, str]]
+        @param pull_policy: Which pull policy to use for the Pods' containers. If the experiment is running locally on a
+        MiniKube instance for testing, this parameter should be set to 'Never', or the container name should be changed
+        during deployment (see helm charts).
+        @type pull_policy: str
         @return:
         @rtype:
         """
@@ -344,7 +352,8 @@ class DeploymentBuilder:
             cmd = _generate_command(conf, task)
             container = _build_typed_container(conf, cmd, curr_resource,
                                                requires_mount=not indx,
-                                               experiment_name=configmap_name_dict[tpe])
+                                               experiment_name=configmap_name_dict[tpe],
+                                               pull_policy=pull_policy)
             self._build_description.typed_containers[tpe] = container
 
     def build_tolerations(self, tols: Optional[List[Tuple[str, Optional[str], str, str]]] = None,
@@ -461,7 +470,8 @@ class DeploymentBuilder:
 
 
 def construct_job(conf: DistributedConfig, task: tasks.ArrivalTask,
-                  configmap_name_dict: Optional[Dict[str, str]] = None) -> KubeflowOrgV1PyTorchJob:
+                  configmap_name_dict: Optional[Dict[str, str]] = None,
+                  pull_policy: str = 'Always') -> KubeflowOrgV1PyTorchJob:
     """
     Function to build a Job, based on the specifications of an ArrivalTask, and the general configuration of the
     DistributedConfig.
@@ -477,7 +487,7 @@ def construct_job(conf: DistributedConfig, task: tasks.ArrivalTask,
     dp_builder = DeploymentBuilder()
     dp_builder.create_identifier(task)
     dp_builder.build_resources(task)
-    dp_builder.build_container(task, conf, configmap_name_dict)
+    dp_builder.build_container(task, conf, configmap_name_dict, pull_policy=pull_policy)
     dp_builder.build_tolerations()
     dp_builder.build_template(configmap_name_dict)
     dp_builder.build_spec(task)

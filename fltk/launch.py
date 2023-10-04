@@ -81,7 +81,9 @@ def get_arrival_generator_args(conf: DistributedConfig, replication: int) -> (Li
     return args, kwd_args
 
 
-def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, replication: int = 0):
+def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, replication: int = 0,
+                      pull_policy: str = 'Always'
+                ):
     """
     Default runner for the Orchestrator that is based on KubeFlow
     @param args: Commandline arguments passed to the execution. Might be removed in a future commit.
@@ -91,6 +93,8 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, re
     @type conf: Optional[DistributedConfig]
     @param replication: Replication index of the experiment, zero indexed.
     @type replication: int
+    @param pull_policy: Which Kubernetes pull policy to use for deployed Pods.
+    @type pull_policy: str
     @return: None
     @rtype: None
     """
@@ -109,7 +113,7 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, re
     # TODO: Move ClusterManager one level up, to allow for re-use
     cluster_manager = ClusterManager()
     arrival_generator = get_arrival_generator(conf, args.experiment)
-    orchestrator = get_orchestrator(conf, cluster_manager, arrival_generator, )
+    orchestrator = get_orchestrator(conf, cluster_manager, arrival_generator, pull_policy=pull_policy)
 
     pool = ThreadPool(3)
 
@@ -315,7 +319,7 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
 
 def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC] = None, host: Optional[Host] = None,
                    prefix: Optional[Prefix] = None, args: Optional[Namespace] = None,
-                   conf: Optional[DistributedConfig] = None) -> None:
+                   conf: Optional[DistributedConfig] = None, pull_policy='Always') -> None:
     """
     Function to launch Orchestrator for execution with provided configurations. Currently, this assumes that a single
     Orchestrator is started that manages all the training jobs withing the K8s cluster.
@@ -336,6 +340,10 @@ def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NI
     @type args: Namespace
     @param conf: (Optional) Distributed configuration object for running in a Kubernetes cluster.
     @type conf: DistributedConfig
+    @param pull_policy: Which pull policy to use during deployment. If the experiment is running locally on a MiniKube
+        instance for testing, this parameter should be set to 'Never', or the container name should be changed
+        during deployment (see helm charts).
+    @type pull_policy: str
     @return: None
     @rtype: None
     """
@@ -350,7 +358,7 @@ def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NI
         logging.info(f"Starting with experiment replication: {replication} with seed: {experiment_seed}")
         init_reproducibility(conf.execution_config)
         try:
-            exec_orchestrator(args=args, conf=conf, replication=replication)
+            exec_orchestrator(args=args, conf=conf, replication=replication, pull_policy=pull_policy)
         except Exception as e:
             logging.info(f"Execution of replication {replication} with seed {experiment_seed} failed."
                          f"Reason: {e}")

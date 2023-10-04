@@ -7,6 +7,7 @@ import fltk.core.distributed as distributed
 import fltk.util.task as tasks
 
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from fltk.util.config import DistributedConfig
     from fltk.util.cluster import ClusterManager
@@ -19,7 +20,11 @@ class OrchestratorType(Enum):
     SIMULATED = 'simulated'
 
 
-def get_orchestrator(config: DistributedConfig, cluster_manager: ClusterManager, arrival_generator: tasks.ArrivalGenerator) -> distributed.Orchestrator:
+def get_orchestrator(
+        config: DistributedConfig,
+        cluster_manager: ClusterManager,
+        arrival_generator: tasks.ArrivalGenerator,
+        pull_policy: str = 'Always') -> distributed.Orchestrator:
     """Retrieve Orchestrator type given a Distributed (experiment) configuration. This allows for defining the
     type of experiment (Batch or Simulated arrivals) once, and letting the Orchestrator implementation
     make sure that the tasks are scheduled correctly.
@@ -39,10 +44,10 @@ def get_orchestrator(config: DistributedConfig, cluster_manager: ClusterManager,
     }
 
     orchestrator_type = __lookup.get(config.cluster_config.orchestrator.orchestrator_type, None)
-    return orchestrator_type(cluster_manager, arrival_generator, config)
+    return orchestrator_type(cluster_manager, arrival_generator, config, pull_policy=pull_policy)
 
 
-def get_arrival_generator(config: DistributedConfig, experiment: str) -> ArrivalGenerator:
+def get_arrival_generator(config: DistributedConfig, experiment: str) -> tasks.ArrivalGenerator:
     """Retrieval function to create generator functions
 
     Args:
@@ -54,8 +59,8 @@ def get_arrival_generator(config: DistributedConfig, experiment: str) -> Arrival
 
     """
     __lookup = {
-        OrchestratorType.BATCH: SequentialArrivalGenerator,
-        OrchestratorType.SIMULATED: SimulatedArrivalGenerator
+        OrchestratorType.BATCH: tasks.SequentialArrivalGenerator,
+        OrchestratorType.SIMULATED: tasks.SimulatedArrivalGenerator
     }
 
     return __lookup.get(config.cluster_config.orchestrator.orchestrator_type, None)(Path(experiment))
