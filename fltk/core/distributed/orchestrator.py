@@ -11,8 +11,7 @@ from typing import OrderedDict, Dict, Type, Set, Union, Optional, List
 from typing import TYPE_CHECKING
 
 from jinja2 import Environment, FileSystemLoader
-from kubeflow.training import TrainingClient
-from kubeflow.training.constants.constants import KUBEFLOW_GROUP, OPERATOR_VERSION, PYTORCHJOB_PLURAL
+from kubeflow.training import TrainingClient, KubeflowOrgV1PyTorchJob, KubeflowOrgV1JobStatus, KubeflowOrgV1JobCondition
 from kubernetes import client
 from kubernetes.client import V1ConfigMap, V1ObjectMeta
 
@@ -139,7 +138,8 @@ class Orchestrator(DistNode, abc.ABC):
     completed_tasks: Set[tasks.arrival_task._ArrivalTask] = set()
     SLEEP_TIME = 5
 
-    def __init__(self, cluster_mgr: client_manager.ClusterManager, arv_gen: tasks.ArrivalGenerator, config: DistributedConfig):
+    def __init__(self, cluster_mgr: client_manager.ClusterManager, arv_gen: tasks.ArrivalGenerator, config: DistributedConfig,
+                 pull_policy: str = 'Always'):
         self._logger = logging.getLogger('Orchestrator')
         self._logger.debug("Loading in-cluster configuration")
         self._cluster_mgr = cluster_mgr
@@ -149,6 +149,7 @@ class Orchestrator(DistNode, abc.ABC):
         # API to interact with the cluster.
         self._client = TrainingClient()
         self._v1 = client.CoreV1Api()
+        self.pull_policy = pull_policy
 
     def stop(self) -> None:
         """
@@ -187,16 +188,15 @@ class Orchestrator(DistNode, abc.ABC):
         namespace = self._config.cluster_config.namespace
         self._logger.info(f'Clearing old jobs in current namespace: {namespace}')
 
-        for job in self._client.get(namespace=self._config.cluster_config.namespace)['items']:
-            job_name = job['metadata']['name']
+        jobs: List[KubeflowOrgV1PyTorchJob] = self._client.list_pytorchjobs(namespace='test')
+        for job in jobs:
+            job_name = job.metadata.name
             self._logger.info(f'Deleting: {job_name}')
             try:
-                self._client.custom_api.delete_namespaced_custom_object(
-                        KUBEFLOW_GROUP,
-                        OPERATOR_VERSION,
-                        namespace,
-                        PYTORCHJOB_PLURAL,
-                        job_name)
+                self._client.delete_pytorchjob(
+                        name=job_name,
+                        namespace=namespace
+                )
             except Exception as excp:
                 self._logger.warning(f'Could not delete: {job_name}. Reason: {excp}')
 
@@ -225,8 +225,12 @@ class Orchestrator(DistNode, abc.ABC):
             task_to_move = set()
             for task in self.deployed_tasks:
                 try:
-                    job_status = self._client.get_job_status(name=f"trainjob-{task.id}",
+                    job: KubeflowOrgV1PyTorchJob = self._client.get_pytorchjob(name=f"trainjob-{task.id}",
                                                              namespace='test')
+                    kubeflow_job_status: KubeflowOrgV1JobStatus = job.status
+                    job_conditions: List[KubeflowOrgV1JobCondition] = kubeflow_job_status.conditions
+                    if len(job_conditions) > 0:
+                        job_status = job_conditions[-1].status
                 except Exception as e:
                     logging.debug(msg=f"Could not retrieve job_status for {task.id}")
                     job_status = None
@@ -247,8 +251,9 @@ class SimulatedOrchestrator(Orchestrator):
     are supported.
     """
 
-    def __init__(self, cluster_mgr: client_manager.ClusterManager, arrival_generator: ArrivalGenerator, config: DistributedConfig):
-        super().__init__(cluster_mgr, arrival_generator, config)
+    def __init__(self, cluster_mgr: client_manager.ClusterManager, arrival_generator: tasks.ArrivalGenerator, config: DistributedConfig,
+                 pull_policy: str = 'Always'):
+        super().__init__(cluster_mgr, arrival_generator, config, pull_policy=pull_policy)
 
     def run(self, clear: bool = False, experiment_replication: int = -1) -> None:
         self._alive = True
@@ -266,7 +271,7 @@ class SimulatedOrchestrator(Orchestrator):
 
             # Deploy all pending tasks without logic
             while not self.pending_tasks.empty():
-                curr_task: ArrivalTask = self.pending_tasks.get()
+                curr_task: tasks.ArrivalTask = self.pending_tasks.get()
                 self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
                 # Create persistent logging information. A these will not be deleted by the Orchestrator, as such, they
                 # allow you to retrieve information of experiments after removing the PytorchJob after completion.
@@ -275,9 +280,9 @@ class SimulatedOrchestrator(Orchestrator):
                                                                             u_id=curr_task.id,
                                                                             replication=experiment_replication)
                 self._create_config_maps(config_dict)
-                job_to_start = client_manager.construct_job(self._config, curr_task, configmap_name_dict)
+                job_to_start = client_manager.construct_job(self._config, curr_task, configmap_name_dict, pull_policy=self.pull_policy)
                 self._logger.info(f"Deploying on cluster: {curr_task.id}")
-                self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
+                self._client.create_pytorchjob(job_to_start, namespace=self._config.cluster_config.namespace)
                 self.deployed_tasks.add(curr_task)
 
                 # TODO: Extend this logic in your real project, this is only meant for demo purposes
@@ -296,8 +301,9 @@ class BatchOrchestrator(Orchestrator):
     Orchestrator implementation to allow for running all experiments that were defined in one go.
     """
 
-    def __init__(self, cluster_mgr: client_manager.ClusterManager, arrival_generator: ArrivalGenerator, config: DistributedConfig):
-        super().__init__(cluster_mgr, arrival_generator, config)
+    def __init__(self, cluster_mgr: client_manager.ClusterManager, arrival_generator: tasks.ArrivalGenerator, config: DistributedConfig,
+                 pull_policy: str = 'Always'):
+        super().__init__(cluster_mgr, arrival_generator, config, pull_policy=pull_policy)
 
     def run(self, clear: bool = False,
             experiment_replication: int = 1,
@@ -316,8 +322,8 @@ class BatchOrchestrator(Orchestrator):
         self._alive = True
         try:
             if wait_historical:
-                curr_jobs = self._client.get(namespace="test")
-                jobs = [job['metadata']['name'] for job in curr_jobs['items']]
+                curr_jobs: List[KubeflowOrgV1PyTorchJob] = self._client.list_pytorchjobs(namespace="test")
+                jobs = [job.metadata.name for job in curr_jobs]
                 self.wait_for_jobs_to_complete(others=jobs)
             start_time = time.time()
 
@@ -343,7 +349,7 @@ class BatchOrchestrator(Orchestrator):
         # 2. Schedule all tasks that arrived previously
         while not self.pending_tasks.empty():
             # Do blocking request to priority queue
-            curr_task: ArrivalTask = self.pending_tasks.get()
+            curr_task: tasks.ArrivalTask = self.pending_tasks.get()
             self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
 
             # Create persistent logging information. A these will not be deleted by the Orchestrator, as such
@@ -356,7 +362,7 @@ class BatchOrchestrator(Orchestrator):
 
             job_to_start = client_manager.construct_job(self._config, curr_task, configmap_name_dict)
             self._logger.info(f"Deploying on cluster: {curr_task.id}")
-            self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
+            self._client.create_pytorchjob(job_to_start, namespace=self._config.cluster_config.namespace)
             self.deployed_tasks.add(curr_task)
             # Either wait to complete, or continue. Note that the orchestrator currently does not support scaling
             # experiments up or down.
