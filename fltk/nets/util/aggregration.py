@@ -1,6 +1,8 @@
 import collections
 from typing import Union, List
 import torch
+import typing
+
 
 def average_nn_parameters(parameters):
     """
@@ -16,8 +18,8 @@ def average_nn_parameters(parameters):
 
 
 def drop_local_weights(
-        new_params: collections.OrderedDict[str, torch.Tensor],
-        local_params: collections.OrderedDict[str, torch.Tensor],
+        new_params: typing.OrderedDict[str, torch.Tensor],
+        local_params: typing.OrderedDict[str, torch.Tensor],
         exclude: Union[str, List[str]]):
     """Helper function to remove (partial) parameters from a shared set of global parameters. Intended for Federated
     Continual Learning experiments where local models of clients are expected to have a local component in addition

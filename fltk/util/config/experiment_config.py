@@ -8,8 +8,7 @@ from typing import Optional, Union, Tuple, Dict, Any, MutableMapping, Type, Orde
 
 from dataclasses_json import dataclass_json, LetterCase, config
 
-if typing.TYPE_CHECKING:
-    import fltk.util.config.definitions as defs
+import fltk.util.config.definitions as defs
 
 
 def _none_factory() -> None:
