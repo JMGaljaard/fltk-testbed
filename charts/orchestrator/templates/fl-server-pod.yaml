@@ -17,13 +17,14 @@ spec:
         - cluster
         - {{ .Values.fltk.configDir }}/{{ .Values.orchestrator.runtime.configurationFile }}  # The configuration file (generator settings & logging)
         - {{ .Values.fltk.configDir }}/{{ .Values.orchestrator.runtime.experimentFile }}     # The experiment file (arrivals)
+        - --pull_policy={{ .Values.fltk.pullPolicy }}
       env:
         - name: PYTHONUNBUFFERED
           value: "1"
         - name: IMAGE_NAME
           value: {{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName }}
       image: {{ .Values.provider.domain }}/{{ .Values.provider.projectName }}/{{ .Values.provider.imageName }}
-      pullPolicy: {{ .Values.fltk.pullPolicy }}
+      imagePullPolicy: {{ .Values.fltk.pullPolicy }}
       name: federation-lab-server
       resources:
         limits:

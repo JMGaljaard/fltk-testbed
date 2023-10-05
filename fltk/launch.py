@@ -319,7 +319,7 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
 
 def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC] = None, host: Optional[Host] = None,
                    prefix: Optional[Prefix] = None, args: Optional[Namespace] = None,
-                   conf: Optional[DistributedConfig] = None, pull_policy='Always') -> None:
+                   conf: Optional[DistributedConfig] = None) -> None:
     """
     Function to launch Orchestrator for execution with provided configurations. Currently, this assumes that a single
     Orchestrator is started that manages all the training jobs withing the K8s cluster.
@@ -340,10 +340,6 @@ def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NI
     @type args: Namespace
     @param conf: (Optional) Distributed configuration object for running in a Kubernetes cluster.
     @type conf: DistributedConfig
-    @param pull_policy: Which pull policy to use during deployment. If the experiment is running locally on a MiniKube
-        instance for testing, this parameter should be set to 'Never', or the container name should be changed
-        during deployment (see helm charts).
-    @type pull_policy: str
     @return: None
     @rtype: None
     """
@@ -358,7 +354,8 @@ def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NI
         logging.info(f"Starting with experiment replication: {replication} with seed: {experiment_seed}")
         init_reproducibility(conf.execution_config)
         try:
-            exec_orchestrator(args=args, conf=conf, replication=replication, pull_policy=pull_policy)
+            exec_orchestrator(args=args, conf=conf, replication=replication, pull_policy=args.pull_policy)
         except Exception as e:
             logging.info(f"Execution of replication {replication} with seed {experiment_seed} failed."
                          f"Reason: {e}")
+            raise e

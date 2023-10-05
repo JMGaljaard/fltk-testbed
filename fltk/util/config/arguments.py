@@ -52,6 +52,7 @@ def _create_cluster_parser(subparsers) -> None:
     cluster_parser.add_argument('config', type=str)
     cluster_parser.add_argument('experiment', type=str)
     cluster_parser.add_argument('-l', '--local', type=bool, default=False)
+    cluster_parser.add_argument('--pull_policy', type=str, default='Always')
 
 
 def _create_container_util_parser(subparsers) -> None:
